@@ -1,0 +1,5 @@
+.claude/
+node_modules/
+*.mp4
+Thumbs.db
+.DS_Store

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inscripción — LEF</title>
+<meta name="description" content="Inscríbete en LEF: comparte tus datos, elige tu nivel y horario, y confirma por WhatsApp.">
+<link rel="icon" href="assets/logo-isotype.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html" aria-label="LEF — Learn English Fluently">
+      <img src="assets/logo-horizontal.png" alt="LEF — Learn English Fluently">
+    </a>
+    <nav class="links">
+      <a href="niveles.html" data-i18n="nav_levels">Niveles</a>
+      <a href="sistema.html" data-i18n="nav_system">Sis. aprendizaje</a>
+      <a href="ofrecemos.html" data-i18n="nav_offer">Qué ofrecemos</a>
+      <a href="inscripcion.html" data-i18n="nav_inscripcion">Inscripción</a>
+    </nav>
+    <div class="actions">
+      <div class="lang-toggle">
+        <button type="button" data-lang="es">ES</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <a class="wa-icon-link wa-target" href="#" target="_blank" rel="noopener" aria-label="WhatsApp">
+        <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
+      </a>
+      <a class="btn btn-dark btn-sm" href="inscripcion.html" data-i18n="nav_enroll">Inscribirme</a>
+      <button type="button" class="menu-btn" aria-label="Menú" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="drawer-overlay"></div>
+<aside class="drawer">
+  <div class="drawer-top">
+    <img src="assets/logo-horizontal.png" alt="LEF — Learn English Fluently">
+    <button type="button" class="drawer-close" aria-label="Cerrar menú">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="links">
+    <a href="niveles.html" data-i18n="nav_levels">Niveles</a>
+    <a href="sistema.html" data-i18n="nav_system">Sis. aprendizaje</a>
+    <a href="ofrecemos.html" data-i18n="nav_offer">Qué ofrecemos</a>
+    <a href="inscripcion.html" data-i18n="nav_inscripcion">Inscripción</a>
+  </nav>
+  <div class="drawer-actions">
+    <div class="lang-toggle">
+      <button type="button" data-lang="es">ES</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+    <a class="btn btn-dark" href="inscripcion.html" data-i18n="nav_enroll">Inscribirme</a>
+  </div>
+</aside>
+
+<main>
+
+<section class="block block-papel page-hero reveal">
+  <div class="wrap">
+    <span class="eyebrow" data-i18n="page_enroll_eyebrow">Empieza hoy</span>
+    <h1 data-i18n="page_enroll_title">Inscripción</h1>
+    <p data-i18n="page_enroll_intro">Inscribirte en LEF toma cuatro pasos simples — desde compartir tus datos hasta confirmar por WhatsApp. Completa el formulario y nos pondremos en contacto para terminar el proceso juntos.</p>
+  </div>
+</section>
+
+<section class="block block-papel" id="enroll">
+  <div class="wrap reveal">
+    <div class="enroll-box" style="margin-bottom:34px;">
+      <div class="steps-bar">
+        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">1</span><span data-i18n="step_1">Tus datos</span></div></div>
+        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">2</span><span data-i18n="step_2">Elige tu nivel</span></div></div>
+        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">3</span><span data-i18n="step_3">Elige tu horario</span></div></div>
+        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">4</span><span data-i18n="step_4">Revisa y confirma</span></div></div>
+      </div>
+    </div>
+
+    <form class="form-card" id="enroll-form">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="f-name" data-i18n="form_name">Nombre completo<span class="req">*</span></label>
+          <input id="f-name" name="name" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="f-phone" data-i18n="form_phone">Número de WhatsApp<span class="req">*</span></label>
+          <input id="f-phone" name="phone" type="tel" autocomplete="tel" required>
+        </div>
+        <div class="field">
+          <label for="f-email" data-i18n="form_email">Correo electrónico<span class="req">*</span></label>
+          <input id="f-email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="f-age" data-i18n="form_age">Edad</label>
+          <input id="f-age" name="age" type="number" min="5" max="99">
+        </div>
+        <div class="field">
+          <label for="f-city" data-i18n="form_city">Ciudad</label>
+          <input id="f-city" name="city" type="text" autocomplete="address-level2">
+        </div>
+        <div class="field">
+          <label for="f-level" data-i18n="form_level">Nivel (si ya lo sabes)</label>
+          <select id="f-level" name="level">
+            <option value="" data-i18n="form_level_opt">Aún no sé — lo confirmamos en clase</option>
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-schedule" data-i18n="form_schedule">Horario preferido</label>
+          <select id="f-schedule" name="schedule">
+            <option value="" data-i18n="form_schedule_opt">Sin preferencia</option>
+            <option value="Mañana" data-i18n="form_schedule_morning">Mañana</option>
+            <option value="Tarde" data-i18n="form_schedule_afternoon">Tarde</option>
+            <option value="Noche" data-i18n="form_schedule_evening">Noche</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-foot">
+        <p data-i18n="form_note">Este formulario no se envía solo: al presionar "Continuar" se abre WhatsApp con tus datos listos para enviar, para que nuestro equipo confirme tu cupo.</p>
+        <button type="submit" class="btn btn-dark">
+          <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
+          <span data-i18n="form_submit">Continuar por WhatsApp</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="top">
+    <div class="col brand-col">
+      <img src="assets/logo-horizontal.png" alt="LEF — Learn English Fluently">
+      <p data-i18n="footer_tagline">Un programa de inglés online estructurado, diseñado para una competencia comunicativa real.</p>
+      <div class="social-row">
+        <a href="https://www.facebook.com/profile.php?id=100067494009346" target="_blank" rel="noopener" aria-label="Facebook">
+          <img src="assets/icon-facebook.png" alt="Facebook">
+        </a>
+        <a href="https://instagram.com/Lefcenter" target="_blank" rel="noopener" aria-label="Instagram">
+          <img src="assets/icon-instagram.png" alt="Instagram">
+        </a>
+        <a href="mailto:lefenglishcenter@gmail.com" aria-label="Email">
+          <img src="assets/icon-email.png" alt="Email">
+        </a>
+        <a href="tel:+573001234567" aria-label="Llamar">
+          <img src="assets/icon-phone.png" alt="Llamar">
+        </a>
+        <a class="wa-target" href="#" target="_blank" rel="noopener" aria-label="WhatsApp">
+          <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
+        </a>
+        <span aria-label="LinkedIn — próximamente" title="Próximamente" style="opacity:.45;cursor:default;">
+          <img src="assets/icon-linkedin.png" alt="LinkedIn">
+        </span>
+      </div>
+    </div>
+    <div class="col">
+      <h4 data-i18n="footer_col_program">Programa</h4>
+      <a href="niveles.html" data-i18n="nav_levels">Niveles</a>
+      <a href="sistema.html" data-i18n="nav_system">Sis. aprendizaje</a>
+      <a href="ofrecemos.html" data-i18n="nav_offer">Qué ofrecemos</a>
+      <a href="inscripcion.html" data-i18n="nav_inscripcion">Inscripción</a>
+    </div>
+    <div class="col">
+      <h4 data-i18n="footer_col_contact">Contacto</h4>
+      <a class="wa-target" href="#" target="_blank" rel="noopener" data-i18n="footer_whatsapp">WhatsApp</a>
+      <a href="mailto:lefenglishcenter@gmail.com">lefenglishcenter@gmail.com</a>
+      <span data-i18n="footer_location">Barranquilla, Colombia</span>
+    </div>
+  </div>
+  <div class="bottom">
+    <span>LEF · Learn English Fluently</span>
+    <div class="legal-links">
+      <a href="preguntas-frecuentes.html" data-i18n="nav_faq">Preguntas frecuentes</a>
+      <a href="politica-privacidad.html" data-i18n="nav_privacy">Política de privacidad</a>
+      <a href="terminos-uso.html" data-i18n="nav_terms">Términos de uso</a>
+    </div>
+    <span data-i18n="footer_right">Barranquilla, Colombia · 2026</span>
+  </div>
+</footer>
+
+<a class="faq-float" href="preguntas-frecuentes.html" aria-label="Preguntas frecuentes" title="Preguntas frecuentes">
+  <img src="assets/icon-faq.png" alt="Preguntas frecuentes">
+</a>
+
+<a class="wa-float wa-target" href="#" target="_blank" rel="noopener" aria-label="WhatsApp">
+  <img src="assets/icon-whatsapp-green.png" alt="WhatsApp">
+</a>
+
+<script src="script.js"></script>
+</body>
+</html>
