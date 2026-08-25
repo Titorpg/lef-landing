@@ -153,12 +153,12 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .mask-defs{position:absolute;width:0;height:0;overflow:hidden;}
 .hero{position:relative;overflow:hidden;}
 .hero.hero-light{background:linear-gradient(160deg,#eef2f9 0%,var(--azul-niebla) 100%);color:var(--ink);}
-.hero-shell{position:relative;z-index:2;display:flex;align-items:center;min-height:clamp(560px,72vh,720px);}
+.hero-shell{position:relative;z-index:2;display:flex;align-items:center;min-height:clamp(460px,56vh,580px);}
 .hero-text-col{
-  width:min(100%,480px);
-  padding:64px 24px 64px 6vw;
+  width:min(100%,620px);
+  padding:64px 20px 64px 6vw;
 }
-.hero h1{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:clamp(26px,3vw,42px);line-height:1.05;margin-bottom:22px;}
+.hero h1{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:clamp(38px,5vw,66px);line-height:1.0;margin-bottom:22px;}
 .hero h1 span{display:block;white-space:nowrap;}
 .hero .sub{font-size:clamp(17px,1.9vw,21px);max-width:460px;margin-bottom:32px;line-height:1.55;}
 .hero.hero-light .sub{color:var(--grafito);font-weight:600;font-size:clamp(18px,2vw,23px);line-height:1.5;}
@@ -169,7 +169,7 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 
 /* ---------- hero carousel (full-bleed, cloud-fade left edge) ---------- */
 .hero-carousel{
-  position:absolute;top:0;bottom:0;left:13vw;right:6vw;z-index:1;overflow:hidden;
+  position:absolute;top:0;bottom:0;left:15vw;right:6vw;z-index:1;overflow:hidden;
   -webkit-mask-image:url(#cloudMask);mask-image:url(#cloudMask);
 }
 .hero-carousel-track{position:relative;width:100%;height:100%;}
@@ -522,9 +522,7 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
     position:relative;top:auto;bottom:auto;left:auto;right:auto;
     height:280px;-webkit-mask-image:none;mask-image:none;
   }
-  .hero-badges{display:grid;grid-template-columns:1fr 1fr;}
-  .hero-badges .badge-chip{justify-content:center;}
-  .hero-badges .badge-chip:last-child{grid-column:1/-1;}
+  .hero-badges{display:flex;flex-wrap:wrap;}
   .offer-split{grid-template-columns:1fr;gap:30px;}
   .levels-grid{grid-template-columns:1fr;}
   .steps-bar{flex-direction:column;}
