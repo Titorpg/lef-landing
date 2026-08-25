@@ -63,43 +63,49 @@
 </aside>
 
 <!-- ============ HERO ============ -->
+<svg class="mask-defs" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="cloudEdge" x="-30%" y="-30%" width="160%" height="160%" primitiveUnits="objectBoundingBox">
+      <feTurbulence type="fractalNoise" baseFrequency="8 20" numOctaves="3" seed="11" result="noise"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.12" xChannelSelector="R" yChannelSelector="G" result="displaced"></feDisplacementMap>
+      <feGaussianBlur in="displaced" stdDeviation="0.015"></feGaussianBlur>
+    </filter>
+    <linearGradient id="cloudGradient" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000"></stop>
+      <stop offset="0.42" stop-color="#000"></stop>
+      <stop offset="0.62" stop-color="#fff"></stop>
+      <stop offset="1" stop-color="#fff"></stop>
+    </linearGradient>
+    <mask id="cloudMask" maskContentUnits="objectBoundingBox">
+      <rect x="0" y="0" width="1" height="1" fill="url(#cloudGradient)" filter="url(#cloudEdge)"></rect>
+    </mask>
+  </defs>
+</svg>
 <section class="hero hero-light" id="top">
-  <div class="inner">
-    <div class="hero-grid">
-      <div class="hero-text">
-        <span class="eyebrow" data-i18n="hero_tag">Academia de inglés online · Barranquilla, Colombia</span>
-        <h1>
-          <span data-i18n="hero_h1_1">Habla inglés</span><br>
-          <span class="line2" data-i18n="hero_h1_2">con fluidez.</span>
-        </h1>
-        <p class="sub" data-i18n="hero_sub">Un programa online estructurado que combina claridad académica, práctica contextualizada y progreso medible — desde tu primera clase.</p>
-        <div class="cta-row">
-          <a class="btn btn-dark" href="inscripcion.html" data-i18n="hero_cta_primary">Inscribirme ahora</a>
-          <a class="btn btn-whatsapp wa-target" href="#" target="_blank" rel="noopener">
-            <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
-            <span data-i18n="hero_cta_secondary">Escríbenos por WhatsApp</span>
-          </a>
-        </div>
-        <div class="hero-badges">
-          <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact1">4 niveles CEFR</span></span>
-          <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact2">Máx. 8 estudiantes</span></span>
-          <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact3">Enfoque en speaking</span></span>
-        </div>
+  <div class="hero-shell">
+    <div class="hero-text-col">
+      <span class="eyebrow" data-i18n="hero_tag">Academia de inglés online · Barranquilla, Colombia</span>
+      <h1>
+        <span data-i18n="hero_h1_1">Habla inglés</span><br>
+        <span class="line2" data-i18n="hero_h1_2">con fluidez.</span>
+      </h1>
+      <p class="sub" data-i18n="hero_sub">Un programa online estructurado que combina claridad académica, práctica contextualizada y progreso medible — desde tu primera clase.</p>
+      <div class="cta-row">
+        <a class="btn btn-dark" href="inscripcion.html" data-i18n="hero_cta_primary">Inscribirme ahora</a>
+        <a class="btn btn-whatsapp wa-target" href="#" target="_blank" rel="noopener">
+          <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
+          <span data-i18n="hero_cta_secondary">Escríbenos por WhatsApp</span>
+        </a>
       </div>
-      <div class="hero-visual">
-        <div class="collage">
-          <div class="ph-img c-main branded">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            <span class="ph-label" data-i18n="ph_label">Imagen pendiente</span>
-            <span class="ph-sub" data-i18n="ph_collage">Foto pendiente</span>
-          </div>
-          <div class="ph-img c-a">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          </div>
-          <div class="ph-img c-b">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          </div>
-        </div>
+      <div class="hero-badges">
+        <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact1">4 niveles CEFR</span></span>
+        <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact2">Máx. 8 estudiantes</span></span>
+        <span class="badge-chip"><span class="dot"></span><span data-i18n="hero_fact3">Enfoque en speaking</span></span>
+      </div>
+    </div>
+    <div class="hero-carousel">
+      <div class="hero-carousel-track">
+        <div class="hero-slide is-active" style="background-image:url('assets/photo-materials.jpg')"></div>
       </div>
     </div>
   </div>
@@ -216,9 +222,9 @@
 <section class="block block-niebla" id="founder">
   <div class="wrap reveal founder-block">
     <div class="founder-portrait">
-      <img src="assets/photo-founder.png" alt="Luis Antonio Caballero Torres — Fundador y Director Académico de LEF">
+      <img src="assets/photo-founder.png" alt="Luis Antonio Caballero Torrez — Fundador y Director Académico de LEF">
     </div>
-    <h3 class="founder-name">Luis Antonio Caballero Torres</h3>
+    <h3 class="founder-name">Luis Antonio Caballero Torrez</h3>
     <p class="founder-role" data-i18n="founder_role">Fundador y Director Académico</p>
     <p class="founder-quote" id="founder-quote"></p>
   </div>

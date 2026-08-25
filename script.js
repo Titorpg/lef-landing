@@ -470,6 +470,17 @@ function initReveal(){
   document.querySelectorAll(".reveal").forEach(el => io.observe(el));
 }
 
+function initHeroCarousel(){
+  const slides = document.querySelectorAll(".hero-slide");
+  if (slides.length < 2) return;
+  let i = 0;
+  setInterval(() => {
+    slides[i].classList.remove("is-active");
+    i = (i + 1) % slides.length;
+    slides[i].classList.add("is-active");
+  }, 5000);
+}
+
 function initFounderQuotes(){
   const el = document.getElementById("founder-quote");
   if (!el) return;
@@ -498,6 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initReveal();
   initDrawer();
   initEnrollForm();
+  initHeroCarousel();
   initFounderQuotes();
   document.querySelectorAll("nav.links a, .drawer nav.links a").forEach(a => {
     if (a.getAttribute("href") === location.pathname.split("/").pop() || (location.pathname.endsWith("/") && a.getAttribute("href") === "index.html")) {
