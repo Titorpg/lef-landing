@@ -125,13 +125,16 @@ const I18N = {
     payment_t: "Payment gateway",
     payment_p: "Soon you'll be able to pay for your enrollment securely online through Wompi.",
     payment_cta: "Pay with Wompi (coming soon)",
-    commit_h2: "Student commitment",
-    commit_icon_alt: "Handshake with checkmark icon",
-    commit_1: "Participate actively in every session",
-    commit_2: "Maintain respectful communication",
-    commit_3: "Attend classes consistently",
-    commit_4: "Complete assigned tasks",
-    commit_5: "Take responsibility for their learning",
+    diff_eyebrow: "What sets us apart",
+    founder_role: "Founder and Academic Director",
+    founder_quotes: [
+      "Learning English goes beyond memorizing grammar rules or following traditional methods.",
+      "Fluency isn't born from perfection, but from the consistency with which we dare to speak.",
+      "At LEF we don't train students who memorize English; we shape people who think and express themselves in it.",
+      "Every module we design starts from a simple question: will this actually serve a student in real life?",
+      "Real progress is measured by the confidence with which someone dares to speak, not by an exam.",
+      "We believe in learning that supports rather than pressures — because fear has never taught anyone to speak better."
+    ],
     close_support: "Structured cycles, real conversation, and continuous support — from your first class.",
     close_cta_primary: "Enroll now",
     close_cta_secondary: "Chat on WhatsApp",
@@ -303,13 +306,16 @@ const I18N = {
     payment_t: "Pasarela de pagos",
     payment_p: "Próximamente podrás pagar tu inscripción directamente en línea, de forma segura, a través de Wompi.",
     payment_cta: "Pagar con Wompi (próximamente)",
-    commit_h2: "Compromiso del estudiante",
-    commit_icon_alt: "Ícono de apretón de manos con visto bueno",
-    commit_1: "Participar activamente en cada sesión",
-    commit_2: "Mantener una comunicación respetuosa",
-    commit_3: "Asistir a clases de forma constante",
-    commit_4: "Completar las tareas asignadas",
-    commit_5: "Asumir la responsabilidad de su propio aprendizaje",
+    diff_eyebrow: "Nuestro diferencial",
+    founder_role: "Fundador y Director Académico",
+    founder_quotes: [
+      "Aprender inglés va más allá de memorizar reglas gramaticales o seguir métodos tradicionales.",
+      "La fluidez no nace de la perfección, sino de la constancia con la que nos atrevemos a hablar.",
+      "En LEF no formamos estudiantes que memorizan inglés; formamos personas que piensan y se expresan en él.",
+      "Cada módulo que diseñamos parte de una pregunta simple: ¿esto le servirá a un estudiante en la vida real?",
+      "El verdadero progreso se mide en la confianza con la que alguien se atreve a hablar, no en un examen.",
+      "Creemos en un aprendizaje que acompaña, no que presiona — porque el miedo nunca ha enseñado a nadie a hablar mejor."
+    ],
     close_support: "Ciclos estructurados, conversación real y acompañamiento continuo — desde tu primera clase.",
     close_cta_primary: "Inscribirme ahora",
     close_cta_secondary: "Escríbenos por WhatsApp",
@@ -464,11 +470,35 @@ function initReveal(){
   document.querySelectorAll(".reveal").forEach(el => io.observe(el));
 }
 
+function initFounderQuotes(){
+  const el = document.getElementById("founder-quote");
+  if (!el) return;
+  let i = 0;
+  const render = () => {
+    const lang = document.documentElement.getAttribute("lang") || "es";
+    const quotes = I18N[lang].founder_quotes;
+    el.textContent = `“${quotes[i % quotes.length]}”`;
+  };
+  render();
+  setInterval(() => {
+    el.classList.add("fade-out");
+    setTimeout(() => {
+      i++;
+      render();
+      el.classList.remove("fade-out");
+    }, 400);
+  }, 5500);
+  document.querySelectorAll(".lang-toggle button").forEach(btn => {
+    btn.addEventListener("click", render);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initLang();
   initReveal();
   initDrawer();
   initEnrollForm();
+  initFounderQuotes();
   document.querySelectorAll("nav.links a, .drawer nav.links a").forEach(a => {
     if (a.getAttribute("href") === location.pathname.split("/").pop() || (location.pathname.endsWith("/") && a.getAttribute("href") === "index.html")) {
       a.classList.add("active");
