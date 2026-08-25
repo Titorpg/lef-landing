@@ -38,7 +38,6 @@ a{color:inherit;}
   margin-bottom:18px;
 }
 .tag.on-dark{border-color:#34343a;color:var(--azul-niebla);}
-.tag.lg{font-size:14px;padding:9px 18px;letter-spacing:.12em;font-weight:600;margin-bottom:20px;}
 
 h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:clamp(30px,4.2vw,50px);line-height:1.03;margin-bottom:14px;}
 .sec-sub{font-size:clamp(17px,1.8vw,20px);color:var(--grafito);max-width:640px;}
@@ -69,6 +68,8 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .btn-outline-dark{background:transparent;color:var(--ink);border-color:var(--ink);}
 .btn-outline-light{background:transparent;color:var(--papel);border-color:#3d3d42;}
 .btn-outline-light:hover{border-color:var(--plata);background:rgba(255,255,255,.05);}
+.btn-whatsapp{background:#25D366;color:#fff;border-color:#25D366;}
+.btn-whatsapp img.icn-inline{filter:brightness(0) invert(1);}
 .btn-sm{padding:10px 18px;font-size:13px;}
 .btn svg{width:16px;height:16px;flex:none;}
 .btn img.icn-inline,.wa-number img.icn-inline{width:19px;height:19px;flex:none;display:inline-block;vertical-align:middle;}
@@ -166,9 +167,8 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .hero.hero-light{background:linear-gradient(160deg,#eef2f9 0%,var(--azul-niebla) 100%);color:var(--ink);}
 .hero.hero-light .sub{color:var(--grafito);font-weight:600;font-size:clamp(19px,2.3vw,25px);line-height:1.5;}
 .hero.hero-light h1 .line2{
-  color:var(--papel);-webkit-text-stroke:3px var(--ink);
-  paint-order:stroke fill;
-  filter:drop-shadow(0 6px 14px rgba(16,16,16,.28));
+  color:var(--papel);
+  filter:drop-shadow(0 2px 3px rgba(16,16,16,.45)) drop-shadow(0 10px 22px rgba(16,16,16,.35));
 }
 
 /* ---------- hero badges (chip style) ---------- */
@@ -391,7 +391,10 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
   margin-top:26px;background:var(--azul);color:var(--papel);border-radius:16px;padding:36px;
   display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;
 }
-.discover-level span{font-weight:600;font-size:clamp(22px,2.8vw,29px);line-height:1.2;max-width:600px;}
+.discover-level span{
+  font-family:'Archivo Black',sans-serif;text-transform:uppercase;
+  font-size:clamp(24px,3.4vw,38px);line-height:1.15;max-width:620px;
+}
 .discover-level .btn{background:var(--papel);color:var(--ink);flex:none;}
 @media(max-width:860px){.qualify-grid{grid-template-columns:1fr;}}
 
