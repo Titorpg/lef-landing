@@ -72,68 +72,12 @@
 </section>
 
 <section class="block block-papel" id="enroll">
-  <div class="wrap reveal">
-    <div class="enroll-box" style="margin-bottom:34px;">
-      <div class="steps-bar">
-        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">1</span><span data-i18n="step_1">Tus datos</span></div></div>
-        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">2</span><span data-i18n="step_2">Elige tu nivel</span></div></div>
-        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">3</span><span data-i18n="step_3">Elige tu horario</span></div></div>
-        <div class="seg"><div class="bar"></div><div class="lab"><span class="dot">4</span><span data-i18n="step_4">Revisa y confirma</span></div></div>
-      </div>
+  <div class="wrap">
+    <div id="enroll-app">
+      <noscript><p>Necesitas activar JavaScript para completar la inscripción en línea. También puedes <a href="https://wa.me/573013240652">escribirnos por WhatsApp</a>.</p></noscript>
     </div>
 
-    <form class="form-card" id="enroll-form">
-      <div class="form-grid">
-        <div class="field full">
-          <label for="f-name" data-i18n="form_name">Nombre completo<span class="req">*</span></label>
-          <input id="f-name" name="name" type="text" autocomplete="name" required>
-        </div>
-        <div class="field">
-          <label for="f-phone" data-i18n="form_phone">Número de WhatsApp<span class="req">*</span></label>
-          <input id="f-phone" name="phone" type="tel" autocomplete="tel" required>
-        </div>
-        <div class="field">
-          <label for="f-email" data-i18n="form_email">Correo electrónico<span class="req">*</span></label>
-          <input id="f-email" name="email" type="email" autocomplete="email" required>
-        </div>
-        <div class="field">
-          <label for="f-age" data-i18n="form_age">Edad</label>
-          <input id="f-age" name="age" type="number" min="5" max="99">
-        </div>
-        <div class="field">
-          <label for="f-city" data-i18n="form_city">Ciudad</label>
-          <input id="f-city" name="city" type="text" autocomplete="address-level2">
-        </div>
-        <div class="field">
-          <label for="f-level" data-i18n="form_level">Nivel (si ya lo sabes)</label>
-          <select id="f-level" name="level">
-            <option value="" data-i18n="form_level_opt">Aún no sé — lo confirmamos en clase</option>
-            <option value="A1">A1</option>
-            <option value="A2">A2</option>
-            <option value="B1">B1</option>
-            <option value="B2">B2</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="f-schedule" data-i18n="form_schedule">Horario preferido</label>
-          <select id="f-schedule" name="schedule">
-            <option value="" data-i18n="form_schedule_opt">Sin preferencia</option>
-            <option value="Mañana" data-i18n="form_schedule_morning">Mañana</option>
-            <option value="Tarde" data-i18n="form_schedule_afternoon">Tarde</option>
-            <option value="Noche" data-i18n="form_schedule_evening">Noche</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-foot">
-        <p data-i18n="form_note">Este formulario no se envía solo: al presionar "Continuar" se abre WhatsApp con tus datos listos para enviar, para que nuestro equipo confirme tu cupo.</p>
-        <button type="submit" class="btn btn-whatsapp">
-          <img src="assets/icon-whatsapp-black.png" alt="WhatsApp" class="icn-inline">
-          <span data-i18n="form_submit">Continuar por WhatsApp</span>
-        </button>
-      </div>
-    </form>
-
-    <div class="payment-card reveal">
+    <div class="payment-card reveal" style="margin-top:34px;">
       <div>
         <span class="t" data-i18n="payment_t">Pasarela de pagos</span>
         <p data-i18n="payment_p">Próximamente podrás pagar tu inscripción directamente en línea, de forma segura, a través de Wompi.</p>
@@ -207,5 +151,6 @@
 <script src="assets/vendor/supabase.min.js"></script>
 <script src="supabase-config.js"></script>
 <script src="script.js"></script>
+<script src="assets/js/lef-enroll.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 26 de agosto de 2026
+Última actualización: 27 de agosto de 2026
 
 ## 🔗 Enlaces
 
@@ -9,6 +9,8 @@
 - **Repositorio (temporal, cuenta personal):** https://github.com/Titorpg/lef-landing
 - **Carpeta local:** `C:\Users\Temporal\Desktop\LEF`
 - **Backend (Supabase):** proyecto `lef-center-prod`, org LEFCENTER — https://cemrxcatbxbcipxmsnjf.supabase.co
+- **Panel admin:** https://www.lefcenter.com/admin  (cuenta `director@lefcenter.com`, contraseña temporal en `.env` → `ADMIN_TEMP_PASSWORD`, cambiar)
+- **Portal estudiante:** https://www.lefcenter.com/portal
 
 El sitio ahora corre en **Vercel** (Team `lefcenter` del cliente). No depende del computador.
 
@@ -17,7 +19,7 @@ El sitio ahora corre en **Vercel** (Team `lefcenter` del cliente). No depende de
 | Pieza | Dónde | Cuenta | Estado |
 |---|---|---|---|
 | Frontend estático | Vercel, proyecto `lef-center` | Team `lefcenter` (cliente) | ✅ desplegado en vivo |
-| Backend (BD/Auth/Storage) | Supabase, proyecto `lef-center-prod` (región us-east-1) | Org LEFCENTER (cliente) | ✅ creado, tabla `inscripciones` activa |
+| Backend (BD/Auth/Functions) | Supabase, proyecto `lef-center-prod` (región us-east-1) | Org LEFCENTER (cliente) | ✅ sistema de inscripción + facturación (base) |
 | Código fuente | GitHub `Titorpg/lef-landing` | **Personal (temporal)** | ⏳ transferir al cliente en la entrega |
 | Dominio `lefcenter.com` | DNS de terceros → Vercel | Cliente | ✅ movido a `lef-center` (apex→www, sin tocar DNS) |
 
@@ -30,25 +32,63 @@ El token y las credenciales de Supabase están en `.env` local (NO se sube — v
   Sigue vivo en `lef-center-app.vercel.app` como referencia del diseño anterior.
 - Supabase: `director@lefcenter.com's Project` (cuenta free permite 2 proyectos; ahora van 2/2)
 
-### Etapa A — hecha ✅
-El formulario de `inscripcion.html`, además de abrir WhatsApp, guarda cada inscripción en
-la tabla `public.inscripciones` de Supabase. RLS activo: el público solo puede INSERT,
-nadie lee sin autenticación. El cliente ve las inscripciones desde el panel de Supabase
-(Table Editor → `inscripciones`). Campo `estado` para seguimiento: nuevo/contactado/inscrito/descartado.
-Archivos: `supabase-config.js`, `assets/vendor/supabase.min.js`, `supabase/migrations/`, cambios en `script.js`.
+### FASE 1 — Sistema de inscripción — HECHA ✅
+Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS plano.
 
-### Etapa B — pendiente (el cliente SÍ quiere editar contenido seguido)
-Mover textos editables a tablas de Supabase (niveles, módulos, FAQ, frases del fundador,
-info general) + panel `/admin` con login (Supabase Auth) para editarlos y ver/gestionar inscripciones.
+- **Backend** (`supabase/migrations/20260827120000_sistema_inscripcion.sql`):
+  9 tablas (`modules`, `cycles`, `teachers`, `schedules`, `groups`, `students`,
+  `enrollments`, `registration_counters`, `profiles`) + funciones SECURITY DEFINER:
+  `get_public_modules`, `get_schedule_availability`, `create_enrollment`
+  (transaccional: valida cupo, detecta duplicados por correo/WhatsApp, asigna grupo,
+  genera matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`. RLS en todo.
+  La tabla `inscripciones` de la etapa A se **eliminó** (reemplazada por students+enrollments).
+- **Asistente de 4 pasos** (`inscripcion.html` + `assets/js/lef-enroll.js` + CSS en `style.css`):
+  1 Tus datos · 2 Elige nivel (12 módulos) · 3 Elige horario (cupos reales) · 4 Revisar.
+  Al confirmar: pantalla con nº de matrícula **+ botón WhatsApp** (opción b).
+- **Panel admin** (`admin.html` + `assets/js/lef-admin.js` + `assets/css/lef-panel.css`):
+  login Supabase Auth. Secciones: Inscripciones (cambiar estado), Estudiantes (crear cuenta
+  de portal), Pagos, Académico (módulos/ciclos/profesores/horarios/grupos — CRUD), Usuarios.
+- **Roles** (tabla `profiles.role`): `admin` (todo) · `teacher` (solo lectura de sus grupos)
+  · `student` (solo el portal). Helpers: `is_admin()`, `is_teacher()`, `current_student_id()`.
+  Cuenta admin única sembrada; el admin crea las demás cuentas desde el panel.
+- **Edge Function** `manage-users`: crea/edita cuentas de auth (solo admin). Sin Wompi no
+  hace falta nada más.
 
-### Etapa C — pendiente
-Mover las imágenes del sitio a Supabase Storage, gestionables desde el panel admin.
+### FASE 2 — Portal + facturación
+
+**Hecho hoy ✅** (sin Wompi, operación manual):
+- Tablas `subscriptions` + `payments`; funciones `record_payment`, `freeze_overdue_subscriptions`,
+  `get_my_billing`, `admin_billing_overview`.
+- **Portal del estudiante** (`portal.html` + `assets/js/lef-portal.js`): login, pestaña
+  **Facturación** — mensualidad, estado (al día/en mora/congelada), próximo pago, historial.
+  Botones de pago en línea visibles pero deshabilitados ("próximamente").
+- **Pestaña Pagos del admin**: crea suscripción por estudiante, registra pagos manuales
+  (efectivo/transferencia/…), congela/activa, botón "congelar cuentas vencidas".
+
+**Pendiente ⏳ (Wompi — el cliente entrega la cuenta mañana):**
+1. Cuenta Wompi del cliente (sandbox + producción) → llaves.
+2. Cobro en línea: PSE + tarjeta (checkout Wompi).
+3. Guardar tarjeta tokenizada (payment_source) para cobro recurrente.
+4. Edge Function `wompi-webhook` (confirmación de pagos) + tabla `payment_methods`.
+5. Cobro mensual automático (pg_cron + Edge Function).
+6. Congelación automática de morosos (pg_cron) — la función ya existe, falta agendarla.
+7. Consentimiento de cobro recurrente + actualizar Términos/Política (revisión legal).
+8. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
+
+### Datos de prueba en Supabase (borrar cuando entren los reales)
+- Profesores: María Rada, Luis Caballero, Daniela Ospino
+- Ciclo abierto "Sep - Oct 2026" + 5 horarios/grupos (A1.1 ×2, A1.3, A2.1, B1.1)
+- Estudiante demo: **Ana Gómez Prueba** (`ana.prueba@lef-test.com`) — matrícula LEF-2026-00001,
+  cuenta de portal activa, suscripción $180.000 con 1 pago registrado.
+- Semilla: `supabase/seed_demo.sql`. Borrable desde el panel (Académico / Estudiantes).
 
 ### Entrega / handoff
 1. GitHub: *Settings → Transfer ownership* del repo a la cuenta del cliente.
 2. Vercel: ya está en el Team del cliente — reconectar a su GitHub si quieren auto-deploy.
-3. Supabase: ya está en la org del cliente. Rotar/regenerar las claves y revocar los tokens de `.env`.
-4. Dominio: el cliente apunta el DNS a Vercel.
+3. Supabase: ya está en la org del cliente. **Regenerar** las llaves API y `manage-users`
+   secrets, cambiar la contraseña del admin, revocar los tokens de `.env`.
+4. Dominio: ya apunta a Vercel.
+5. Datos de prueba: borrarlos.
 
 ## Qué es esto
 
@@ -62,7 +102,9 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 | `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos reales (nombres y descripciones), bloque de horas de acompañamiento (16h+3h=19h) y bloque C1 de cursos adicionales |
 | `sistema.html` | Los 3 pilares del método + nota sobre el examen de validación (no punitivo) |
 | `ofrecemos.html` | Las 6 cosas que ofrece LEF (clases, club de conversación, materiales, plataforma, tutorías **al final de cada ciclo**, acompañamiento) |
-| `inscripcion.html` | Los 4 pasos de inscripción + formulario real que arma un mensaje de WhatsApp + tarjeta de pasarela de pagos Wompi (solo visual, sin integración aún) |
+| `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
+| `admin.html` | Panel administrativo (SPA, `assets/js/lef-admin.js`) — no indexado |
+| `portal.html` | Portal del estudiante — pestaña de facturación (`assets/js/lef-portal.js`) — no indexado |
 | `preguntas-frecuentes.html` | Acordeón de FAQ (contenido **inventado como placeholder**, ver abajo) |
 | `politica-privacidad.html` | Política de privacidad (borrador fundamentado en la Ley 1581 de 2012 de Colombia) |
 | `terminos-uso.html` | Términos de uso (borrador) |
