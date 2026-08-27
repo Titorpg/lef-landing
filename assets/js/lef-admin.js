@@ -29,17 +29,25 @@
   function days(arr) { return (arr || []).map(function (d) { return DAY_ES[d] || d; }).join(" "); }
   function time(t) { if (!t) return ""; var p = t.split(":"); var hh = +p[0]; return (hh % 12 || 12) + ":" + p[1] + (hh >= 12 ? "pm" : "am"); }
   var MONTHS_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  function lastDay(year, month0) { return new Date(year, month0 + 1, 0).getDate(); }
-  function ymd(year, month0, day) {
-    return year + "-" + String(month0 + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
-  }
+  function lastDay(y, m0) { return new Date(y, m0 + 1, 0).getDate(); }
+  function ymd(y, m0, d) { return y + "-" + String(m0 + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0"); }
+
+  // Un color fijo por módulo (module_number 1..12). A1.1 = azul de marca.
+  var MODULE_COLORS = ["#2e4e9e", "#4a86c5", "#5bb1a9", "#6f9d4a", "#b3a133", "#cf8b3b",
+                       "#c15b4a", "#9a5aa3", "#5f6bd0", "#7d8794", "#3aa0a0", "#33415c"];
+  function modColor(n) { return MODULE_COLORS[((n || 1) - 1) % 12]; }
+
+  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Devuelto" };
+  var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
+  var ROLE_ES = { admin: "Administrador", teacher: "Profesor", student: "Estudiante" };
+  var ENROLL_STATUS = ["Pending", "Contacted", "Confirmed", "Paid", "Cancelled"];
+  var ENROLL_ES = { Pending: "Nueva", Contacted: "Contactada", Confirmed: "Confirmada", Paid: "Pagada", Cancelled: "Cancelada" };
 
   function toast(msg, kind) {
     var t = h('<div class="pnl-alert ' + (kind || "ok") + '" style="position:fixed;right:20px;bottom:20px;z-index:80;max-width:360px;box-shadow:0 8px 24px rgba(0,0,0,.15)">' + esc(msg) + "</div>");
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 4600);
   }
-
   function modal(title, bodyNode, onSave, saveLabel, danger) {
     var bg = h('<div class="pnl-modal-bg"></div>');
     var box = h('<div class="pnl-modal"><h3>' + esc(title) + "</h3></div>");
@@ -65,8 +73,12 @@
   function confirmDelete(title, message, onConfirm) {
     return modal(title, h('<p class="pnl-sub" style="margin-bottom:4px">' + esc(message) + "</p>"), onConfirm, "Eliminar", true);
   }
-  function field(label, inputHtml) {
-    return '<label class="fld"><span>' + esc(label) + "</span>" + inputHtml + "</label>";
+  function field(label, inputHtml) { return '<label class="fld"><span>' + esc(label) + "</span>" + inputHtml + "</label>"; }
+  function moduleSelect(name, mods, selectedId) {
+    return '<select name="' + name + '">' + mods.map(function (m) {
+      return '<option value="' + m.id + '"' + (m.id === selectedId ? " selected" : "") + ">" +
+        esc(m.level + " · " + m.title) + "</option>";
+    }).join("") + "</select>";
   }
   function friendly(e) {
     var m = (e && e.message) || String(e);
@@ -76,10 +88,15 @@
     if (e && e.code === "23505") return "Ya existe un registro con ese dato (correo duplicado, por ejemplo).";
     return m;
   }
+  function btn(label, cls, fn) { var b = h('<button class="btn btn-sm ' + cls + '">' + esc(label) + "</button>"); b.onclick = fn; return b; }
 
   /* ============ datos ============ */
   function q(table) { return sb.from(table); }
   function rpc(fn, args) { return sb.rpc(fn, args || {}).then(function (r) { if (r.error) throw r.error; return r.data; }); }
+  function activeModules() {
+    return q("modules").select("id,level,title,module_number").eq("active", true).order("module_number")
+      .then(function (r) { if (r.error) throw r.error; return r.data || []; });
+  }
   function callFn(body) {
     return fetch(window.LEF_SUPABASE.url + "/functions/v1/manage-users", {
       method: "POST",
@@ -110,7 +127,6 @@
   }
 
   /* ============ shell ============ */
-  var ROLE_ES = { admin: "Administrador", teacher: "Profesor", student: "Estudiante" };
   var SECTIONS = [
     { id: "dashboard", label: "Dashboard", roles: ["admin", "teacher"] },
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
@@ -168,54 +184,49 @@
       "</tr></thead><tbody></tbody></table></div>");
     return { wrap: w, body: w.querySelector("tbody") };
   }
+  function statRow(tiles) {
+    return h('<div class="stat-row">' + tiles.map(function (t) {
+      return '<div class="stat"><div class="k">' + esc(t[0]) + '</div><div class="v">' + t[1] + "</div></div>";
+    }).join("") + "</div>");
+  }
 
   /* ============ donut (SVG, sin librerías) ============ */
-  var DONUT_COLORS = ["#2e4e9e", "#3f6fd6", "#6f93da", "#101010", "#4d4d4d", "#8c8c8c", "#c9d6ec"];
-  function donut(items) {
-    // items: [{label, value}]
-    var total = items.reduce(function (a, b) { return a + b.value; }, 0);
-    if (!total) return h('<p class="muted">Sin inscripciones para graficar todavía.</p>');
-    var sorted = items.slice().sort(function (a, b) { return b.value - a.value; });
-    var top = sorted.slice(0, 6);
-    var rest = sorted.slice(6);
-    if (rest.length) top.push({ label: "Otros", value: rest.reduce(function (a, b) { return a + b.value; }, 0) });
-
-    var acc = 0;
-    var circles = top.map(function (it, i) {
-      var pct = it.value / total * 100;
-      var c = '<circle cx="21" cy="21" r="15.915" fill="transparent" stroke="' + DONUT_COLORS[i % DONUT_COLORS.length] +
-        '" stroke-width="5" stroke-dasharray="' + pct.toFixed(2) + " " + (100 - pct).toFixed(2) +
-        '" stroke-dashoffset="' + (25 - acc).toFixed(2) + '"></circle>';
-      acc += pct;
-      return c;
-    }).join("");
+  function donut(modItems) {
+    // modItems: [{n: module_number, label, value}] — TODOS los módulos activos
+    var total = modItems.reduce(function (a, b) { return a + b.value; }, 0);
+    var arcs = "";
+    if (total) {
+      var acc = 0;
+      modItems.filter(function (m) { return m.value > 0; }).forEach(function (m) {
+        var pct = m.value / total * 100;
+        arcs += '<circle cx="21" cy="21" r="15.915" fill="transparent" stroke="' + modColor(m.n) +
+          '" stroke-width="5" stroke-dasharray="' + pct.toFixed(2) + " " + (100 - pct).toFixed(2) +
+          '" stroke-dashoffset="' + (25 - acc).toFixed(2) + '"></circle>';
+        acc += pct;
+      });
+    }
     var svg = '<svg viewBox="0 0 42 42" class="donut-svg" role="img" aria-label="Inscripciones por módulo">' +
-      '<circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#eee" stroke-width="5"></circle>' +
-      circles +
+      '<circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#eee" stroke-width="5"></circle>' + arcs +
       '<text x="21" y="20.5" text-anchor="middle" class="donut-c1">' + total + "</text>" +
-      '<text x="21" y="25" text-anchor="middle" class="donut-c2">inscritos</text>' +
-      "</svg>";
-    var legend = '<ul class="donut-legend">' + top.map(function (it, i) {
-      var pct = Math.round(it.value / total * 100);
-      return '<li><span class="sw" style="background:' + DONUT_COLORS[i % DONUT_COLORS.length] + '"></span>' +
-        '<span class="lb">' + esc(it.label) + "</span><span class=\"vl\">" + it.value + " · " + pct + "%</span></li>";
+      '<text x="21" y="25" text-anchor="middle" class="donut-c2">inscritos</text></svg>';
+    var legend = '<ul class="donut-legend">' + modItems.map(function (m) {
+      var pct = total ? Math.round(m.value / total * 100) : 0;
+      return '<li><span class="sw" style="background:' + modColor(m.n) + '"></span>' +
+        '<span class="lb">' + esc(m.label) + '</span><span class="vl">' + m.value + " · " + pct + "%</span></li>";
     }).join("") + "</ul>";
     return h('<div class="donut-wrap">' + svg + legend + "</div>");
   }
 
   /* ============ DASHBOARD ============ */
-  var ENROLL_STATUS = ["Pending", "Contacted", "Confirmed", "Paid", "Cancelled"];
-  var ENROLL_ES = { Pending: "Nueva", Contacted: "Contactada", Confirmed: "Confirmada", Paid: "Pagada", Cancelled: "Cancelada" };
-  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Devuelto" };
-  var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
-
   function secDashboard(main) {
     var isAdmin = ME.role === "admin";
     head(main, "Dashboard", isAdmin ? "Resumen general del sistema." : "Resumen de tus grupos.");
 
     var jobs = [
-      q("enrollments").select("id,registration_number,status,created_at,students(full_name,whatsapp,email),modules(level,title),groups(schedules(days,start_time,end_time),teachers(full_name))").order("created_at", { ascending: false }),
-      q("students").select("id", { count: "exact", head: true })
+      q("enrollments").select("id,registration_number,status,created_at,module_id,students(full_name,whatsapp,email),modules(level,title,module_number),groups(schedules(days,start_time,end_time),teachers(full_name))").order("created_at", { ascending: false }),
+      q("students").select("id", { count: "exact", head: true }),
+      q("modules").select("id,level,title,module_number,active").order("module_number"),
+      q("teachers").select("id", { count: "exact", head: true }).eq("active", true)
     ];
     if (isAdmin) {
       jobs.push(rpc("admin_billing_overview"));
@@ -223,11 +234,13 @@
     }
 
     Promise.all(jobs).then(function (res) {
-      var enr = (res[0].data || []);
       if (res[0].error) throw res[0].error;
+      var enr = res[0].data || [];
       var studentCount = res[1].count || 0;
-      var billing = isAdmin ? (res[2] || []) : [];
-      var recentPays = isAdmin ? (res[3].data || []) : [];
+      var mods = res[2].data || [];
+      var teacherCount = res[3].count || 0;
+      var billing = isAdmin ? (res[4] || []) : [];
+      var recentPays = isAdmin ? (res[5].data || []) : [];
 
       var activos = enr.filter(function (e) { return e.status !== "Cancelled"; });
       var nuevas = enr.filter(function (e) { return e.status === "Pending"; }).length;
@@ -235,30 +248,32 @@
       var mora = billing.filter(function (b) { return b.status === "active" && b.is_overdue; }).length;
       var congeladas = billing.filter(function (b) { return b.status === "frozen"; }).length;
 
-      /* --- KPIs --- */
-      var tiles = [
-        ["Estudiantes", studentCount],
-        ["Inscripciones activas", activos.length],
-        ["Inscripciones nuevas", nuevas]
-      ];
-      if (isAdmin) {
-        tiles.push(["Al día", alDia]);
-        tiles.push(["En mora", mora]);
-        tiles.push(["Congeladas", congeladas]);
-      }
-      main.appendChild(h('<div class="stat-row">' + tiles.map(function (t) {
-        return '<div class="stat"><div class="k">' + esc(t[0]) + '</div><div class="v">' + t[1] + "</div></div>";
-      }).join("") + "</div>"));
+      var tiles = [["Estudiantes", studentCount], ["Profesores", teacherCount],
+        ["Inscripciones activas", activos.length], ["Inscripciones nuevas", nuevas]];
+      if (isAdmin) { tiles.push(["Al día", alDia]); tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]); }
+      main.appendChild(statRow(tiles));
 
-      /* --- donut de módulos --- */
-      var byModule = {};
-      activos.forEach(function (e) {
-        var key = e.modules ? (e.modules.level + " · " + e.modules.title) : "—";
-        byModule[key] = (byModule[key] || 0) + 1;
+      /* --- donut: TODOS los módulos activos, cada uno con su color --- */
+      var countByMod = {};
+      activos.forEach(function (e) { if (e.module_id) countByMod[e.module_id] = (countByMod[e.module_id] || 0) + 1; });
+      var modItems = mods.filter(function (m) { return m.active || countByMod[m.id]; }).map(function (m) {
+        return { n: m.module_number, label: m.level + " · " + m.title + (m.active ? "" : " (inactivo)"), value: countByMod[m.id] || 0 };
       });
-      var modItems = Object.keys(byModule).map(function (k) { return { label: k, value: byModule[k] }; });
       main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:26px 0 12px">Inscripciones por módulo</h2>'));
       main.appendChild(donut(modItems));
+
+      /* --- estado módulos --- */
+      main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:28px 0 12px">Estado de los módulos</h2>'));
+      var inactive = mods.filter(function (m) { return !m.active; });
+      if (inactive.length) {
+        main.appendChild(h('<div class="mod-warn"><span class="ico">⚠️</span><div>' +
+          "<b>" + inactive.length + " módulo(s) desactivado(s).</b> No aparecen para inscribir ni asignar. " +
+          "Revisa que sea intencional:<br>" +
+          inactive.map(function (m) { return esc(m.level + " · " + m.title); }).join(" · ") +
+          '</div></div>'));
+      } else {
+        main.appendChild(h('<div class="mod-ok">Los ' + mods.length + " módulos están activos.</div>"));
+      }
 
       /* --- inscripciones --- */
       main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:30px 0 12px">Inscripciones</h2>'));
@@ -281,6 +296,7 @@
           sel.onchange = function () {
             q("enrollments").update({ status: sel.value }).eq("id", e.id).then(function (u) {
               toast(u.error ? u.error.message : "Estado actualizado.", u.error ? "err" : "ok");
+              if (!u.error) route();
             });
           };
           cell.appendChild(sel);
@@ -290,7 +306,6 @@
       if (!enr.length) t1.body.appendChild(h('<tr><td colspan="8" class="muted">Sin inscripciones todavía.</td></tr>'));
       main.appendChild(t1.wrap);
 
-      /* --- pagos recientes --- */
       if (isAdmin) {
         main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:30px 0 12px">Pagos recientes</h2>'));
         var t2 = tableWrap(["Estudiante", "Monto", "Método", "Estado", "Fecha"]);
@@ -308,64 +323,76 @@
 
   /* ============ ESTUDIANTES ============ */
   function secEstudiantes(main) {
-    head(main, "Estudiantes", "Personas inscritas. El admin gestiona aquí sus datos y su cuenta de acceso al portal.");
+    head(main, "Estudiantes", "Personas inscritas. El admin gestiona sus datos, el módulo en que están y su cuenta de acceso.");
+    var toolbar;
     if (ME.role === "admin") {
-      var bar = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark" data-add>+ Estudiante</button>' +
-        '<span class="muted" style="font-size:13px">La mayoría se agregan solos al inscribirse. Usa esto para cargar uno manualmente.</span></div>');
-      main.appendChild(bar);
-      bar.querySelector("[data-add]").onclick = function () { editStudent(null); };
+      toolbar = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark" data-add>+ Estudiante</button>' +
+        '<span class="muted" style="font-size:13px">Al agregar uno se elige su módulo y queda inscrito.</span></div>');
+      main.appendChild(toolbar);
     }
     Promise.all([
       q("students").select("*").order("created_at", { ascending: false }),
-      ME.role === "admin" ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] })
+      ME.role === "admin" ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
+      q("enrollments").select("student_id,module_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
+      activeModules()
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
-      var profByStudent = {};
+      var profByStudent = {}, modByStudent = {};
       (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
-      var t = tableWrap(["Nombre", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
+      (res[2].data || []).forEach(function (e) {
+        if (e.status === "Cancelled") return;
+        if (!modByStudent[e.student_id]) modByStudent[e.student_id] = e; // el más reciente
+      });
+      var mods = res[3];
+      if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
+
+      var t = tableWrap(["Nombre", "Módulo", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
         var prof = profByStudent[s.id];
+        var enr = modByStudent[s.id];
+        var modLabel = enr && enr.modules ? enr.modules.level + " · " + enr.modules.title : "—";
+        var modColorDot = enr && enr.modules ? '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(enr.modules.module_number) + '"></span>' : "";
         var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
           : prof.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
-        var tr = h("<tr>" +
-          "<td>" + esc(s.full_name) + "</td><td>" + esc(s.whatsapp) + '</td><td class="wrap">' + esc(s.email) +
-          "</td><td>" + esc(s.city || "—") + "</td><td>" + estado +
-          (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : "") +
-          '</td><td class="acts"></td></tr>');
-        var cell = tr.children[5];
+        var tr = h([
+          "<tr><td>", esc(s.full_name), "</td>",
+          "<td>", modColorDot, esc(modLabel), "</td>",
+          "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
+          "<td>", esc(s.city || "—"), "</td>",
+          "<td>", estado, (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : ""), "</td>",
+          '<td class="acts"></td></tr>'
+        ].join(""));
+        var cell = tr.children[6];
         if (ME.role === "admin") {
-          if (!prof) {
-            cell.appendChild(btn("Crear cuenta de portal", "btn-blue", function () { crearCuentaEstudiante(s); }));
-          } else {
+          if (!prof) cell.appendChild(btn("Crear cuenta de portal", "btn-blue", function () { crearCuentaEstudiante(s); }));
+          else {
             cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () { resetStudentPwd(s, prof); }));
             cell.appendChild(btn((prof.active ? "Desactivar" : "Activar") + " acceso", "btn-ghost", function () {
               callFn({ action: "set_active", user_id: prof.user_id, active: !prof.active })
                 .then(function () { toast("Actualizado."); route(); }).catch(function (e) { toast(friendly(e), "err"); });
             }));
           }
-          cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s); }));
+          cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s, enr ? enr.module_id : null, mods); }));
           cell.appendChild(btn("Eliminar", "btn-danger", function () { deleteStudent(s, prof); }));
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="6" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse, o agrégalos con “+ Estudiante”.</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse por el formulario, o agrégalos con “+ Estudiante”.</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
-  function btn(label, cls, fn) {
-    var b = h('<button class="btn btn-sm ' + cls + '">' + esc(label) + "</button>");
-    b.onclick = fn;
-    return b;
-  }
-
-  function editStudent(s) {
+  function editStudent(s, currentModuleId, mods) {
+    if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
     var b = h("<div>" +
       field("Nombre completo", '<input name="n" value="' + esc(s ? s.full_name : "") + '">') +
+      field("Módulo en que se inscribe", moduleSelect("mod", mods, currentModuleId || mods[0].id)) +
       field("WhatsApp", '<input name="w" value="' + esc(s ? s.whatsapp : "") + '">') +
       field("Correo", '<input name="e" type="email" value="' + esc(s ? s.email : "") + '">') +
       field("Edad (opcional)", '<input name="a" type="number" min="5" max="100" value="' + (s && s.age ? s.age : "") + '">') +
-      field("Ciudad (opcional)", '<input name="c" value="' + esc(s ? (s.city || "") : "") + '">') + "</div>");
+      field("Ciudad (opcional)", '<input name="c" value="' + esc(s ? (s.city || "") : "") + '">') +
+      (s ? '<p class="pnl-sub">Cambiar el módulo actualiza su inscripción (si tenía grupo asignado, se libera).</p>' : "") +
+      "</div>");
     modal(s ? "Editar estudiante" : "Nuevo estudiante", b, function () {
       var payload = {
         full_name: b.querySelector("[name=n]").value.trim(),
@@ -374,9 +401,14 @@
         age: +b.querySelector("[name=a]").value || null,
         city: b.querySelector("[name=c]").value.trim() || null
       };
-      var pr = s ? q("students").update(payload).eq("id", s.id) : q("students").insert(payload);
-      return pr.then(function (r) { if (r.error) throw r.error; toast(s ? "Estudiante actualizado." : "Estudiante agregado."); route(); });
-    }, s ? "Guardar" : "Agregar");
+      var moduleId = b.querySelector("[name=mod]").value;
+      var pr = s
+        ? q("students").update(payload).eq("id", s.id).then(function (r) { if (r.error) throw r.error; return s.id; })
+        : q("students").insert(payload).select("id").single().then(function (r) { if (r.error) throw r.error; return r.data.id; });
+      return pr.then(function (sid) {
+        return rpc("admin_assign_module", { p_student_id: sid, p_module_id: moduleId });
+      }).then(function () { toast(s ? "Estudiante actualizado." : "Estudiante inscrito."); route(); });
+    }, s ? "Guardar" : "Inscribir");
   }
 
   function resetStudentPwd(s, prof) {
@@ -394,16 +426,10 @@
       return q("payments").select("id", { count: "exact", head: true }).eq("student_id", s.id).then(function (pc) {
         if ((pc.count || 0) > 0) throw new Error("Este estudiante tiene pagos registrados. No se puede eliminar (historial contable). Desactiva su acceso en su lugar.");
         return q("subscriptions").delete().eq("student_id", s.id);
-      }).then(function () {
-        return q("enrollments").delete().eq("student_id", s.id);
-      }).then(function () {
-        return prof ? callFn({ action: "delete_account", user_id: prof.user_id }) : null;
-      }).then(function () {
-        return q("students").delete().eq("id", s.id);
-      }).then(function (r) {
-        if (r && r.error) throw r.error;
-        toast("Estudiante eliminado."); route();
-      });
+      }).then(function () { return q("enrollments").delete().eq("student_id", s.id); })
+        .then(function () { return prof ? callFn({ action: "delete_account", user_id: prof.user_id }) : null; })
+        .then(function () { return q("students").delete().eq("id", s.id); })
+        .then(function (r) { if (r && r.error) throw r.error; toast("Estudiante eliminado."); route(); });
     });
   }
 
@@ -437,25 +463,32 @@
       rpc("freeze_overdue_subscriptions").then(function (n) { toast(n + " cuenta(s) congelada(s)."); route(); })
         .catch(function (e) { toast(friendly(e), "err"); });
     };
-    Promise.all([rpc("admin_billing_overview"), q("students").select("id,full_name").order("full_name")])
+    Promise.all([rpc("admin_billing_overview"), q("students").select("id,full_name").order("full_name"), activeModules()])
       .then(function (res) {
-        var rows = res[0] || [], students = res[1].data || [];
+        var rows = res[0] || [], students = res[1].data || [], mods = res[2];
         var newBtn = h('<button class="btn btn-dark btn-sm" data-new>+ Nueva suscripción</button>');
         bar.appendChild(newBtn);
-        newBtn.onclick = function () { editarSuscripcion(null, students); };
-        var t = tableWrap(["Estudiante", "Descripción", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
+        newBtn.onclick = function () { editarSuscripcion(null, students, mods); };
+        var t = tableWrap(["Estudiante", "Módulo", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
         rows.forEach(function (r) {
           var st = r.status === "frozen" ? '<span class="badge bad">congelada</span>'
             : r.is_overdue ? '<span class="badge warn">en mora</span>'
             : r.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
             : '<span class="badge ok">al día</span>';
-          var tr = h("<tr><td>" + esc(r.student_name) + '</td><td class="wrap">' + esc(r.description || "—") +
+          var tr = h("<tr><td>" + esc(r.student_name) + '</td><td class="wrap">' + esc(r.module_label || "—") +
             "</td><td>" + money(r.monthly_amount, r.currency) + "</td><td>" + date(r.next_due_date) + "</td><td>" +
             (r.last_payment_at ? date(r.last_payment_at) + " · " + money(r.last_payment_amount, r.currency) : "—") +
             '</td><td>' + st + '</td><td class="acts"></td></tr>');
           var cell = tr.children[6];
           cell.appendChild(btn("Registrar pago", "btn-blue", function () { registrarPago(r); }));
-          cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students); }));
+          cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students, mods); }));
+          cell.appendChild(btn("Eliminar", "btn-danger", function () {
+            confirmDelete("Eliminar suscripción", "Solo se puede si no tiene pagos registrados.", function () {
+              return q("subscriptions").delete().eq("id", r.subscription_id).then(function (d) {
+                if (d.error) throw d.error; toast("Suscripción eliminada."); route();
+              });
+            });
+          }));
           t.body.appendChild(tr);
         });
         if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin suscripciones. Crea una con “Nueva suscripción”.</td></tr>'));
@@ -463,21 +496,24 @@
       }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
-  function editarSuscripcion(r, students) {
+  function editarSuscripcion(r, students, mods) {
     var body = h("<div>" +
       (r ? "" : field("Estudiante", '<select name="sid">' + students.map(function (s) {
         return '<option value="' + s.id + '">' + esc(s.full_name) + "</option>";
       }).join("") + "</select>")) +
-      field("Descripción", '<input name="desc" value="' + esc(r ? (r.description || "") : "") + '" placeholder="Curso A1.1 — Hello, World">') +
+      field("Módulo", moduleSelect("mod", mods, r ? r.module_id : (mods[0] && mods[0].id))) +
       field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : "") + '">') +
       field("Día de cobro (1–28)", '<input name="day" type="number" min="1" max="28" value="' + (r ? "" : 1) + '" placeholder="1">') +
       field("Días de gracia", '<input name="grace" type="number" min="0" max="60" value="5">') +
       (r ? field("Estado", '<select name="status"><option value="active">Activa</option><option value="frozen">Congelada</option><option value="cancelled">Cancelada</option></select>') : "") +
       "</div>");
-    if (r && body.querySelector("[name=status]")) body.querySelector("[name=status]").value = r.status;
+    if (r) {
+      body.querySelector("[name=mod]").value = r.module_id || (mods[0] && mods[0].id);
+      if (body.querySelector("[name=status]")) body.querySelector("[name=status]").value = r.status;
+    }
     modal(r ? "Editar suscripción" : "Nueva suscripción", body, function () {
       var payload = {
-        description: body.querySelector("[name=desc]").value.trim() || null,
+        module_id: body.querySelector("[name=mod]").value,
         monthly_amount: +body.querySelector("[name=amt]").value || 0,
         grace_days: +body.querySelector("[name=grace]").value || 5
       };
@@ -543,33 +579,38 @@
 
   function acModulos(box) {
     box.innerHTML = '<p class="muted">Cargando…</p>';
-    q("modules").select("*").order("module_number").then(function (r) {
-      var t = tableWrap(["#", "Nivel", "Título", "Descripción", "Estado", "Acciones"]);
-      (r.data || []).forEach(function (m) {
-        var tr = h("<tr><td>" + m.module_number + "</td><td>" + esc(m.level) + "</td><td>" + esc(m.title) +
-          '</td><td class="wrap">' + esc(m.description) + "</td><td>" +
-          (m.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
-          '</td><td class="acts"></td></tr>');
-        var cell = tr.children[5];
-        cell.appendChild(btn(m.active ? "Desactivar" : "Activar", "btn-ghost", function () {
-          q("modules").update({ active: !m.active }).eq("id", m.id).then(function (u) {
-            if (u.error) toast(friendly(u.error), "err"); else { toast("Módulo " + (m.active ? "desactivado" : "activado") + "."); acModulos(box); }
-          });
-        }));
-        cell.appendChild(btn("Editar", "btn-ghost", function () {
-          var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
-            field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") + "</div>");
-          modal("Editar módulo " + m.level, b, function () {
-            return q("modules").update({
-              title: b.querySelector("[name=t]").value.trim(),
-              description: b.querySelector("[name=d]").value.trim()
-            }).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
-          });
-        }));
-        t.body.appendChild(tr);
+    Promise.all([q("modules").select("*").order("module_number"), rpc("module_enrollment_counts")])
+      .then(function (res) {
+        var counts = {};
+        (res[1] || []).forEach(function (c) { counts[c.module_id] = c.count; });
+        var t = tableWrap(["#", "Nivel", "Título", "Descripción", "Inscritos", "Estado", "Acciones"]);
+        (res[0].data || []).forEach(function (m) {
+          var tr = h("<tr><td>" + m.module_number + '</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(m.module_number) + '"></span>' + esc(m.level) +
+            "</td><td>" + esc(m.title) + '</td><td class="wrap">' + esc(m.description) +
+            '</td><td style="font-weight:600">' + (counts[m.id] || 0) + "</td><td>" +
+            (m.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
+            '</td><td class="acts"></td></tr>');
+          var cell = tr.children[6];
+          cell.appendChild(btn(m.active ? "Desactivar" : "Activar", "btn-ghost", function () {
+            q("modules").update({ active: !m.active }).eq("id", m.id).then(function (u) {
+              if (u.error) toast(friendly(u.error), "err");
+              else { toast("Módulo " + (m.active ? "desactivado" : "activado") + "."); acModulos(box); }
+            });
+          }));
+          cell.appendChild(btn("Editar", "btn-ghost", function () {
+            var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
+              field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") + "</div>");
+            modal("Editar módulo " + m.level, b, function () {
+              return q("modules").update({
+                title: b.querySelector("[name=t]").value.trim(),
+                description: b.querySelector("[name=d]").value.trim()
+              }).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
+            });
+          }));
+          t.body.appendChild(tr);
+        });
+        box.innerHTML = ""; box.appendChild(t.wrap);
       });
-      box.innerHTML = ""; box.appendChild(t.wrap);
-    });
   }
 
   function acProfesores(box) {
@@ -615,9 +656,7 @@
 
   /* ---- Ciclos ---- */
   function periodOptions() {
-    // 24 pares de meses consecutivos a partir del mes actual
-    var out = [];
-    var now = new Date();
+    var out = [], now = new Date();
     for (var i = 0; i < 24; i++) {
       var a = new Date(now.getFullYear(), now.getMonth() + i, 1);
       var b = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
@@ -644,8 +683,7 @@
       "</div>");
     var sel = b.querySelector("[name=p]"), si = b.querySelector("[name=s]"), ei = b.querySelector("[name=e]");
     function applyPeriod() {
-      var parts = sel.value.split("|");
-      var a = parts[0].split("-"), z = parts[1].split("-");
+      var parts = sel.value.split("|"), a = parts[0].split("-"), z = parts[1].split("-");
       var ay = +a[0], am = +a[1] - 1, zy = +z[0], zm = +z[1] - 1;
       si.min = ymd(ay, am, 1); si.max = ymd(ay, am, lastDay(ay, am));
       ei.min = ymd(zy, zm, 1); ei.max = ymd(zy, zm, lastDay(zy, zm));
@@ -664,10 +702,9 @@
     add.querySelector("button").onclick = function () {
       var b = cycleForm(null);
       modal("Nuevo ciclo", b, function () {
-        var label = b.querySelector("[name=p]").selectedOptions[0].textContent;
         return q("cycles").insert({
-          name: label, start_date: b.querySelector("[name=s]").value,
-          end_date: b.querySelector("[name=e]").value, status: "Open"
+          name: b.querySelector("[name=p]").selectedOptions[0].textContent,
+          start_date: b.querySelector("[name=s]").value, end_date: b.querySelector("[name=e]").value, status: "Open"
         }).then(function (i) { if (i.error) throw i.error; toast("Ciclo creado."); acCiclos(box); });
       });
     };
@@ -684,11 +721,16 @@
         cell.appendChild(btn("Editar", "btn-ghost", function () {
           var b = cycleForm(c);
           modal("Editar ciclo", b, function () {
-            var label = b.querySelector("[name=p]").selectedOptions[0].textContent;
             return q("cycles").update({
-              name: label, start_date: b.querySelector("[name=s]").value,
-              end_date: b.querySelector("[name=e]").value, status: b.querySelector("[name=st]").value
+              name: b.querySelector("[name=p]").selectedOptions[0].textContent,
+              start_date: b.querySelector("[name=s]").value, end_date: b.querySelector("[name=e]").value,
+              status: b.querySelector("[name=st]").value
             }).eq("id", c.id).then(function (u) { if (u.error) throw u.error; toast("Ciclo actualizado."); acCiclos(box); });
+          });
+        }));
+        cell.appendChild(btn("Eliminar", "btn-danger", function () {
+          confirmDelete("Eliminar ciclo", "No se puede si tiene horarios asociados.", function () {
+            return q("cycles").delete().eq("id", c.id).then(function (d) { if (d.error) throw d.error; toast("Ciclo eliminado."); acCiclos(box); });
           });
         }));
         t.body.appendChild(tr);
@@ -701,17 +743,17 @@
   function acHorarios(box) {
     box.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
-      q("schedules").select("*,cycles(name,status),modules(level,title)").order("created_at", { ascending: false }),
-      q("cycles").select("id,name,status"), q("modules").select("id,level,title").order("module_number")
+      q("schedules").select("*,cycles(name,status),modules(level,title,active)").order("created_at", { ascending: false }),
+      q("cycles").select("id,name,status"), activeModules()
     ]).then(function (res) {
       box.innerHTML = "";
-      var cycles = res[1].data || [], modules = res[2].data || [];
+      var cycles = res[1].data || [], modules = res[2];
       var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Horario</button></div>');
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
         var b = h("<div>" +
           field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
-          field("Módulo", '<select name="m">' + modules.map(function (m) { return '<option value="' + m.id + '">' + esc(m.level + " · " + m.title) + "</option>"; }).join("") + "</select>") +
+          field("Módulo", moduleSelect("m", modules, modules[0] && modules[0].id)) +
           field("Días", '<div>' + DOW.map(function (d) { return '<label style="display:inline-flex;gap:4px;margin:0 8px 6px 0;font-size:13px"><input type="checkbox" style="width:auto" value="' + d + '">' + DAY_ES[d] + "</label>"; }).join("") + "</div>") +
           field("Hora inicio", '<input name="s" type="time" value="18:00">') + field("Hora fin", '<input name="e" type="time" value="19:00">') + "</div>");
         modal("Nuevo horario", b, function () {
@@ -725,7 +767,8 @@
       };
       var t = tableWrap(["Ciclo", "Módulo", "Días", "Horario", "Estado", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
-        var tr = h("<tr><td>" + esc(s.cycles ? s.cycles.name : "—") + "</td><td>" + esc(s.modules ? s.modules.level + " · " + s.modules.title : "—") +
+        var modTxt = s.modules ? s.modules.level + " · " + s.modules.title + (s.modules.active ? "" : " (módulo inactivo)") : "—";
+        var tr = h("<tr><td>" + esc(s.cycles ? s.cycles.name : "—") + "</td><td>" + esc(modTxt) +
           "</td><td>" + esc(days(s.days)) + "</td><td>" + esc(time(s.start_time) + "–" + time(s.end_time)) +
           "</td><td>" + (s.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
           '</td><td class="acts"></td></tr>');
@@ -748,14 +791,16 @@
     box.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
       q("groups").select("*,modules(level,title),teachers(full_name),schedules(days,start_time,end_time,cycles(name))").order("created_at", { ascending: false }),
-      q("schedules").select("id,days,start_time,end_time,module_id,modules(level,title)").eq("active", true),
+      q("schedules").select("id,days,start_time,end_time,module_id,modules(level,title,active)").eq("active", true),
       q("teachers").select("id,full_name").eq("active", true)
     ]).then(function (res) {
       box.innerHTML = "";
-      var scheds = res[1].data || [], teachers = res[2].data || [];
+      var scheds = (res[1].data || []).filter(function (s) { return s.modules && s.modules.active; });
+      var teachers = res[2].data || [];
       var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Grupo</button></div>');
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
+        if (!scheds.length) { toast("No hay horarios activos con módulo activo.", "err"); return; }
         var b = h("<div>" +
           field("Horario", '<select name="s">' + scheds.map(function (s) {
             return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time)) + "</option>";
@@ -807,11 +852,16 @@
 
   /* ============ USUARIOS ============ */
   function secUsuarios(main) {
-    head(main, "Usuarios", "Cuentas de acceso. Solo el administrador puede crear cuentas, cambiar roles y eliminar.");
+    head(main, "Usuarios", "Todas las cuentas y personas del sistema, con su rol. Solo el administrador gestiona aquí.");
     var bar = h('<div class="pnl-toolbar">' +
       '<button class="btn btn-sm btn-dark" data-new>+ Cuenta de staff</button>' +
-      '<span class="muted" style="font-size:13px">Las cuentas de estudiante se crean desde “Estudiantes”.</span></div>');
+      '<select data-f-rol style="width:auto"><option value="">Todos los roles</option><option value="admin">Administrador</option><option value="teacher">Profesor</option><option value="student">Estudiante</option></select>' +
+      '<select data-f-est style="width:auto"><option value="">Activos e inactivos</option><option value="1">Solo activos</option><option value="0">Solo inactivos</option></select>' +
+      '<select data-f-ord style="width:auto"><option value="desc">Más recientes primero</option><option value="asc">Más antiguos primero</option></select>' +
+      "</div>");
     main.appendChild(bar);
+    var host = h("<div></div>"); main.appendChild(host);
+
     bar.querySelector("[data-new]").onclick = function () {
       q("teachers").select("id,full_name").eq("active", true).then(function (tr) {
         var teachers = tr.data || [];
@@ -829,42 +879,92 @@
             email: b.querySelector("[name=e]").value.trim(),
             password: b.querySelector("[name=p]").value,
             teacher_id: b.querySelector("[name=t]").value || null
-          }).then(function () { toast("Cuenta creada."); route(); });
+          }).then(function () { toast("Cuenta creada."); load(); });
         }, "Crear");
       });
     };
-    q("profiles").select("*").order("created_at").then(function (r) {
-      if (r.error) throw r.error;
-      var t = tableWrap(["Nombre", "Correo", "Rol", "Estado", "Acciones"]);
-      (r.data || []).forEach(function (p) {
-        var tr = h("<tr><td>" + esc(p.full_name || "—") + "</td><td>" + esc(p.email) + "</td><td>" +
-          esc(ROLE_ES[p.role] || p.role) + "</td><td>" +
-          (p.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>') +
-          '</td><td class="acts"></td></tr>');
-        var cell = tr.children[4];
-        if (p.user_id === ME.user_id) { cell.innerHTML = '<span class="muted">tú</span>'; t.body.appendChild(tr); return; }
-        cell.appendChild(btn(p.active ? "Desactivar" : "Activar", "btn-ghost", function () {
-          callFn({ action: "set_active", user_id: p.user_id, active: !p.active })
-            .then(function () { toast("Actualizado."); route(); }).catch(function (e) { toast(friendly(e), "err"); });
-        }));
-        if (p.role !== "student") {
-          var rl = h('<select style="width:auto"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>');
-          rl.value = p.role;
-          rl.onchange = function () {
-            callFn({ action: "set_role", user_id: p.user_id, role: rl.value })
-              .then(function () { toast("Rol actualizado."); }).catch(function (e) { toast(friendly(e), "err"); });
-          };
-          cell.appendChild(rl);
-        }
-        cell.appendChild(btn("Eliminar", "btn-danger", function () {
-          confirmDelete("Eliminar cuenta", "Se elimina el acceso de " + (p.full_name || p.email) + ". El registro de estudiante/profesor asociado NO se borra.", function () {
-            return callFn({ action: "delete_account", user_id: p.user_id }).then(function () { toast("Cuenta eliminada."); route(); });
-          });
-        }));
-        t.body.appendChild(tr);
-      });
-      main.appendChild(t.wrap);
-    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+
+    function load() {
+      host.innerHTML = '<p class="muted">Cargando…</p>';
+      Promise.all([q("profiles").select("*"), q("teachers").select("*")]).then(function (res) {
+        if (res[0].error) throw res[0].error;
+        var profiles = res[0].data || [], teachers = res[1].data || [];
+        var linkedTeacher = {};
+        profiles.forEach(function (p) { if (p.teacher_id) linkedTeacher[p.teacher_id] = true; });
+        var rows = profiles.map(function (p) {
+          return { name: p.full_name || "—", email: p.email, role: p.role, active: p.active,
+            created_at: p.created_at, kind: "cuenta", user_id: p.user_id };
+        });
+        teachers.filter(function (t) { return !linkedTeacher[t.id]; }).forEach(function (t) {
+          rows.push({ name: t.full_name, email: t.email, role: "teacher", active: t.active,
+            created_at: t.created_at, kind: "profesor-sin-cuenta", teacher_id: t.id });
+        });
+
+        var fRol = bar.querySelector("[data-f-rol]").value;
+        var fEst = bar.querySelector("[data-f-est]").value;
+        var fOrd = bar.querySelector("[data-f-ord]").value;
+        rows = rows.filter(function (r) {
+          if (fRol && r.role !== fRol) return false;
+          if (fEst === "1" && !r.active) return false;
+          if (fEst === "0" && r.active) return false;
+          return true;
+        }).sort(function (a, b) {
+          var d = new Date(a.created_at) - new Date(b.created_at);
+          return fOrd === "asc" ? d : -d;
+        });
+
+        var t = tableWrap(["Nombre", "Correo", "Rol", "Acceso", "Creado", "Acciones"]);
+        rows.forEach(function (r) {
+          var acceso = r.kind === "profesor-sin-cuenta" ? '<span class="badge neutral">sin cuenta</span>'
+            : r.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
+          var tr = h("<tr><td>" + esc(r.name) + "</td><td>" + esc(r.email) + "</td><td>" +
+            esc(ROLE_ES[r.role] || r.role) + "</td><td>" + acceso + "</td><td>" + date(r.created_at) +
+            '</td><td class="acts"></td></tr>');
+          var cell = tr.children[5];
+          if (r.kind === "profesor-sin-cuenta") {
+            cell.appendChild(btn("Crear cuenta", "btn-blue", function () {
+              var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+              var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name) + '">') +
+                field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
+                field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + "</div>");
+              modal("Crear cuenta — " + r.name, b, function () {
+                return callFn({
+                  action: "create_account", role: "teacher",
+                  full_name: b.querySelector("[name=n]").value.trim(),
+                  email: b.querySelector("[name=e]").value.trim(),
+                  password: b.querySelector("[name=p]").value, teacher_id: r.teacher_id
+                }).then(function () { toast("Cuenta creada."); load(); });
+              }, "Crear");
+            }));
+            t.body.appendChild(tr); return;
+          }
+          if (r.user_id === ME.user_id) { cell.innerHTML = '<span class="muted">tú</span>'; t.body.appendChild(tr); return; }
+          cell.appendChild(btn(r.active ? "Desactivar" : "Activar", "btn-ghost", function () {
+            callFn({ action: "set_active", user_id: r.user_id, active: !r.active })
+              .then(function () { toast("Actualizado."); load(); }).catch(function (e) { toast(friendly(e), "err"); });
+          }));
+          if (r.role !== "student") {
+            var rl = h('<select style="width:auto"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>');
+            rl.value = r.role;
+            rl.onchange = function () {
+              callFn({ action: "set_role", user_id: r.user_id, role: rl.value })
+                .then(function () { toast("Rol actualizado."); }).catch(function (e) { toast(friendly(e), "err"); });
+            };
+            cell.appendChild(rl);
+          }
+          cell.appendChild(btn("Eliminar", "btn-danger", function () {
+            confirmDelete("Eliminar cuenta", "Se elimina el acceso de " + (r.name || r.email) + ". El registro de estudiante/profesor asociado NO se borra.", function () {
+              return callFn({ action: "delete_account", user_id: r.user_id }).then(function () { toast("Cuenta eliminada."); load(); });
+            });
+          }));
+          t.body.appendChild(tr);
+        });
+        if (!rows.length) t.body.appendChild(h('<tr><td colspan="6" class="muted">Sin usuarios con esos filtros.</td></tr>'));
+        host.innerHTML = ""; host.appendChild(t.wrap);
+      }).catch(function (e) { host.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+    }
+    bar.querySelectorAll("select").forEach(function (s) { s.addEventListener("change", load); });
+    load();
   }
 
   boot();
