@@ -409,14 +409,15 @@ function initLang(){
 // Inserta el enlace "Iniciar sesión" en el header y el drawer de todas las páginas
 // (una sola puerta: /login enruta a admin o portal según el rol).
 function initLoginLink(){
+  const ICON = '<svg class="login-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
   const headerActions = document.querySelector(".site-header .actions");
   if (headerActions && !headerActions.querySelector(".login-link")){
     const enroll = headerActions.querySelector('a[href="inscripcion.html"]');
     const a = document.createElement("a");
     a.className = "login-link";
     a.href = "login.html";
-    a.setAttribute("data-i18n", "nav_login");
-    a.textContent = "Iniciar sesión";
+    a.setAttribute("aria-label", "Iniciar sesión");
+    a.innerHTML = ICON + '<span class="login-txt" data-i18n="nav_login">Iniciar sesión</span>';
     headerActions.insertBefore(a, enroll || headerActions.querySelector(".menu-btn"));
   }
   const drawerActions = document.querySelector(".drawer-actions");

@@ -572,17 +572,18 @@ grant execute on function public.freeze_overdue_subscriptions()             to a
 -- 9. Semilla: los 12 módulos
 -- ----------------------------------------------------------------------------
 
+-- Título en inglés, descripción en español (ver migración 20260827190000).
 insert into public.modules (level, module_number, title, description) values
-  ('A1.1', 1,  'Primeros pasos',          'Saludos, el abecedario, números y presentaciones cotidianas.'),
-  ('A1.2', 2,  'Vida cotidiana',          'Rutinas diarias, familia, comida y presente simple.'),
-  ('A1.3', 3,  'En la ciudad',            'Direcciones, lugares de la ciudad y pasado simple.'),
-  ('A2.1', 4,  'Historias y viajes',      'Pasado continuo, vocabulario de viajes y comparativos.'),
-  ('A2.2', 5,  'Haciendo planes',         'Formas de futuro, invitaciones y superlativos.'),
-  ('A2.3', 6,  'Opiniones y consejos',    'Should/shouldn''t, modales y cómo dar consejos.'),
-  ('B1.1', 7,  'Experiencias',            'Present Perfect vs. Past Simple, for/since y First Conditional.'),
-  ('B1.2', 8,  'Contar y deducir',        'Estilo indirecto, Past Perfect y modales de deducción.'),
-  ('B1.3', 9,  'Especulación y debate',   'Modales de especulación, formas de futuro complejas y debate estructurado.'),
-  ('B2.1', 10, 'Condicionales mixtos',    'Condicionales mixtos y lenguaje hipotético avanzado.'),
-  ('B2.2', 11, 'Voz pasiva y precisión',  'Voz pasiva avanzada y reportes precisos.'),
-  ('B2.3', 12, 'Fluidez en acción',       'Modismos, phrasal verbs y el proyecto final de B2.')
+  ('A1.1', 1,  'Hello, World',              'Saludos, el abecedario, números y presentaciones cotidianas.'),
+  ('A1.2', 2,  'Everyday Life',             'Rutinas diarias, familia, comida y presente simple.'),
+  ('A1.3', 3,  'My Story',                  'Direcciones, lugares de la ciudad y pasado simple.'),
+  ('A2.1', 4,  'Out and About',             'Pasado continuo, vocabulario de viajes y comparativos.'),
+  ('A2.2', 5,  'On the Move',               'Formas de futuro, invitaciones y superlativos.'),
+  ('A2.3', 6,  'Experience Counts',         'Should/shouldn''t, modales y cómo dar consejos.'),
+  ('B1.1', 7,  'Connecting the Dots',       'Present Perfect vs. Past Simple, for/since y First Conditional.'),
+  ('B1.2', 8,  'Behind the Words',          'Estilo indirecto, Past Perfect y modales de deducción.'),
+  ('B1.3', 9,  'What If?',                  'Modales de especulación, formas de futuro complejas y debate estructurado.'),
+  ('B2.1', 10, 'The Bigger Picture',        'Condicionales mixtos y lenguaje hipotético avanzado.'),
+  ('B2.2', 11, 'Power of Words',            'Voz pasiva avanzada y reportes precisos.'),
+  ('B2.3', 12, 'Your English, Your Voice',  'Modismos, phrasal verbs y el proyecto final de B2.')
 on conflict (level) do nothing;
