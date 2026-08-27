@@ -9,6 +9,7 @@
 - **Repositorio (temporal, cuenta personal):** https://github.com/Titorpg/lef-landing
 - **Carpeta local:** `C:\Users\Temporal\Desktop\LEF`
 - **Backend (Supabase):** proyecto `lef-center-prod`, org LEFCENTER — https://cemrxcatbxbcipxmsnjf.supabase.co
+- **Inicio de sesión único:** https://www.lefcenter.com/login  (enruta a admin o portal según el rol; enlace "Iniciar sesión" en el header de todo el sitio)
 - **Panel admin:** https://www.lefcenter.com/admin  (cuenta `director@lefcenter.com`, contraseña temporal en `.env` → `ADMIN_TEMP_PASSWORD`, cambiar)
 - **Portal estudiante:** https://www.lefcenter.com/portal
 
@@ -103,6 +104,7 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 | `sistema.html` | Los 3 pilares del método + nota sobre el examen de validación (no punitivo) |
 | `ofrecemos.html` | Las 6 cosas que ofrece LEF (clases, club de conversación, materiales, plataforma, tutorías **al final de cada ciclo**, acompañamiento) |
 | `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
+| `login.html` | Inicio de sesión único (`assets/js/lef-auth.js`) — enruta por rol — no indexado |
 | `admin.html` | Panel administrativo (SPA, `assets/js/lef-admin.js`) — no indexado |
 | `portal.html` | Portal del estudiante — pestaña de facturación (`assets/js/lef-portal.js`) — no indexado |
 | `preguntas-frecuentes.html` | Acordeón de FAQ (contenido **inventado como placeholder**, ver abajo) |

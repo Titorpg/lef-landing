@@ -613,3 +613,16 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
   .wz-steps li{flex-basis:calc(50% - 8px);}
 }
 @media(max-width:460px){ .wz-mods{grid-template-columns:1fr;} }
+
+/* Enlace "Iniciar sesión" en el header / drawer (inyectado por script.js) */
+.site-header .actions .login-link{
+  font-size:14px;font-weight:600;color:var(--carbon);text-decoration:none;white-space:nowrap;
+}
+.site-header .actions .login-link:hover{color:var(--azul);}
+.drawer-actions .drawer-login{
+  display:inline-flex;align-items:center;justify-content:center;
+  font-weight:600;font-size:15px;padding:12px 20px;border-radius:999px;
+  border:1.5px solid var(--ink);color:var(--ink);text-decoration:none;
+}
+.drawer-actions .drawer-login:hover{background:var(--ink);color:var(--papel);}
+@media(max-width:860px){ .site-header .actions .login-link{display:none;} }

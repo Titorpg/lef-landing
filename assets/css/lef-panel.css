@@ -14,14 +14,18 @@ a{color:var(--azul);}
 img{max-width:100%;display:block;}
 
 /* ---- layout ---- */
-.pnl-top{position:sticky;top:0;z-index:20;background:var(--ink);color:var(--papel);
-  display:flex;align-items:center;gap:20px;padding:12px 22px;}
-.pnl-top .brand{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:15px;letter-spacing:.02em;}
-.pnl-top .brand span{color:var(--azul-niebla);}
-.pnl-top .who{margin-left:auto;font-size:13px;color:#b9b9b9;display:flex;align-items:center;gap:14px;}
-.pnl-top button.link{background:none;border:none;color:var(--azul-niebla);cursor:pointer;font:inherit;text-decoration:underline;}
+.pnl-top{position:sticky;top:0;z-index:20;background:rgba(250,250,248,.96);backdrop-filter:blur(6px);
+  color:var(--ink);border-bottom:1px solid var(--niebla);
+  display:flex;align-items:center;gap:20px;padding:11px 22px;}
+.pnl-top .brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:inherit;}
+.pnl-top .brand img{height:34px;width:auto;display:block;}
+.pnl-top .brand .tag{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:11px;
+  letter-spacing:.12em;color:var(--azul);border-left:1px solid var(--niebla);padding-left:10px;}
+.pnl-top .who{margin-left:auto;font-size:13px;color:var(--grafito);display:flex;align-items:center;gap:14px;}
+.pnl-top button.link{background:none;border:none;color:var(--azul);cursor:pointer;font:inherit;font-weight:600;text-decoration:none;}
+.pnl-top button.link:hover{text-decoration:underline;}
 
-.pnl-wrap{display:flex;min-height:calc(100vh - 49px);}
+.pnl-wrap{display:flex;min-height:calc(100vh - 58px);}
 .pnl-nav{flex:none;width:210px;border-right:1px solid var(--niebla);padding:18px 12px;background:#fff;}
 .pnl-nav a{display:block;padding:9px 12px;border-radius:8px;color:var(--carbon);text-decoration:none;
   font-size:14.5px;font-weight:500;margin-bottom:2px;}
@@ -79,11 +83,16 @@ label.fld span{display:block;font-size:12px;font-weight:600;color:var(--carbon);
 .pnl-modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;}
 
 /* ---- login / centered card ---- */
-.pnl-center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-.pnl-login{background:#fff;border:1px solid var(--niebla);border-radius:16px;padding:34px;max-width:380px;width:100%;}
-.pnl-login .brand{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:18px;text-align:center;margin-bottom:6px;}
+.pnl-center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--papel);}
+.pnl-login{background:#fff;border:1px solid var(--niebla);border-radius:16px;padding:36px 34px;max-width:390px;width:100%;
+  box-shadow:0 10px 40px rgba(16,16,16,.06);}
+.pnl-login .logo{display:block;height:38px;width:auto;margin:0 auto 18px;}
+.pnl-login .brand{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:16px;text-align:center;margin-bottom:6px;}
 .pnl-login .brand span{color:var(--azul);}
 .pnl-login p.hint{text-align:center;color:var(--grafito);font-size:13.5px;margin-bottom:22px;}
+.pnl-login .back{text-align:center;margin:18px 0 0;font-size:13px;}
+.pnl-login .back a{color:var(--grafito);text-decoration:none;}
+.pnl-login .back a:hover{color:var(--azul);}
 
 /* ---- stat cards (portal) ---- */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}

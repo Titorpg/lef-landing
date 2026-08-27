@@ -33,56 +33,25 @@
 
   function boot() {
     sb.auth.getSession().then(function (r) {
-      if (!r.data.session) return renderLogin();
+      if (!r.data.session) return (window.location.replace("login.html"));
       sb.from("profiles").select("role,full_name,active").eq("user_id", r.data.session.user.id).maybeSingle()
         .then(function (p) {
           if (p.error || !p.data || !p.data.active) {
-            return sb.auth.signOut().then(function () { renderLogin("Esta cuenta no está activa."); });
+            return sb.auth.signOut().then(function () { window.location.replace("login.html"); });
           }
           if (p.data.role !== "student") {
-            // staff: mándalos al panel
-            app.innerHTML = "";
-            app.appendChild(h('<div class="pnl-center"><div class="pnl-login"><div class="brand">LEF</div>' +
-              '<p class="hint">Esta cuenta es de staff. Entra al <a href="admin.html">panel administrativo</a>.</p>' +
-              '<button class="btn btn-ghost" style="width:100%;justify-content:center" id="o">Cerrar sesión</button></div></div>'));
-            document.getElementById("o").onclick = function () { sb.auth.signOut().then(boot); };
-            return;
+            // staff entró aquí: mándalos al panel
+            return (window.location.replace("admin.html"));
           }
           renderBilling(p.data);
         });
     });
   }
 
-  function renderLogin(msg) {
-    app.innerHTML = "";
-    var card = h('<div class="pnl-center"><form class="pnl-login">' +
-      '<div class="brand">LEF <span>·</span> Mi cuenta</div>' +
-      '<p class="hint">Ingresa con el correo y la contraseña que te dio LEF.</p>' +
-      (msg ? '<div class="pnl-alert err">' + esc(msg) + "</div>" : "") +
-      '<div class="pnl-alert err" data-err style="display:none"></div>' +
-      '<label class="fld"><span>Correo</span><input type="email" name="email" autocomplete="username" required></label>' +
-      '<label class="fld"><span>Contraseña</span><input type="password" name="password" autocomplete="current-password" required></label>' +
-      '<button class="btn btn-dark" style="width:100%;justify-content:center" type="submit">Ingresar</button>' +
-      '<p class="hint" style="margin:16px 0 0"><a href="index.html">&larr; Volver al sitio</a></p>' +
-      "</form></div>");
-    var form = card.querySelector("form");
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var err = form.querySelector("[data-err]"); err.style.display = "none";
-      var btn = form.querySelector("button"); btn.disabled = true;
-      sb.auth.signInWithPassword({ email: form.email.value.trim(), password: form.password.value })
-        .then(function (r) { if (r.error) throw r.error; boot(); })
-        .catch(function (er) {
-          err.textContent = er.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : er.message;
-          err.style.display = "block"; btn.disabled = false;
-        });
-    });
-    app.appendChild(card);
-  }
-
   function renderBilling(profile) {
     app.innerHTML = "";
-    app.appendChild(h('<div class="pnl-top"><div class="brand">LEF <span>·</span> Mi cuenta</div>' +
+    app.appendChild(h('<div class="pnl-top">' +
+      '<a class="brand" href="index.html"><img src="assets/logo-horizontal.png" alt="LEF"><span class="tag">Mi cuenta</span></a>' +
       '<div class="who">' + esc(profile.full_name || "") + ' <button class="link" id="logout">Salir</button></div></div>'));
     var wrap = h('<div class="pnl-wrap"><nav class="pnl-nav"><a class="active" href="#facturacion">Facturación</a></nav>' +
       '<main class="pnl-main"><p class="muted">Cargando…</p></main></div>');

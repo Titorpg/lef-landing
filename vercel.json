@@ -24,7 +24,7 @@
       ]
     },
     {
-      "source": "/(admin|portal|supabase-config\\.js|script\\.js)",
+      "source": "/(admin|portal|login|supabase-config\\.js|script\\.js)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]

@@ -79,48 +79,20 @@
   function boot() {
     sb.auth.getSession().then(function (r) {
       var s = r.data.session;
-      if (!s) return renderLogin();
+      if (!s) return (window.location.replace("login.html"));
       TOKEN = s.access_token;
       return q("profiles").select("*").eq("user_id", s.user.id).maybeSingle().then(function (p) {
-        if (p.error || !p.data || !p.data.active || !["admin", "teacher"].includes(p.data.role)) {
-          return sb.auth.signOut().then(function () {
-            renderLogin("Esta cuenta no tiene acceso al panel.");
-          });
+        if (p.error || !p.data || !p.data.active) {
+          return sb.auth.signOut().then(function () { window.location.replace("login.html"); });
+        }
+        if (!["admin", "teacher"].includes(p.data.role)) {
+          // un estudiante entró aquí: mándalo a su portal
+          return (window.location.replace("portal.html"));
         }
         ME = p.data;
         renderShell();
       });
     });
-  }
-
-  function renderLogin(msg) {
-    app.innerHTML = "";
-    var card = h(
-      '<div class="pnl-center"><form class="pnl-login">' +
-      '<div class="brand">LEF <span>·</span> Panel</div>' +
-      '<p class="hint">Ingresa con tu cuenta de staff.</p>' +
-      (msg ? '<div class="pnl-alert err">' + esc(msg) + "</div>" : "") +
-      '<div class="pnl-alert err" data-err style="display:none"></div>' +
-      field("Correo", '<input type="email" name="email" autocomplete="username" required>') +
-      field("Contraseña", '<input type="password" name="password" autocomplete="current-password" required>') +
-      '<button class="btn btn-dark" style="width:100%;justify-content:center" type="submit">Ingresar</button>' +
-      "</form></div>"
-    );
-    var form = card.querySelector("form");
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var err = form.querySelector("[data-err]"); err.style.display = "none";
-      var btn = form.querySelector("button"); btn.disabled = true;
-      sb.auth.signInWithPassword({ email: form.email.value.trim(), password: form.password.value })
-        .then(function (r) {
-          if (r.error) throw r.error;
-          boot();
-        }).catch(function (er) {
-          err.textContent = er.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : er.message;
-          err.style.display = "block"; btn.disabled = false;
-        });
-    });
-    app.appendChild(card);
   }
 
   /* ============ shell ============ */
@@ -137,8 +109,8 @@
     var allowed = SECTIONS.filter(function (s) { return s.roles.includes(ME.role); });
     app.appendChild(h(
       '<div class="pnl-top">' +
-      '<div class="brand">LEF <span>·</span> Panel</div>' +
-      '<div class="who">' + esc(ME.full_name || ME.email) + ' · ' + esc(ME.role) +
+      '<a class="brand" href="index.html"><img src="assets/logo-horizontal.png" alt="LEF"><span class="tag">Panel</span></a>' +
+      '<div class="who">' + esc(ME.full_name || ME.email) + ' · ' + esc(ROLE_ES[ME.role] || ME.role) +
       ' <button class="link" data-logout>Salir</button></div>' +
       "</div>"
     ));
@@ -226,7 +198,29 @@
 
   /* ============ ESTUDIANTES ============ */
   function secEstudiantes(main) {
-    head(main, "Estudiantes", "Personas inscritas. Aquí el admin crea la cuenta de acceso al portal de facturación.");
+    head(main, "Estudiantes", "Personas inscritas. El admin crea aquí la cuenta de acceso al portal de facturación.");
+    if (ME.role === "admin") {
+      var bar = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark" data-add>+ Estudiante</button>' +
+        '<span class="muted" style="font-size:13px">La mayoría se agregan solos al inscribirse. Usa esto para cargar uno manualmente.</span></div>');
+      main.appendChild(bar);
+      bar.querySelector("[data-add]").onclick = function () {
+        var b = h("<div>" +
+          field("Nombre completo", '<input name="n">') +
+          field("WhatsApp", '<input name="w">') +
+          field("Correo", '<input name="e" type="email">') +
+          field("Edad (opcional)", '<input name="a" type="number" min="5" max="100">') +
+          field("Ciudad (opcional)", '<input name="c">') + "</div>");
+        modal("Nuevo estudiante", b, function () {
+          return q("students").insert({
+            full_name: b.querySelector("[name=n]").value.trim(),
+            whatsapp: b.querySelector("[name=w]").value.trim(),
+            email: b.querySelector("[name=e]").value.trim(),
+            age: +b.querySelector("[name=a]").value || null,
+            city: b.querySelector("[name=c]").value.trim() || null
+          }).then(function (i) { if (i.error) throw i.error; toast("Estudiante agregado."); route(); });
+        }, "Agregar");
+      };
+    }
     Promise.all([
       q("students").select("*").order("created_at", { ascending: false }),
       ME.role === "admin" ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] })
@@ -234,24 +228,48 @@
       if (res[0].error) throw res[0].error;
       var profByStudent = {};
       (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
-      var t = tableWrap(["Nombre", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", ""]);
+      var t = tableWrap(["Nombre", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
         var prof = profByStudent[s.id];
+        var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
+          : prof.active ? '<span class="badge ok">activa</span>'
+          : '<span class="badge bad">inactiva</span>';
         var tr = h("<tr>" +
           "<td>" + esc(s.full_name) + "</td>" +
           "<td>" + esc(s.whatsapp) + "</td>" +
           '<td class="wrap">' + esc(s.email) + "</td>" +
           "<td>" + esc(s.city || "—") + "</td>" +
-          "<td>" + (prof ? '<span class="badge ok">activa</span>' : '<span class="badge neutral">sin cuenta</span>') + "</td>" +
+          "<td>" + estado + (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : "") + "</td>" +
           "<td></td></tr>");
-        if (ME.role === "admin" && !prof) {
-          var b = h('<button class="btn btn-sm btn-ghost">Crear cuenta</button>');
-          b.onclick = function () { crearCuentaEstudiante(s); };
-          tr.children[5].appendChild(b);
+        var cell = tr.children[5];
+        if (ME.role === "admin") {
+          if (!prof) {
+            var b = h('<button class="btn btn-sm btn-blue">Crear cuenta de portal</button>');
+            b.onclick = function () { crearCuentaEstudiante(s); };
+            cell.appendChild(b);
+          } else {
+            var rp = h('<button class="btn btn-sm btn-ghost">Restablecer contraseña</button>');
+            rp.onclick = function () {
+              var np = "lef" + Math.random().toString(36).slice(2, 10);
+              var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
+                '<p class="pnl-sub">Compártela con el estudiante. Podrá cambiarla luego.</p></div>');
+              modal("Restablecer contraseña — " + s.full_name, bb, function () {
+                return callFn({ action: "reset_password", user_id: prof.user_id, password: bb.querySelector("[name=p]").value })
+                  .then(function () { toast("Contraseña actualizada."); });
+              }, "Guardar");
+            };
+            cell.appendChild(rp);
+            var tg = h('<button class="btn btn-sm btn-ghost" style="margin-left:6px">' + (prof.active ? "Desactivar" : "Activar") + " acceso</button>");
+            tg.onclick = function () {
+              callFn({ action: "set_active", user_id: prof.user_id, active: !prof.active })
+                .then(function () { toast("Actualizado."); route(); }).catch(function (e) { toast(e.message, "err"); });
+            };
+            cell.appendChild(tg);
+          }
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="6" class="muted">Sin estudiantes.</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="6" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse, o agrégalos con “+ Estudiante”.</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(e.message) + "</div>")); });
   }
@@ -260,11 +278,12 @@
     var pwd = "lef" + Math.random().toString(36).slice(2, 10);
     var body = h("<div>" +
       field("Nombre", '<input name="fn" value="' + esc(s.full_name) + '">') +
-      field("Correo (usuario)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
+      field("Correo (usuario para entrar)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
       field("Contraseña temporal", '<input name="pw" value="' + pwd + '">') +
-      '<p class="pnl-sub">Comparte estos datos con el estudiante. Podrá cambiar la contraseña luego.</p>' +
+      '<p class="pnl-sub">Comparte estos datos con el estudiante. Entra en ' +
+      esc(window.location.host) + '/login y podrá cambiar la contraseña luego.</p>' +
       "</div>");
-    modal("Crear cuenta de portal", body, function () {
+    modal("Crear cuenta de portal — " + s.full_name, body, function () {
       return callFn({
         action: "create_account", role: "student",
         full_name: body.querySelector("[name=fn]").value.trim(),

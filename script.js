@@ -10,6 +10,7 @@ const I18N = {
     nav_offer: "What we offer",
     nav_evaluation: "Evaluation",
     nav_enroll: "Enroll",
+    nav_login: "Log in",
     hero_tag: "Online English Academy · Barranquilla, Colombia",
     hero_h1_1: "Speak English",
     hero_h1_2: "with fluency.",
@@ -191,6 +192,7 @@ const I18N = {
     nav_offer: "Qué ofrecemos",
     nav_evaluation: "Evaluación",
     nav_enroll: "Inscribirme",
+    nav_login: "Iniciar sesión",
     hero_tag: "Academia de inglés online · Barranquilla, Colombia",
     hero_h1_1: "Habla inglés",
     hero_h1_2: "con fluidez.",
@@ -404,6 +406,30 @@ function initLang(){
   });
 }
 
+// Inserta el enlace "Iniciar sesión" en el header y el drawer de todas las páginas
+// (una sola puerta: /login enruta a admin o portal según el rol).
+function initLoginLink(){
+  const headerActions = document.querySelector(".site-header .actions");
+  if (headerActions && !headerActions.querySelector(".login-link")){
+    const enroll = headerActions.querySelector('a[href="inscripcion.html"]');
+    const a = document.createElement("a");
+    a.className = "login-link";
+    a.href = "login.html";
+    a.setAttribute("data-i18n", "nav_login");
+    a.textContent = "Iniciar sesión";
+    headerActions.insertBefore(a, enroll || headerActions.querySelector(".menu-btn"));
+  }
+  const drawerActions = document.querySelector(".drawer-actions");
+  if (drawerActions && !drawerActions.querySelector(".login-link")){
+    const a = document.createElement("a");
+    a.className = "login-link drawer-login";
+    a.href = "login.html";
+    a.setAttribute("data-i18n", "nav_login");
+    a.textContent = "Iniciar sesión";
+    drawerActions.appendChild(a);
+  }
+}
+
 function initDrawer(){
   const btn = document.querySelector(".menu-btn");
   const drawer = document.querySelector(".drawer");
@@ -468,6 +494,7 @@ function initFounderQuotes(){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initLoginLink();
   initLang();
   initReveal();
   initDrawer();
