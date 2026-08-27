@@ -1,6 +1,6 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 27 de agosto de 2026
+Última actualización: 27 de agosto de 2026 (sesión: migración Vercel+Supabase, Fase 1 completa, base Fase 2)
 
 ## 🔗 Enlaces
 
@@ -36,34 +36,57 @@ El token y las credenciales de Supabase están en `.env` local (NO se sube — v
 ### FASE 1 — Sistema de inscripción — HECHA ✅
 Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS plano.
 
-- **Backend** (`supabase/migrations/20260827120000_sistema_inscripcion.sql`):
-  9 tablas (`modules`, `cycles`, `teachers`, `schedules`, `groups`, `students`,
-  `enrollments`, `registration_counters`, `profiles`) + funciones SECURITY DEFINER:
-  `get_public_modules`, `get_schedule_availability`, `create_enrollment`
-  (transaccional: valida cupo, detecta duplicados por correo/WhatsApp, asigna grupo,
-  genera matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`. RLS en todo.
-  La tabla `inscripciones` de la etapa A se **eliminó** (reemplazada por students+enrollments).
+**Migraciones aplicadas** (`supabase/migrations/`):
+| Archivo | Qué hace |
+|---|---|
+| `20260827120000_sistema_inscripcion.sql` | 9 tablas + funciones + RLS + seed 12 módulos; elimina `inscripciones` de la etapa A |
+| `20260827190000_module_titles_en.sql` | Títulos de módulos en inglés (Hello World, Everyday Life…), descripción en español |
+| `20260827210000_modulo_por_estudiante.sql` | `enrollments.group_id`/`cycle_id` opcionales; `subscriptions.module_id`; `admin_assign_module`, `module_enrollment_counts` |
+| `20260827220000_billing_overview_modulo.sql` | `admin_billing_overview` devuelve el módulo de la suscripción |
+
+**Tablas:** `modules`, `cycles`, `teachers`, `schedules`, `groups`, `students`,
+`enrollments`, `registration_counters`, `profiles`, `subscriptions`, `payments`.
+
+**Funciones SECURITY DEFINER:** `get_public_modules`, `get_schedule_availability`,
+`create_enrollment` (transaccional: valida cupo, dup-check correo/WhatsApp, asigna grupo,
+matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_module`
+(crea/actualiza la inscripción "solo módulo" de un estudiante), `module_enrollment_counts`,
+`record_payment`, `freeze_overdue_subscriptions`, `get_my_billing`, `admin_billing_overview`,
+`is_admin`/`is_teacher`/`is_staff`/`current_student_id`. RLS en todas las tablas.
+
 - **Asistente de 4 pasos** (`inscripcion.html` + `assets/js/lef-enroll.js` + CSS en `style.css`):
-  1 Tus datos · 2 Elige nivel (12 módulos) · 3 Elige horario (cupos reales) · 4 Revisar.
+  1 Tus datos · 2 Elige nivel (12 módulos, título en inglés) · 3 Elige horario (cupos reales) · 4 Revisar.
   Al confirmar: pantalla con nº de matrícula **+ botón WhatsApp** (opción b).
 - **Panel admin** (`admin.html` + `assets/js/lef-admin.js` + `assets/css/lef-panel.css`):
-  login vía `/login`. Secciones:
-  - **Dashboard**: KPIs (estudiantes, inscripciones, al día/mora/congeladas), donut SVG de
-    inscripciones por módulo, tabla de inscripciones (cambiar estado), pagos recientes.
-  - **Estudiantes**: crear cuenta de portal, restablecer contraseña, activar/desactivar
-    acceso, editar, eliminar, + Estudiante manual.
-  - **Pagos**: suscripciones, registrar pago manual, editar, congelar vencidas.
-  - **Académico**: Módulos (activar/desactivar + editar título/desc), Ciclos (Periodo =
-    selector de pares de meses que fija los calendarios de inicio/fin, abrir/cerrar, editar),
-    Profesores (editar/eliminar), Horarios (activar/desactivar, eliminar), Grupos
-    (editar profesor/cupo, activar/desactivar, eliminar).
-  - **Usuarios**: crear staff, cambiar rol, activar/desactivar, eliminar.
-  - Barra superior con logo LEF (sin tag "Panel"); el logo lleva al Dashboard, no al sitio.
-- **Roles** (tabla `profiles.role`): `admin` (todo) · `teacher` (solo lectura de sus grupos)
-  · `student` (solo el portal). Helpers: `is_admin()`, `is_teacher()`, `current_student_id()`.
-  Cuenta admin única sembrada; el admin crea las demás cuentas desde el panel.
-- **Edge Function** `manage-users`: crea/edita cuentas de auth (solo admin). Sin Wompi no
-  hace falta nada más.
+  login vía `/login`. Barra superior = solo logo LEF (lleva al Dashboard). Secciones:
+  - **Dashboard**: KPIs (estudiantes, **profesores**, inscripciones activas/nuevas,
+    al día/mora/congeladas — todos en una fila en escritorio); donut SVG con **1 color fijo
+    por módulo** y leyenda en grilla con % de cada uno; sección **"Estado de los módulos"**
+    con aviso ⚠️ si hay alguno desactivado; tabla de inscripciones (cambiar estado);
+    pagos recientes.
+  - **Estudiantes**: al crear/editar se **elige el módulo** (crea/actualiza la inscripción
+    vía `admin_assign_module`); columna Módulo; crear cuenta de portal, restablecer
+    contraseña, activar/desactivar acceso, editar, eliminar, + Estudiante.
+  - **Pagos**: suscripción atada a **Módulo** (lista desplegable, no texto libre);
+    registrar pago manual, editar, eliminar, congelar vencidas.
+  - **Académico**: Módulos (activar/desactivar, editar título/desc, columna **Inscritos**),
+    Ciclos (**Periodo** = selector de pares de meses que fija los calendarios inicio/fin;
+    abrir/cerrar, editar, eliminar), Profesores (editar/eliminar), Horarios
+    (activar/desactivar, eliminar), Grupos (editar profesor/cupo, activar/desactivar, eliminar).
+    Un módulo desactivado deja de aparecer para asignar en todas las pestañas.
+  - **Usuarios**: lista admin + estudiantes + **profesores** (con o sin cuenta); columna
+    Creado; filtros por rol / activo-inactivo / orden por fecha; crear staff, cambiar rol,
+    activar/desactivar, eliminar.
+- **Portal del estudiante** (`portal.html` + `assets/js/lef-portal.js`): pestaña Facturación.
+- **Roles** (`profiles.role`): `admin` (todo) · `teacher` (lectura de sus grupos) ·
+  `student` (solo el portal). Cuenta admin única sembrada; crea las demás desde el panel.
+- **Login único** (`login.html` + `assets/js/lef-auth.js`): un solo formulario para todos;
+  enruta a `/admin` o `/portal` según el rol. Enlace "Iniciar sesión" en el header de todo
+  el sitio (texto en escritorio, ícono donde estaba el de WhatsApp en móvil — el ícono de
+  WhatsApp del header se quitó).
+- **Edge Function** `manage-users` (solo admin): `create_account`, `set_role`, `set_active`,
+  `reset_password`, `delete_account`, `update_email`. Deploy: `npx supabase functions deploy
+  manage-users --project-ref cemrxcatbxbcipxmsnjf` (con `SUPABASE_ACCESS_TOKEN` en el env).
 
 ### FASE 2 — Portal + facturación
 
@@ -89,9 +112,13 @@ Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS p
 ### Datos de prueba en Supabase (borrar cuando entren los reales)
 - Profesores: María Rada, Luis Caballero, Daniela Ospino
 - Ciclo abierto "Sep - Oct 2026" + 5 horarios/grupos (A1.1 ×2, A1.3, A2.1, B1.1)
-- Estudiante demo: **Ana Gómez Prueba** (`ana.prueba@lef-test.com`) — matrícula LEF-2026-00001,
-  cuenta de portal activa, suscripción $180.000 con 1 pago registrado.
-- Semilla: `supabase/seed_demo.sql`. Borrable desde el panel (Académico / Estudiantes).
+- Estudiante demo: **Ana Gómez Prueba** (`ana.prueba@lef-test.com` / `AnaDemo2026!`) —
+  matrícula LEF-2026-00001, módulo A1.1, cuenta de portal activa, suscripción $180.000 con 1 pago.
+- Estudiante **Jorge Rada** (`jorgeradash@gmail.com`) — creado por el cliente probando el panel;
+  quedó **sin módulo** (se creó antes de la migración `20260827210000`). Editarlo y asignarle
+  módulo para que entre al conteo, o borrarlo.
+- Semilla: `supabase/seed_demo.sql`. Todo borrable desde el panel (Académico / Estudiantes / Usuarios).
+- Contraseña temporal del admin: `.env` → `ADMIN_TEMP_PASSWORD` (cambiar en la entrega).
 
 ### Entrega / handoff
 1. GitHub: *Settings → Transfer ownership* del repo a la cuenta del cliente.
@@ -105,12 +132,12 @@ Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS p
 
 Landing page multi-página para **LEF (Learn English Fluently)**, academia de inglés online en Barranquilla, Colombia. Sitio estático (HTML/CSS/JS, sin framework ni build), bilingüe (ES/EN con toggle), construido siguiendo `BRAND_GUIDELINES.md`.
 
-## Estructura del sitio (8 páginas)
+## Estructura del sitio (páginas públicas + panel/portal)
 
 | Archivo | Contenido |
 |---|---|
 | `index.html` | Home: hero con carrusel de fotos y frase animada, "¿Qué hace LEF diferente?" (tarjetas + ruta de niveles con módulo C1), preguntas de calificación, frase ancla, sección del fundador (foto + cita rotativa), cierre + CTA |
-| `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos reales (nombres y descripciones), bloque de horas de acompañamiento (16h+3h=19h) y bloque C1 de cursos adicionales |
+| `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos (títulos en inglés — mismos que en el panel/asistente — y descripciones en español), bloque de horas (16h+3h=19h) y bloque C1 |
 | `sistema.html` | Los 3 pilares del método + nota sobre el examen de validación (no punitivo) |
 | `ofrecemos.html` | Las 6 cosas que ofrece LEF (clases, club de conversación, materiales, plataforma, tutorías **al final de cada ciclo**, acompañamiento) |
 | `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
@@ -121,7 +148,15 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 | `politica-privacidad.html` | Política de privacidad (borrador fundamentado en la Ley 1581 de 2012 de Colombia) |
 | `terminos-uso.html` | Términos de uso (borrador) |
 
-Archivos compartidos: `style.css` (todo el sistema visual), `script.js` (i18n EN/ES, menú drawer móvil, formulario→WhatsApp, reveal-on-scroll, carrusel del hero, cita rotativa del fundador).
+Archivos compartidos: `style.css` (todo el sistema visual, incluye el asistente de inscripción),
+`script.js` (i18n EN/ES, menú drawer móvil, reveal-on-scroll, carrusel del hero, cita rotativa
+del fundador, inyección del enlace "Iniciar sesión" en el header). `supabase-config.js` (URL +
+publishable key, factory `lefClient`). `assets/vendor/supabase.min.js` (supabase-js vendorizado).
+`assets/js/`: `lef-enroll.js` (asistente), `lef-admin.js` (panel), `lef-portal.js` (portal),
+`lef-auth.js` (login). `assets/css/lef-panel.css` (panel + portal + login).
+
+**Backup del código:** solo el repo GitHub personal + Vercel. `.env` (tokens y credenciales)
+vive únicamente local y NO está en Git.
 
 ## Identidad de marca (resumen)
 
@@ -155,8 +190,21 @@ Archivos compartidos: `style.css` (todo el sistema visual), `script.js` (i18n EN
 
 ## Cómo seguir trabajando
 
-- **Para pedir cambios:** solo decime qué ajustar, yo edito los archivos localmente.
-- **Para publicar cambios en el sitio en vivo:** avisame y hago `git add` + `commit` + `push` — se actualiza solo en 1-2 minutos, sin que tengas que volver a autenticarte.
-- **Para ver el sitio en local antes de publicar:** puedo levantar un servidor local de prueba (Node) en `http://127.0.0.1:PUERTO/` si querés revisar algo antes de subirlo.
-- **Si un cambio publicado no se ve en el celular:** normalmente es caché del navegador — probar en modo incógnito o borrar caché del sitio antes de asumir que algo quedó mal.
-- **Assets:** todas las imágenes/íconos están en `assets/` (logos, fotos reales de clase y materiales, foto del fundador, íconos de WhatsApp/redes/FAQ ya integrados).
+- **Para pedir cambios:** decime qué ajustar, edito los archivos localmente.
+- **Para publicar:** `npx vercel deploy --prod --yes --token <VERCEL_TOKEN> --scope lefcenter`
+  (token en `.env`). El sitio actualiza al toque. Luego `git add` + `commit` + `push` para
+  guardar en el repo. **No hay auto-deploy** — cada cambio hay que desplegarlo a mano.
+- **Backend:** las migraciones SQL se aplican vía la Management API de Supabase con
+  `SUPABASE_ACCESS_TOKEN`. Las Edge Functions con `npx supabase functions deploy`.
+- **Caché:** el `vercel.json` deja que JS/CSS revaliden y cachea imágenes 1 año. Si un cambio
+  de JS no se ve, `Ctrl+Shift+R` una vez (afecta solo a quien ya había cargado la versión vieja).
+- **Assets:** imágenes/íconos en `assets/`. Falta un ícono propio de "login" (hoy es un SVG inline).
+
+## Estado al cerrar esta sesión (27 ago 2026)
+
+- ✅ Sitio migrado a Vercel + Supabase, dominio apuntando, Fase 1 completa y probada en vivo.
+- ✅ Base de Fase 2 (portal + facturación manual) lista.
+- ⏳ **Mañana:** el cliente entrega la cuenta de Wompi → se hace toda la integración de pagos
+  (ver "Pendiente ⏳" arriba).
+- ⏳ Jorge Rada sin módulo (ver datos de prueba).
+- ⏳ Contenido bilingüe de FAQ/política/términos; imágenes reales; revisión legal.
