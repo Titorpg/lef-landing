@@ -3,3 +3,11 @@ node_modules/
 *.mp4
 Thumbs.db
 .DS_Store
+
+# Secrets / tokens locales (no subir)
+.env
+.env.*
+.vercel/
+supabase/.temp/
+
+.vercel

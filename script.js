@@ -418,6 +418,21 @@ function initDrawer(){
   drawer.querySelectorAll("a").forEach(a => a.addEventListener("click", close));
 }
 
+function saveEnrollment(payload){
+  // Guarda la inscripción en Supabase. No bloquea el flujo de WhatsApp:
+  // si falla (sin conexión, config ausente, etc.) solo se registra en consola.
+  const client = window.lefSupabase;
+  if (!client) return Promise.resolve({ ok: false, skipped: true });
+  return client
+    .from("inscripciones")
+    .insert([payload])
+    .then(({ error }) => {
+      if (error) { console.warn("[LEF] Inscripción no guardada:", error.message); return { ok: false }; }
+      return { ok: true };
+    })
+    .catch((err) => { console.warn("[LEF] Inscripción no guardada:", err); return { ok: false }; });
+}
+
 function initEnrollForm(){
   const form = document.getElementById("enroll-form");
   if (!form) return;
@@ -432,6 +447,20 @@ function initEnrollForm(){
     const city = (data.get("city") || "").toString().trim();
     const level = (data.get("level") || "").toString().trim();
     const schedule = (data.get("schedule") || "").toString().trim();
+
+    // Etapa A: registrar la inscripción en la base de datos (no bloquea WhatsApp).
+    saveEnrollment({
+      nombre: name,
+      telefono: phone,
+      email: email,
+      edad: age ? parseInt(age, 10) : null,
+      ciudad: city || null,
+      nivel: level || null,
+      horario: schedule || null,
+      idioma: lang === "en" ? "en" : "es",
+      origen: "sitio-web"
+    });
+
     const lines = lang === "en"
       ? [
           "Hi! I'd like to enroll at LEF.",

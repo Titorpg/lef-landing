@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+.claude
+node_modules
+supabase
+estado.md
+*.md
+BRAND_GUIDELINES.md
+LEF_CONTENT.md
+LEF_Cursos_Niveles.md
