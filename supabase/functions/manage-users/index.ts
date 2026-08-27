@@ -90,6 +90,23 @@ Deno.serve(async (req) => {
       return error ? json({ error: error.message }, 400) : json({ ok: true });
     }
 
+    if (action === "delete_account") {
+      const uid = String(payload.user_id);
+      if (uid === auth.user.id) return json({ error: "no_puedes_borrarte" }, 400);
+      await admin.from("profiles").delete().eq("user_id", uid);
+      const { error } = await admin.auth.admin.deleteUser(uid);
+      return error ? json({ error: error.message }, 400) : json({ ok: true });
+    }
+
+    if (action === "update_email") {
+      const uid = String(payload.user_id);
+      const email = String(payload.email ?? "").trim().toLowerCase();
+      const { error } = await admin.auth.admin.updateUserById(uid, { email, email_confirm: true });
+      if (error) return json({ error: error.message }, 400);
+      await admin.from("profiles").update({ email }).eq("user_id", uid);
+      return json({ ok: true });
+    }
+
     return json({ error: "accion_desconocida" }, 400);
   } catch (e) {
     return json({ error: String(e) }, 500);

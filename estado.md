@@ -47,8 +47,18 @@ Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS p
   1 Tus datos · 2 Elige nivel (12 módulos) · 3 Elige horario (cupos reales) · 4 Revisar.
   Al confirmar: pantalla con nº de matrícula **+ botón WhatsApp** (opción b).
 - **Panel admin** (`admin.html` + `assets/js/lef-admin.js` + `assets/css/lef-panel.css`):
-  login Supabase Auth. Secciones: Inscripciones (cambiar estado), Estudiantes (crear cuenta
-  de portal), Pagos, Académico (módulos/ciclos/profesores/horarios/grupos — CRUD), Usuarios.
+  login vía `/login`. Secciones:
+  - **Dashboard**: KPIs (estudiantes, inscripciones, al día/mora/congeladas), donut SVG de
+    inscripciones por módulo, tabla de inscripciones (cambiar estado), pagos recientes.
+  - **Estudiantes**: crear cuenta de portal, restablecer contraseña, activar/desactivar
+    acceso, editar, eliminar, + Estudiante manual.
+  - **Pagos**: suscripciones, registrar pago manual, editar, congelar vencidas.
+  - **Académico**: Módulos (activar/desactivar + editar título/desc), Ciclos (Periodo =
+    selector de pares de meses que fija los calendarios de inicio/fin, abrir/cerrar, editar),
+    Profesores (editar/eliminar), Horarios (activar/desactivar, eliminar), Grupos
+    (editar profesor/cupo, activar/desactivar, eliminar).
+  - **Usuarios**: crear staff, cambiar rol, activar/desactivar, eliminar.
+  - Barra superior con logo LEF (sin tag "Panel"); el logo lleva al Dashboard, no al sitio.
 - **Roles** (tabla `profiles.role`): `admin` (todo) · `teacher` (solo lectura de sus grupos)
   · `student` (solo el portal). Helpers: `is_admin()`, `is_teacher()`, `current_student_id()`.
   Cuenta admin única sembrada; el admin crea las demás cuentas desde el panel.
