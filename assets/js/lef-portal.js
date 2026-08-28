@@ -29,7 +29,7 @@
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
-  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Devuelto" };
+  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reverso" };
 
   function boot() {
     sb.auth.getSession().then(function (r) {
@@ -103,15 +103,15 @@
 
       main.appendChild(h('<h2 class="pnl-h" style="font-size:16px;margin-top:8px">Historial de pagos</h2>'));
       var t = h('<div class="pnl-table-wrap"><table class="pnl"><thead><tr>' +
-        "<th>Fecha</th><th>Mes cubierto</th><th>Monto</th><th>Método</th><th>Estado</th><th>Referencia</th>" +
+        "<th>Recibo</th><th>Fecha</th><th>Mes cubierto</th><th>Monto</th><th>Método</th><th>Estado</th><th>Referencia</th>" +
         "</tr></thead><tbody></tbody></table></div>");
       var tb = t.querySelector("tbody");
       pays.forEach(function (p) {
-        tb.appendChild(h("<tr><td>" + date(p.paid_at) + "</td><td>" + monthLabel(p.period_month) + "</td><td>" +
+        tb.appendChild(h("<tr><td>" + esc(p.receipt_number || "—") + "</td><td>" + date(p.paid_at) + "</td><td>" + monthLabel(p.period_month) + "</td><td>" +
           money(p.amount, p.currency) + "</td><td>" + esc(METHOD_ES[p.method] || p.method) + "</td><td>" +
           esc(PAYST_ES[p.status] || p.status) + "</td><td>" + esc(p.reference || "—") + "</td></tr>"));
       });
-      if (!pays.length) tb.appendChild(h('<tr><td colspan="6" class="muted">Todavía no hay pagos registrados.</td></tr>'));
+      if (!pays.length) tb.appendChild(h('<tr><td colspan="7" class="muted">Todavía no hay pagos registrados.</td></tr>'));
       main.appendChild(t);
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu información: ' + esc(e.message) + "</div>";

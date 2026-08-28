@@ -43,6 +43,8 @@ Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS p
 | `20260827190000_module_titles_en.sql` | Títulos de módulos en inglés (Hello World, Everyday Life…), descripción en español |
 | `20260827210000_modulo_por_estudiante.sql` | `enrollments.group_id`/`cycle_id` opcionales; `subscriptions.module_id`; `admin_assign_module`, `module_enrollment_counts` |
 | `20260827220000_billing_overview_modulo.sql` | `admin_billing_overview` devuelve el módulo de la suscripción |
+| `20260827230000_cascadas_admin.sql` | Grupo borrable si no tiene inscripciones activas; desactivar módulo apaga sus horarios/grupos en cascada; `group_enrollment_counts` |
+| `20260827240000_pagos_libro_contable.sql` | Documento del estudiante **obligatorio**; se puede **eliminar** un estudiante (`admin_delete_student`) conservando el historial de pagos desligado; datos del **pagador** en la suscripción + congelados en cada pago; pagos **inmutables** (trigger) con consecutivo `REC-AAAA-NNNNN`; corrección vía `admin_reverse_payment` |
 
 **Tablas:** `modules`, `cycles`, `teachers`, `schedules`, `groups`, `students`,
 `enrollments`, `registration_counters`, `profiles`, `subscriptions`, `payments`.
@@ -99,21 +101,41 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
 - **Pestaña Pagos del admin**: crea suscripción por estudiante, registra pagos manuales
   (efectivo/transferencia/…), congela/activa, botón "congelar cuentas vencidas".
 
-**Pendiente ⏳ (Wompi — el cliente entrega la cuenta mañana):**
+**Modelo contable (implementado en `20260827240000`):**
+- **Estudiante** ≠ **Pagador**. El documento del estudiante es obligatorio (TI/CC/CE/PP,
+  el estudiante puede ser menor). El "tercero" del libro es **quien paga**: nombre + tipo y
+  número de documento + correo + teléfono, se guardan en la **suscripción** y se **congelan
+  en cada pago** (el pagador puede cambiar mes a mes).
+- Cada pago lleva consecutivo `REC-AAAA-NNNNN` y una copia congelada de estudiante + pagador,
+  así el asiento es auto-suficiente ante la DIAN aunque se elimine al estudiante.
+- Los pagos son **inmutables** (trigger `payments_immutable`): no se editan ni se borran.
+  Corrección = `admin_reverse_payment` (asiento de reverso, status `refunded`).
+- Eliminar un estudiante (`admin_delete_student`): borra inscripción y suscripciones **sin
+  pagos**; **desliga** (student_id→NULL) las suscripciones/pagos con historial. No se reconecta
+  si se recrea al estudiante.
+
+**Pendiente ⏳ (Wompi — el cliente entrega la cuenta):**
 1. Cuenta Wompi del cliente (sandbox + producción) → llaves.
 2. Cobro en línea: PSE + tarjeta (checkout Wompi).
 3. Guardar tarjeta tokenizada (payment_source) para cobro recurrente.
 4. Edge Function `wompi-webhook` (confirmación de pagos) + tabla `payment_methods`.
+   El webhook debe llenar `payments` **solo en estado final** (el trigger bloquea UPDATE) y
+   registrar campos de la pasarela: id de transacción, banco PSE / franquicia / últimos 4,
+   `payment_source_id`, monto en centavos, referencia de comercio, `status`/mensaje.
 5. Cobro mensual automático (pg_cron + Edge Function).
 6. Congelación automática de morosos (pg_cron) — la función ya existe, falta agendarla.
 7. Consentimiento de cobro recurrente + actualizar Términos/Política (revisión legal).
-8. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
+8. **Decisión pendiente: ¿LEF emite factura electrónica ante la DIAN o documento
+   equivalente?** Define si hay que integrar un proveedor externo (Siigo/Alegra/Factus)
+   y guardar el CUFE / número de factura en cada pago.
+9. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
 
 ### Datos de prueba en Supabase (borrar cuando entren los reales)
 - Profesores: María Rada, Luis Caballero, Daniela Ospino
 - Ciclo abierto "Sep - Oct 2026" + 5 horarios/grupos (A1.1 ×2, A1.3, A2.1, B1.1)
 - Estudiante demo: **Ana Gómez Prueba** (`ana.prueba@lef-test.com` / `AnaDemo2026!`) —
   matrícula LEF-2026-00001, módulo A1.1, cuenta de portal activa, suscripción $180.000 con 1 pago.
+  Tras `20260827240000` su documento quedó como `CC PENDIENTE` (backfill) — editarlo.
 - Estudiante **Jorge Rada** (`jorgeradash@gmail.com`) — creado por el cliente probando el panel;
   quedó **sin módulo** (se creó antes de la migración `20260827210000`). Editarlo y asignarle
   módulo para que entre al conteo, o borrarlo.
@@ -200,11 +222,13 @@ vive únicamente local y NO está en Git.
   de JS no se ve, `Ctrl+Shift+R` una vez (afecta solo a quien ya había cargado la versión vieja).
 - **Assets:** imágenes/íconos en `assets/`. Falta un ícono propio de "login" (hoy es un SVG inline).
 
-## Estado al cerrar esta sesión (27 ago 2026)
+## Estado al cerrar esta sesión (28 ago 2026)
 
 - ✅ Sitio migrado a Vercel + Supabase, dominio apuntando, Fase 1 completa y probada en vivo.
 - ✅ Base de Fase 2 (portal + facturación manual) lista.
-- ⏳ **Mañana:** el cliente entrega la cuenta de Wompi → se hace toda la integración de pagos
-  (ver "Pendiente ⏳" arriba).
+- ✅ Migración `20260827240000` (documento del estudiante + libro contable + borrado de
+  estudiante conservando historial) escrita. **Falta aplicarla a Supabase y desplegar.**
+- ⏳ También sin aplicar: `20260827230000_cascadas_admin.sql`.
+- ⏳ Wompi: el cliente entrega la cuenta → integración de pagos en línea (ver "Pendiente ⏳").
 - ⏳ Jorge Rada sin módulo (ver datos de prueba).
 - ⏳ Contenido bilingüe de FAQ/política/términos; imágenes reales; revisión legal.

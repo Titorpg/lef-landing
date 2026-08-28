@@ -37,8 +37,15 @@
                        "#c15b4a", "#9a5aa3", "#5f6bd0", "#7d8794", "#3aa0a0", "#33415c"];
   function modColor(n) { return MODULE_COLORS[((n || 1) - 1) % 12]; }
 
-  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Devuelto" };
+  var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reversado" };
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
+  var DOC_TYPES = ["TI", "CC", "CE", "PP"];
+  var DOC_LABEL = { TI: "Tarjeta de identidad", CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", PP: "Pasaporte" };
+  function docSelect(name, val) {
+    return '<select name="' + name + '">' + DOC_TYPES.map(function (k) {
+      return '<option value="' + k + '"' + (k === val ? " selected" : "") + ">" + esc(DOC_LABEL[k]) + "</option>";
+    }).join("") + "</select>";
+  }
   var ROLE_ES = { admin: "Administrador", teacher: "Profesor", student: "Estudiante" };
   var ENROLL_STATUS = ["Pending", "Contacted", "Confirmed", "Paid", "Cancelled"];
   var ENROLL_ES = { Pending: "Nueva", Contacted: "Contactada", Confirmed: "Confirmada", Paid: "Pagada", Cancelled: "Cancelada" };
@@ -80,10 +87,28 @@
         esc(m.level + " · " + m.title) + "</option>";
     }).join("") + "</select>";
   }
+  var BLOCK_TABLE_ES = {
+    enrollments: "inscripciones", payments: "pagos", subscriptions: "suscripciones",
+    groups: "grupos", schedules: "horarios", students: "estudiantes", teachers: "profesores"
+  };
+  var CODE_ES = {
+    LEF_PAYMENT_INMUTABLE: "Un pago registrado no se edita ni se borra. Usa “Reversar” para corregirlo.",
+    LEF_PERIOD_ALREADY_PAID: "Ya hay un pago aprobado para ese mes en esta suscripción. Si fue un error, revérsalo primero.",
+    LEF_ALREADY_REVERSED: "Ese pago ya tiene un reverso registrado.",
+    LEF_PAYMENT_NOT_FOUND: "No se encontró el pago.",
+    LEF_STUDENT_NOT_FOUND: "No se encontró el estudiante.",
+    LEF_INVALID_DOC_TYPE: "Tipo de documento inválido.",
+    LEF_MISSING_FIELDS: "Faltan datos obligatorios (nombre, documento, WhatsApp o correo)."
+  };
   function friendly(e) {
     var m = (e && e.message) || String(e);
+    var key = Object.keys(CODE_ES).find(function (k) { return m.indexOf(k) === 0 || m.indexOf(k) > -1; });
+    if (key) return CODE_ES[key];
     if (e && (e.code === "23503" || /foreign key|violates/i.test(m))) {
-      return "No se puede eliminar: tiene registros asociados (inscripciones, pagos, grupos u horarios). Cámbialos o desactívalo primero.";
+      var det = (e && e.details) || "";
+      var tbl = (det.match(/from table "(\w+)"/) || [])[1];
+      var label = BLOCK_TABLE_ES[tbl] || "otros registros";
+      return "No se puede eliminar: tiene " + label + " asociados. Cámbialos, cancélalos o desactívalo primero.";
     }
     if (e && e.code === "23505") return "Ya existe un registro con ese dato (correo duplicado, por ejemplo).";
     return m;
@@ -230,7 +255,7 @@
     ];
     if (isAdmin) {
       jobs.push(rpc("admin_billing_overview"));
-      jobs.push(q("payments").select("amount,currency,method,status,paid_at,students(full_name)").order("paid_at", { ascending: false }).limit(8));
+      jobs.push(q("payments").select("amount,currency,method,status,paid_at,receipt_number,student_name,students(full_name)").order("paid_at", { ascending: false }).limit(8));
     }
 
     Promise.all(jobs).then(function (res) {
@@ -308,14 +333,15 @@
 
       if (isAdmin) {
         main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:30px 0 12px">Pagos recientes</h2>'));
-        var t2 = tableWrap(["Estudiante", "Monto", "Método", "Estado", "Fecha"]);
+        var t2 = tableWrap(["Recibo", "Estudiante", "Monto", "Método", "Estado", "Fecha"]);
         recentPays.forEach(function (p) {
-          var badge = p.status === "approved" ? "ok" : p.status === "declined" ? "bad" : "neutral";
-          t2.body.appendChild(h("<tr><td>" + esc(p.students ? p.students.full_name : "—") + "</td><td>" +
+          var badge = p.status === "approved" ? "ok" : p.status === "refunded" ? "neutral" : p.status === "declined" ? "bad" : "neutral";
+          var nombre = (p.students && p.students.full_name) || p.student_name || "—";
+          t2.body.appendChild(h("<tr><td>" + esc(p.receipt_number || "—") + "</td><td>" + esc(nombre) + "</td><td>" +
             money(p.amount, p.currency) + "</td><td>" + esc(METHOD_ES[p.method] || p.method) + '</td><td><span class="badge ' + badge + '">' +
             esc(PAYST_ES[p.status] || p.status) + "</span></td><td>" + date(p.paid_at) + "</td></tr>"));
         });
-        if (!recentPays.length) t2.body.appendChild(h('<tr><td colspan="5" class="muted">Sin pagos registrados.</td></tr>'));
+        if (!recentPays.length) t2.body.appendChild(h('<tr><td colspan="6" class="muted">Sin pagos registrados.</td></tr>'));
         main.appendChild(t2.wrap);
       }
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
@@ -346,7 +372,7 @@
       var mods = res[3];
       if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
 
-      var t = tableWrap(["Nombre", "Módulo", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
+      var t = tableWrap(["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
         var prof = profByStudent[s.id];
         var enr = modByStudent[s.id];
@@ -356,13 +382,14 @@
           : prof.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
         var tr = h([
           "<tr><td>", esc(s.full_name), "</td>",
+          "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
           "<td>", modColorDot, esc(modLabel), "</td>",
           "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
           "<td>", esc(s.city || "—"), "</td>",
           "<td>", estado, (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : ""), "</td>",
           '<td class="acts"></td></tr>'
         ].join(""));
-        var cell = tr.children[6];
+        var cell = tr.children[7];
         if (ME.role === "admin") {
           if (!prof) cell.appendChild(btn("Crear cuenta de portal", "btn-blue", function () { crearCuentaEstudiante(s); }));
           else {
@@ -377,7 +404,7 @@
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse por el formulario, o agrégalos con “+ Estudiante”.</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="8" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse por el formulario, o agrégalos con “+ Estudiante”.</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
@@ -385,17 +412,24 @@
   function editStudent(s, currentModuleId, mods) {
     if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
     var b = h("<div>" +
-      field("Nombre completo", '<input name="n" value="' + esc(s ? s.full_name : "") + '">') +
+      field("Nombre completo del estudiante", '<input name="n" value="' + esc(s ? s.full_name : "") + '">') +
+      field("Tipo de documento", docSelect("dt", s ? s.doc_type : "TI")) +
+      field("Número de documento", '<input name="dn" value="' + esc(s ? (s.doc_number || "") : "") + '">') +
       field("Módulo en que se inscribe", moduleSelect("mod", mods, currentModuleId || mods[0].id)) +
       field("WhatsApp", '<input name="w" value="' + esc(s ? s.whatsapp : "") + '">') +
       field("Correo", '<input name="e" type="email" value="' + esc(s ? s.email : "") + '">') +
       field("Edad (opcional)", '<input name="a" type="number" min="5" max="100" value="' + (s && s.age ? s.age : "") + '">') +
       field("Ciudad (opcional)", '<input name="c" value="' + esc(s ? (s.city || "") : "") + '">') +
+      '<p class="pnl-sub">El documento del estudiante es obligatorio. Si es menor de edad, va su tarjeta de identidad; el documento de quien paga se registra aparte, en la suscripción.</p>' +
       (s ? '<p class="pnl-sub">Cambiar el módulo actualiza su inscripción (si tenía grupo asignado, se libera).</p>' : "") +
       "</div>");
     modal(s ? "Editar estudiante" : "Nuevo estudiante", b, function () {
+      var docNum = b.querySelector("[name=dn]").value.trim();
+      if (docNum.length < 3) throw new Error("Ingresa el número de documento del estudiante.");
       var payload = {
         full_name: b.querySelector("[name=n]").value.trim(),
+        doc_type: b.querySelector("[name=dt]").value,
+        doc_number: docNum,
         whatsapp: b.querySelector("[name=w]").value.trim(),
         email: b.querySelector("[name=e]").value.trim(),
         age: +b.querySelector("[name=a]").value || null,
@@ -422,15 +456,35 @@
   }
 
   function deleteStudent(s, prof) {
-    confirmDelete("Eliminar estudiante", "Vas a eliminar a " + s.full_name + " y todo lo asociado (inscripciones y suscripciones sin pagos). Los pagos registrados NO se pueden borrar por historial contable.", function () {
-      return q("payments").select("id", { count: "exact", head: true }).eq("student_id", s.id).then(function (pc) {
-        if ((pc.count || 0) > 0) throw new Error("Este estudiante tiene pagos registrados. No se puede eliminar (historial contable). Desactiva su acceso en su lugar.");
-        return q("subscriptions").delete().eq("student_id", s.id);
-      }).then(function () { return q("enrollments").delete().eq("student_id", s.id); })
+    // El borrado real lo hace admin_delete_student (transaccional): borra
+    // inscripciones y suscripciones sin pagos; DESLIGA las suscripciones/pagos
+    // con historial (quedan fijos como libro contable). Luego borramos la cuenta.
+    function doDelete() {
+      return rpc("admin_delete_student", { p_student_id: s.id })
         .then(function () { return prof ? callFn({ action: "delete_account", user_id: prof.user_id }) : null; })
-        .then(function () { return q("students").delete().eq("id", s.id); })
-        .then(function (r) { if (r && r.error) throw r.error; toast("Estudiante eliminado."); route(); });
-    });
+        .then(function () { toast("Estudiante eliminado."); route(); });
+    }
+    q("payments").select("id", { count: "exact", head: true }).eq("student_id", s.id).then(function (pc) {
+      if (pc.error) throw pc.error;
+      var n = pc.count || 0;
+      if (n === 0) {
+        confirmDelete("Eliminar estudiante",
+          "Vas a eliminar a " + s.full_name + " y todo lo asociado (inscripción, suscripción y cuenta de acceso). No tiene pagos registrados.",
+          doDelete);
+        return;
+      }
+      var b = h("<div>" +
+        '<p class="pnl-sub" style="margin-bottom:6px">' + esc(s.full_name) + " tiene <strong>" + n + " pago(s) registrado(s)</strong>.</p>" +
+        '<p class="pnl-sub" style="margin-bottom:6px">Al eliminarlo, esos pagos <strong>NO se borran</strong>: quedan en el libro contable como historial fijo, pero <strong>desligados</strong> de este estudiante. Si más adelante vuelves a crear a esta persona, <strong>no se reconectará</strong> con esos pagos.</p>' +
+        '<p class="pnl-sub" style="margin-bottom:10px">Se eliminan su inscripción, sus suscripciones sin pagos y su cuenta de acceso. Esta acción no se puede deshacer.</p>' +
+        field('Escribe ELIMINAR para confirmar', '<input name="confirm" autocomplete="off" placeholder="ELIMINAR">') +
+        "</div>");
+      modal("Eliminar estudiante con historial de pagos", b, function () {
+        if ((b.querySelector("[name=confirm]").value || "").trim().toUpperCase() !== "ELIMINAR")
+          throw new Error('Escribe ELIMINAR para confirmar.');
+        return doDelete();
+      }, "Eliminar definitivamente", true);
+    }).catch(function (e) { toast(friendly(e), "err"); });
   }
 
   function crearCuentaEstudiante(s) {
@@ -463,32 +517,44 @@
       rpc("freeze_overdue_subscriptions").then(function (n) { toast(n + " cuenta(s) congelada(s)."); route(); })
         .catch(function (e) { toast(friendly(e), "err"); });
     };
-    Promise.all([rpc("admin_billing_overview"), q("students").select("id,full_name").order("full_name"), activeModules()])
-      .then(function (res) {
+    Promise.all([
+      rpc("admin_billing_overview"),
+      q("students").select("id,full_name,doc_type,doc_number,email,whatsapp").order("full_name"),
+      activeModules()
+    ]).then(function (res) {
         var rows = res[0] || [], students = res[1].data || [], mods = res[2];
         var newBtn = h('<button class="btn btn-dark btn-sm" data-new>+ Nueva suscripción</button>');
         bar.appendChild(newBtn);
         newBtn.onclick = function () { editarSuscripcion(null, students, mods); };
-        var t = tableWrap(["Estudiante", "Módulo", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
+        var t = tableWrap(["Estudiante / pagador", "Módulo", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
         rows.forEach(function (r) {
           var st = r.status === "frozen" ? '<span class="badge bad">congelada</span>'
             : r.is_overdue ? '<span class="badge warn">en mora</span>'
             : r.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
             : '<span class="badge ok">al día</span>';
-          var tr = h("<tr><td>" + esc(r.student_name) + '</td><td class="wrap">' + esc(r.module_label || "—") +
+          var who = esc(r.student_name) +
+            (r.student_deleted ? ' <span class="badge neutral">estudiante eliminado</span>' : "") +
+            (r.payer_name && r.payer_name !== r.student_name
+              ? '<br><span class="muted" style="font-size:12px">paga: ' + esc(r.payer_name) +
+                (r.payer_doc_number ? " (" + esc((r.payer_doc_type || "") + " " + r.payer_doc_number) + ")" : "") + "</span>"
+              : "");
+          var tr = h("<tr><td>" + who + '</td><td class="wrap">' + esc(r.module_label || "—") +
             "</td><td>" + money(r.monthly_amount, r.currency) + "</td><td>" + date(r.next_due_date) + "</td><td>" +
             (r.last_payment_at ? date(r.last_payment_at) + " · " + money(r.last_payment_amount, r.currency) : "—") +
             '</td><td>' + st + '</td><td class="acts"></td></tr>');
           var cell = tr.children[6];
-          cell.appendChild(btn("Registrar pago", "btn-blue", function () { registrarPago(r); }));
-          cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students, mods); }));
-          cell.appendChild(btn("Eliminar", "btn-danger", function () {
-            confirmDelete("Eliminar suscripción", "Solo se puede si no tiene pagos registrados.", function () {
-              return q("subscriptions").delete().eq("id", r.subscription_id).then(function (d) {
-                if (d.error) throw d.error; toast("Suscripción eliminada."); route();
+          cell.appendChild(btn("Ver pagos", "btn-ghost", function () { verPagos(r); }));
+          if (!r.student_deleted) {
+            cell.appendChild(btn("Registrar pago", "btn-blue", function () { registrarPago(r); }));
+            cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students, mods); }));
+            cell.appendChild(btn("Eliminar", "btn-danger", function () {
+              confirmDelete("Eliminar suscripción", "Solo se puede si no tiene pagos registrados. Si los tiene, revérsalos primero o elimina al estudiante (el historial se conserva).", function () {
+                return q("subscriptions").delete().eq("id", r.subscription_id).then(function (d) {
+                  if (d.error) throw d.error; toast("Suscripción eliminada."); route();
+                });
               });
-            });
-          }));
+            }));
+          }
           t.body.appendChild(tr);
         });
         if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin suscripciones. Crea una con “Nueva suscripción”.</td></tr>'));
@@ -496,7 +562,78 @@
       }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
+  function verPagos(r) {
+    var box = h('<div><p class="muted">Cargando…</p></div>');
+    modal("Pagos — " + r.student_name, box, null, "Cerrar");
+    q("payments").select("*").eq("subscription_id", r.subscription_id).order("paid_at", { ascending: false })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        var pays = res.data || [];
+        box.innerHTML = "";
+        if (!pays.length) { box.appendChild(h('<p class="muted">Sin pagos en esta suscripción.</p>')); return; }
+        var reversedIds = {};
+        pays.forEach(function (p) { if (p.reverses_payment) reversedIds[p.reverses_payment] = true; });
+        var tbl = tableWrap(["Recibo", "Mes", "Monto", "Método", "Pagador", "Estado", ""]);
+        pays.forEach(function (p) {
+          var isReversal = !!p.reverses_payment;
+          var isReversed = reversedIds[p.id];
+          var estado = p.status === "refunded" ? '<span class="badge neutral">reverso</span>'
+            : isReversed ? '<span class="badge warn">reversado</span>'
+            : '<span class="badge ok">' + esc(PAYST_ES[p.status] || p.status) + "</span>";
+          var tr = h("<tr><td>" + esc(p.receipt_number || "—") + "</td><td>" + esc((p.period_month || "").slice(0, 7)) +
+            "</td><td>" + money(p.amount, p.currency) + "</td><td>" + esc(METHOD_ES[p.method] || p.method) +
+            '</td><td class="wrap">' + esc((p.payer_name || "—") + (p.payer_doc_number ? " · " + (p.payer_doc_type || "") + " " + p.payer_doc_number : "")) +
+            "</td><td>" + estado + '</td><td class="acts"></td></tr>');
+          if (!isReversal && !isReversed && p.status === "approved") {
+            tr.children[6].appendChild(btn("Reversar", "btn-danger", function () { reversarPago(p); }));
+          }
+          tbl.body.appendChild(tr);
+        });
+        box.appendChild(tbl.wrap);
+      }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function reversarPago(p) {
+    var b = h("<div>" +
+      '<p class="pnl-sub" style="margin-bottom:10px">Se creará un asiento de <strong>reverso</strong> del recibo ' + esc(p.receipt_number || p.id) +
+      " por " + money(p.amount, p.currency) + ". El pago original queda en el libro (no se borra). Revisa después la fecha del próximo pago de la suscripción.</p>" +
+      field("Motivo del reverso", '<input name="reason" placeholder="Ej.: monto equivocado, pago duplicado">') +
+      "</div>");
+    modal("Reversar pago", b, function () {
+      var reason = (b.querySelector("[name=reason]").value || "").trim();
+      if (reason.length < 3) throw new Error("Escribe el motivo del reverso.");
+      return rpc("admin_reverse_payment", { p_payment_id: p.id, p_reason: reason })
+        .then(function () { toast("Reverso registrado."); route(); });
+    }, "Reversar", true);
+  }
+
+  function payerFields(src) {
+    src = src || {};
+    return '<p class="pnl-sub" style="margin:14px 0 6px;font-weight:600">Datos de quien paga (para el libro contable)</p>' +
+      field("Nombre de quien paga", '<input name="pn" value="' + esc(src.name || "") + '">') +
+      field("Tipo de documento", docSelect("pdt", src.docType || "CC")) +
+      field("Número de documento", '<input name="pdn" value="' + esc(src.docNumber || "") + '">') +
+      field("Correo (opcional)", '<input name="pe" type="email" value="' + esc(src.email || "") + '">') +
+      field("Teléfono (opcional)", '<input name="pp" value="' + esc(src.phone || "") + '">');
+  }
+  function readPayer(box) {
+    var g = function (n) { var el = box.querySelector("[name=" + n + "]"); return el ? el.value.trim() : ""; };
+    var name = g("pn"), doc = g("pdn");
+    if (name.length < 2 || doc.length < 3) throw new Error("Ingresa el nombre y el documento de quien paga.");
+    return {
+      p_payer_name: name, p_payer_doc_type: g("pdt"), p_payer_doc_number: doc,
+      p_payer_email: g("pe") || null, p_payer_phone: g("pp") || null
+    };
+  }
+  function payerFromStudent(s) {
+    return s ? { name: s.full_name, docType: s.doc_type, docNumber: s.doc_number, email: s.email, phone: s.whatsapp } : {};
+  }
+
   function editarSuscripcion(r, students, mods) {
+    var byId = {}; students.forEach(function (s) { byId[s.id] = s; });
+    var initPayer = r
+      ? { name: r.payer_name, docType: r.payer_doc_type, docNumber: r.payer_doc_number, email: r.payer_email, phone: r.payer_phone }
+      : payerFromStudent(students[0]);
     var body = h("<div>" +
       (r ? "" : field("Estudiante", '<select name="sid">' + students.map(function (s) {
         return '<option value="' + s.id + '">' + esc(s.full_name) + "</option>";
@@ -506,16 +643,31 @@
       field("Día de cobro (1–28)", '<input name="day" type="number" min="1" max="28" value="' + (r ? "" : 1) + '" placeholder="1">') +
       field("Días de gracia", '<input name="grace" type="number" min="0" max="60" value="5">') +
       (r ? field("Estado", '<select name="status"><option value="active">Activa</option><option value="frozen">Congelada</option><option value="cancelled">Cancelada</option></select>') : "") +
+      payerFields(initPayer) +
+      (r ? "" : '<p class="pnl-sub">Si el estudiante es mayor y paga él mismo, deja sus datos. Si paga un familiar, cámbialos.</p>') +
       "</div>");
     if (r) {
       body.querySelector("[name=mod]").value = r.module_id || (mods[0] && mods[0].id);
       if (body.querySelector("[name=status]")) body.querySelector("[name=status]").value = r.status;
     }
+    var sidSel = body.querySelector("[name=sid]");
+    if (sidSel) sidSel.onchange = function () {
+      var p = payerFromStudent(byId[sidSel.value]);
+      body.querySelector("[name=pn]").value = p.name || "";
+      body.querySelector("[name=pdt]").value = p.docType || "CC";
+      body.querySelector("[name=pdn]").value = p.docNumber || "";
+      body.querySelector("[name=pe]").value = p.email || "";
+      body.querySelector("[name=pp]").value = p.phone || "";
+    };
     modal(r ? "Editar suscripción" : "Nueva suscripción", body, function () {
+      var payer = readPayer(body);
       var payload = {
         module_id: body.querySelector("[name=mod]").value,
         monthly_amount: +body.querySelector("[name=amt]").value || 0,
-        grace_days: +body.querySelector("[name=grace]").value || 5
+        grace_days: +body.querySelector("[name=grace]").value || 5,
+        payer_name: payer.p_payer_name, payer_doc_type: payer.p_payer_doc_type,
+        payer_doc_number: payer.p_payer_doc_number, payer_email: payer.p_payer_email,
+        payer_phone: payer.p_payer_phone
       };
       var day = +body.querySelector("[name=day]").value;
       if (day >= 1 && day <= 28) payload.billing_day = day;
@@ -543,17 +695,24 @@
       field("Monto (COP)", '<input name="amt" type="number" min="0" value="' + (r.monthly_amount || "") + '">') +
       field("Método", '<select name="m"><option value="cash">Efectivo</option><option value="transfer">Transferencia</option><option value="pse">PSE</option><option value="card">Tarjeta</option><option value="other">Otro</option></select>') +
       field("Mes que cubre", '<input name="pm" type="month" value="' + now.toISOString().slice(0, 7) + '">') +
-      field("Referencia (opcional)", '<input name="ref">') +
-      field("Nota (opcional)", '<input name="note">') + "</div>");
+      field("Referencia / nº de soporte (opcional)", '<input name="ref" placeholder="Nº de consignación, transferencia…">') +
+      field("Nota (opcional)", '<input name="note">') +
+      payerFields({
+        name: r.payer_name, docType: r.payer_doc_type, docNumber: r.payer_doc_number,
+        email: r.payer_email, phone: r.payer_phone
+      }) +
+      '<p class="pnl-sub">Registra el documento que figura en el soporte del pago (puede ser distinto al del estudiante).</p>' +
+      "</div>");
     modal("Registrar pago — " + r.student_name, body, function () {
-      return rpc("record_payment", {
+      var payer = readPayer(body);
+      return rpc("record_payment", Object.assign({
         p_subscription_id: r.subscription_id,
         p_amount: +body.querySelector("[name=amt]").value || 0,
         p_method: body.querySelector("[name=m]").value,
         p_period_month: body.querySelector("[name=pm]").value + "-01",
         p_reference: body.querySelector("[name=ref]").value.trim() || null,
         p_notes: body.querySelector("[name=note]").value.trim() || null
-      }).then(function () { toast("Pago registrado."); route(); });
+      }, payer)).then(function () { toast("Pago registrado."); route(); });
     }, "Registrar");
   }
 
@@ -592,10 +751,10 @@
             '</td><td class="acts"></td></tr>');
           var cell = tr.children[6];
           cell.appendChild(btn(m.active ? "Desactivar" : "Activar", "btn-ghost", function () {
-            q("modules").update({ active: !m.active }).eq("id", m.id).then(function (u) {
-              if (u.error) toast(friendly(u.error), "err");
-              else { toast("Módulo " + (m.active ? "desactivado" : "activado") + "."); acModulos(box); }
-            });
+            rpc("admin_set_module_active", { p_module_id: m.id, p_active: !m.active }).then(function () {
+              toast("Módulo " + (m.active ? "desactivado" : "activado") + (m.active ? " (y sus horarios/grupos con él)." : " (y sus horarios/grupos que él había apagado)."));
+              acModulos(box);
+            }).catch(function (e) { toast(friendly(e), "err"); });
           }));
           cell.appendChild(btn("Editar", "btn-ghost", function () {
             var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
@@ -768,13 +927,16 @@
       var t = tableWrap(["Ciclo", "Módulo", "Días", "Horario", "Estado", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
         var modTxt = s.modules ? s.modules.level + " · " + s.modules.title + (s.modules.active ? "" : " (módulo inactivo)") : "—";
+        var estadoTxt = s.active ? '<span class="badge ok">activo</span>'
+          : '<span class="badge neutral">inactivo' + (s.deactivated_by_module ? " · por módulo" : "") + "</span>";
         var tr = h("<tr><td>" + esc(s.cycles ? s.cycles.name : "—") + "</td><td>" + esc(modTxt) +
           "</td><td>" + esc(days(s.days)) + "</td><td>" + esc(time(s.start_time) + "–" + time(s.end_time)) +
-          "</td><td>" + (s.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
+          "</td><td>" + estadoTxt +
           '</td><td class="acts"></td></tr>');
         var cell = tr.children[5];
         cell.appendChild(btn(s.active ? "Desactivar" : "Activar", "btn-ghost", function () {
-          q("schedules").update({ active: !s.active }).eq("id", s.id).then(function () { acHorarios(box); });
+          q("schedules").update({ active: !s.active, deactivated_by_module: false }).eq("id", s.id)
+            .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acHorarios(box); });
         }));
         cell.appendChild(btn("Eliminar", "btn-danger", function () {
           confirmDelete("Eliminar horario", "No se puede si tiene grupos asociados.", function () {
@@ -792,11 +954,14 @@
     Promise.all([
       q("groups").select("*,modules(level,title),teachers(full_name),schedules(days,start_time,end_time,cycles(name))").order("created_at", { ascending: false }),
       q("schedules").select("id,days,start_time,end_time,module_id,modules(level,title,active)").eq("active", true),
-      q("teachers").select("id,full_name").eq("active", true)
+      q("teachers").select("id,full_name").eq("active", true),
+      rpc("group_enrollment_counts")
     ]).then(function (res) {
       box.innerHTML = "";
       var scheds = (res[1].data || []).filter(function (s) { return s.modules && s.modules.active; });
       var teachers = res[2].data || [];
+      var counts = {};
+      (res[3] || []).forEach(function (c) { counts[c.group_id] = c.count; });
       var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Grupo</button></div>');
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
@@ -815,16 +980,19 @@
           }).then(function (i) { if (i.error) throw i.error; toast("Grupo creado."); acGrupos(box); });
         });
       };
-      var t = tableWrap(["Módulo", "Ciclo", "Horario", "Profesor", "Cupo", "Estado", "Acciones"]);
+      var t = tableWrap(["Módulo", "Ciclo", "Horario", "Profesor", "Cupo", "Inscritos", "Estado", "Acciones"]);
       (res[0].data || []).forEach(function (g) {
         var sc = g.schedules;
+        var estadoTxt = g.active ? '<span class="badge ok">activo</span>'
+          : '<span class="badge neutral">inactivo' + (g.deactivated_by_module ? " · por módulo" : "") + "</span>";
         var tr = h("<tr><td>" + esc(g.modules ? g.modules.level + " · " + g.modules.title : "—") + "</td><td>" + esc(sc && sc.cycles ? sc.cycles.name : "—") +
           "</td><td>" + esc(sc ? days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time) : "—") + "</td><td>" + esc(g.teachers ? g.teachers.full_name : "—") +
-          "</td><td>" + g.capacity + "</td><td>" + (g.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
+          "</td><td>" + g.capacity + '</td><td style="font-weight:600">' + (counts[g.id] || 0) + "</td><td>" + estadoTxt +
           '</td><td class="acts"></td></tr>');
-        var cell = tr.children[6];
+        var cell = tr.children[7];
         cell.appendChild(btn(g.active ? "Desactivar" : "Activar", "btn-ghost", function () {
-          q("groups").update({ active: !g.active }).eq("id", g.id).then(function () { acGrupos(box); });
+          q("groups").update({ active: !g.active, deactivated_by_module: false }).eq("id", g.id)
+            .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acGrupos(box); });
         }));
         cell.appendChild(btn("Editar", "btn-ghost", function () {
           var b = h("<div>" +
@@ -840,7 +1008,12 @@
           });
         }));
         cell.appendChild(btn("Eliminar", "btn-danger", function () {
-          confirmDelete("Eliminar grupo", "No se puede si tiene inscripciones. Cancélalas o muévelas primero.", function () {
+          var activos = counts[g.id] || 0;
+          var msg = activos > 0
+            ? "Tiene " + activos + " inscripción(es) activa(s) en este grupo. Cámbialas de módulo (Estudiantes > Editar) o cancélalas (Dashboard > Inscripciones) antes de eliminar."
+            : "Se eliminará el grupo. Las inscripciones canceladas que lo referenciaban quedarán sin grupo (no se borran).";
+          confirmDelete("Eliminar grupo", msg, function () {
+            if (activos > 0) throw new Error(msg);
             return q("groups").delete().eq("id", g.id).then(function (d) { if (d.error) throw d.error; toast("Grupo eliminado."); acGrupos(box); });
           });
         }));

@@ -18,7 +18,7 @@
 
   var state = {
     step: 1,
-    data: { name: "", phone: "", email: "", age: "", city: "" },
+    data: { name: "", docType: "CC", docNumber: "", phone: "", email: "", age: "", city: "" },
     modules: null,
     moduleId: null,
     schedules: null,
@@ -76,9 +76,12 @@
   function step1Valid() {
     var d = state.data;
     return d.name.trim().length >= 2 &&
+      ["TI", "CC", "CE", "PP"].indexOf(d.docType) >= 0 &&
+      d.docNumber.trim().length >= 3 &&
       d.phone.replace(/\D/g, "").length >= 7 &&
       /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email.trim());
   }
+  var DOC_LABEL = { TI: "Tarjeta de identidad", CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", PP: "Pasaporte" };
 
   /* ---------- render ---------- */
   function stepper() {
@@ -109,7 +112,9 @@
       '<h2 class="wz-h">Cuéntanos sobre ti</h2>' +
       '<p class="wz-sub">Usaremos esta información para confirmar tu cupo y contactarte por WhatsApp.</p>' +
       '<div class="wz-grid">' +
-        field("wz-name", "Nombre completo", "text", d.name, true, "full") +
+        field("wz-name", "Nombre completo del estudiante", "text", d.name, true, "full") +
+        docTypeField(d.docType) +
+        field("wz-docnum", "Número de documento", "text", d.docNumber, true) +
         field("wz-phone", "Número de WhatsApp", "tel", d.phone, true) +
         field("wz-email", "Correo electrónico", "email", d.email, true) +
         field("wz-age", "Edad", "number", d.age, false) +
@@ -124,6 +129,14 @@
       '<label for="' + id + '">' + label + (req ? '<span class="req">*</span>' : "") + "</label>" +
       '<input id="' + id + '" type="' + type + '" value="' + esc(val) + '"' +
       (type === "number" ? ' min="5" max="100"' : "") + ">" +
+      "</div>";
+  }
+  function docTypeField(val) {
+    return '<div class="field">' +
+      '<label for="wz-doctype">Tipo de documento<span class="req">*</span></label>' +
+      '<select id="wz-doctype">' + ["TI", "CC", "CE", "PP"].map(function (k) {
+        return '<option value="' + k + '"' + (k === val ? " selected" : "") + ">" + esc(DOC_LABEL[k]) + "</option>";
+      }).join("") + "</select>" +
       "</div>";
   }
 
@@ -187,6 +200,7 @@
     var d = state.data, mod = selectedModule(), sc = selectedSchedule();
     var rows = [
       ["Nombre", d.name],
+      ["Documento", (DOC_LABEL[d.docType] || d.docType) + ": " + d.docNumber],
       ["WhatsApp", d.phone],
       ["Correo", d.email],
       d.age ? ["Edad", d.age] : null,
@@ -247,7 +261,8 @@
   function readStep1() {
     var g = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
     state.data = {
-      name: g("wz-name"), phone: g("wz-phone"), email: g("wz-email"),
+      name: g("wz-name"), docType: g("wz-doctype") || "CC", docNumber: g("wz-docnum"),
+      phone: g("wz-phone"), email: g("wz-email"),
       age: g("wz-age"), city: g("wz-city")
     };
   }
@@ -255,8 +270,8 @@
   function go(step) { state.error = ""; state.step = step; render(); window.scrollTo({ top: mount.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" }); }
 
   function bind() {
-    mount.querySelectorAll("input").forEach(function (el) {
-      el.addEventListener("input", function () {
+    mount.querySelectorAll("input, select").forEach(function (el) {
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", function () {
         if (state.step === 1) {
           readStep1();
           var btn = mount.querySelector('[data-act="to-2"]');
@@ -302,7 +317,7 @@
     if (act === "to-1") return go(1);
     if (act === "to-2") {
       readStep1();
-      if (!step1Valid()) { state.error = "Revisa tu nombre, WhatsApp y correo."; return render(); }
+      if (!step1Valid()) { state.error = "Revisa el nombre, el documento, el WhatsApp y el correo."; return render(); }
       go(2);
       loadModules().then(render).catch(function () { state.error = "No pudimos cargar los niveles. Intenta de nuevo."; render(); });
       return;
@@ -332,6 +347,8 @@
       p_email: d.email.trim(),
       p_module_id: state.moduleId,
       p_schedule_id: state.scheduleId,
+      p_doc_type: d.docType,
+      p_doc_number: d.docNumber.trim(),
       p_age: d.age ? parseInt(d.age, 10) : null,
       p_city: d.city ? d.city.trim() : null
     }).then(function (rows) {
@@ -346,7 +363,7 @@
       state.submitting = false;
       var msg = (err && err.message) || "";
       if (msg.indexOf("LEF_DUPLICATE_REGISTRATION") === 0) {
-        state.error = "Ya existe una inscripción con este correo o WhatsApp para el ciclo actual (" +
+        state.error = "Ya existe una inscripción con este correo, WhatsApp o documento para el ciclo actual (" +
           msg.split(":")[1] + "). Escríbenos por WhatsApp si necesitas ayuda.";
       } else if (msg.indexOf("LEF_CYCLE_CLOSED") === 0) {
         state.error = "El ciclo de inscripción está cerrado por ahora. Escríbenos por WhatsApp para más información.";

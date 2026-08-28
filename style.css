@@ -551,9 +551,9 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 
 .wz-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
 .wz-grid .full{grid-column:1/-1;}
-.wz-grid input{font-family:inherit;font-size:15px;padding:12px 14px;border:1px solid var(--niebla);
+.wz-grid input,.wz-grid select{font-family:inherit;font-size:15px;padding:12px 14px;border:1px solid var(--niebla);
   border-radius:10px;background:#fff;color:var(--ink);width:100%;}
-.wz-grid input:focus{outline:none;border-color:var(--azul);}
+.wz-grid input:focus,.wz-grid select:focus{outline:none;border-color:var(--azul);}
 
 .wz-nav{display:flex;justify-content:space-between;gap:14px;margin-top:30px;flex-wrap:wrap;}
 .wz-nav-end{justify-content:flex-end;}
