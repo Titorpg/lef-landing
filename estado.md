@@ -114,9 +114,12 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
   pagos**; **desliga** (student_id→NULL) las suscripciones/pagos con historial. No se reconecta
   si se recrea al estudiante.
 
-**Pendiente ⏳ (Wompi — el cliente entrega la cuenta):**
-1. Cuenta Wompi del cliente (sandbox + producción) → llaves.
-2. Cobro en línea: PSE + tarjeta (checkout Wompi).
+**Pendiente ⏳ (Wompi — APLAZADO por decisión del usuario, 28 ago 2026):**
+El cliente **ya tiene la cuenta Wompi**, pero se decide hacer la integración más adelante.
+Antes de empezar hay que reunir: llave pública, secreto de integridad, llave privada y
+secreto de eventos (sandbox + producción), y definir las 4 decisiones (abajo).
+1. Cargar llaves en `.env` (local) y secretos de Edge Function (Supabase).
+2. Cobro en línea: PSE + tarjeta (checkout Wompi). ¿Nequi/Bancolombia también?
 3. Guardar tarjeta tokenizada (payment_source) para cobro recurrente.
 4. Edge Function `wompi-webhook` (confirmación de pagos) + tabla `payment_methods`.
    El webhook debe llenar `payments` **solo en estado final** (el trigger bloquea UPDATE) y
@@ -128,7 +131,8 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
 8. **Decisión pendiente: ¿LEF emite factura electrónica ante la DIAN o documento
    equivalente?** Define si hay que integrar un proveedor externo (Siigo/Alegra/Factus)
    y guardar el CUFE / número de factura en cada pago.
-9. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
+9. **Decisión pendiente:** ¿cobro recurrente automático o pago manual cada mes desde el portal?
+10. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
 
 ### Datos de prueba en Supabase (borrar cuando entren los reales)
 - Profesores: María Rada, Luis Caballero, Daniela Ospino
@@ -229,6 +233,7 @@ vive únicamente local y NO está en Git.
 - ✅ Migración `20260827240000` (documento del estudiante + libro contable + borrado de
   estudiante conservando historial) escrita. **Falta aplicarla a Supabase y desplegar.**
 - ⏳ También sin aplicar: `20260827230000_cascadas_admin.sql`.
-- ⏳ Wompi: el cliente entrega la cuenta → integración de pagos en línea (ver "Pendiente ⏳").
+- ⏳ Wompi: el cliente ya tiene la cuenta, pero la integración de pagos en línea se
+  **aplazó** por decisión del usuario (28 ago 2026) — ver "Pendiente ⏳".
 - ⏳ Jorge Rada sin módulo (ver datos de prueba).
 - ⏳ Contenido bilingüe de FAQ/política/términos; imágenes reales; revisión legal.
