@@ -1,6 +1,7 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 27 de agosto de 2026 (sesión: migración Vercel+Supabase, Fase 1 completa, base Fase 2)
+Última actualización: 28 de agosto de 2026 (sesión: libro contable de pagos, documento del
+estudiante obligatorio, borrado de estudiante conservando historial — aplicado y desplegado)
 
 ## 🔗 Enlaces
 
@@ -46,19 +47,26 @@ Portado del proyecto viejo del cliente (`lef-center-app`) y reconstruido en JS p
 | `20260827230000_cascadas_admin.sql` | Grupo borrable si no tiene inscripciones activas; desactivar módulo apaga sus horarios/grupos en cascada; `group_enrollment_counts` |
 | `20260827240000_pagos_libro_contable.sql` | Documento del estudiante **obligatorio**; se puede **eliminar** un estudiante (`admin_delete_student`) conservando el historial de pagos desligado; datos del **pagador** en la suscripción + congelados en cada pago; pagos **inmutables** (trigger) con consecutivo `REC-AAAA-NNNNN`; corrección vía `admin_reverse_payment` |
 
+Las dos últimas se aplicaron el 28 ago 2026 (Management API, HTTP 201) y se desplegó a Vercel.
+
 **Tablas:** `modules`, `cycles`, `teachers`, `schedules`, `groups`, `students`,
 `enrollments`, `registration_counters`, `profiles`, `subscriptions`, `payments`.
 
 **Funciones SECURITY DEFINER:** `get_public_modules`, `get_schedule_availability`,
-`create_enrollment` (transaccional: valida cupo, dup-check correo/WhatsApp, asigna grupo,
-matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_module`
-(crea/actualiza la inscripción "solo módulo" de un estudiante), `module_enrollment_counts`,
-`record_payment`, `freeze_overdue_subscriptions`, `get_my_billing`, `admin_billing_overview`,
-`is_admin`/`is_teacher`/`is_staff`/`current_student_id`. RLS en todas las tablas.
+`create_enrollment` (transaccional: valida cupo, exige documento del estudiante,
+dup-check correo/WhatsApp/documento, asigna grupo, matrícula `LEF-AAAA-NNNNN`),
+`get_enrollment_confirmation`, `admin_assign_module` (crea/actualiza la inscripción
+"solo módulo" de un estudiante), `module_enrollment_counts`, `group_enrollment_counts`,
+`admin_set_module_active` (cascada módulo→horarios/grupos), `record_payment` (congela
+al pagador, consecutivo `REC-…`), `admin_reverse_payment`, `next_receipt_number`,
+`admin_delete_student`, `freeze_overdue_subscriptions`, `get_my_billing`,
+`admin_billing_overview`, `is_admin`/`is_teacher`/`is_staff`/`current_student_id`.
+RLS en todas las tablas. Trigger `payments_immutable` (pagos append-only).
 
 - **Asistente de 4 pasos** (`inscripcion.html` + `assets/js/lef-enroll.js` + CSS en `style.css`):
-  1 Tus datos · 2 Elige nivel (12 módulos, título en inglés) · 3 Elige horario (cupos reales) · 4 Revisar.
-  Al confirmar: pantalla con nº de matrícula **+ botón WhatsApp** (opción b).
+  1 Tus datos (nombre, **tipo y número de documento — obligatorio**, WhatsApp, correo, edad,
+  ciudad) · 2 Elige nivel (12 módulos, título en inglés) · 3 Elige horario (cupos reales) ·
+  4 Revisar. Al confirmar: pantalla con nº de matrícula **+ botón WhatsApp** (opción b).
 - **Panel admin** (`admin.html` + `assets/js/lef-admin.js` + `assets/css/lef-panel.css`):
   login vía `/login`. Barra superior = solo logo LEF (lleva al Dashboard). Secciones:
   - **Dashboard**: KPIs (estudiantes, **profesores**, inscripciones activas/nuevas,
@@ -67,10 +75,15 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
     con aviso ⚠️ si hay alguno desactivado; tabla de inscripciones (cambiar estado);
     pagos recientes.
   - **Estudiantes**: al crear/editar se **elige el módulo** (crea/actualiza la inscripción
-    vía `admin_assign_module`); columna Módulo; crear cuenta de portal, restablecer
-    contraseña, activar/desactivar acceso, editar, eliminar, + Estudiante.
-  - **Pagos**: suscripción atada a **Módulo** (lista desplegable, no texto libre);
-    registrar pago manual, editar, eliminar, congelar vencidas.
+    vía `admin_assign_module`) y se exige **documento** (TI/CC/CE/PP); columnas Documento y
+    Módulo; crear cuenta de portal, restablecer contraseña, activar/desactivar acceso,
+    editar, **eliminar** (si tiene pagos: modal "escribe ELIMINAR", el historial se conserva
+    desligado), + Estudiante.
+  - **Pagos**: suscripción atada a **Módulo** + **datos de quien paga** (nombre + documento +
+    correo + teléfono, prellenados del estudiante); registrar pago manual (con datos del
+    pagador editables por pago), **"Ver pagos"** por suscripción → **"Reversar"** (los pagos
+    no se editan ni se borran); congelar vencidas. Suscripciones de estudiantes eliminados en
+    solo lectura, etiqueta "estudiante eliminado".
   - **Académico**: Módulos (activar/desactivar, editar título/desc, columna **Inscritos**),
     Ciclos (**Periodo** = selector de pares de meses que fija los calendarios inicio/fin;
     abrir/cerrar, editar, eliminar), Profesores (editar/eliminar), Horarios
@@ -79,7 +92,8 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
   - **Usuarios**: lista admin + estudiantes + **profesores** (con o sin cuenta); columna
     Creado; filtros por rol / activo-inactivo / orden por fecha; crear staff, cambiar rol,
     activar/desactivar, eliminar.
-- **Portal del estudiante** (`portal.html` + `assets/js/lef-portal.js`): pestaña Facturación.
+- **Portal del estudiante** (`portal.html` + `assets/js/lef-portal.js`): pestaña Facturación
+  (historial de pagos con nº de recibo `REC-…`).
 - **Roles** (`profiles.role`): `admin` (todo) · `teacher` (lectura de sus grupos) ·
   `student` (solo el portal). Cuenta admin única sembrada; crea las demás desde el panel.
 - **Login único** (`login.html` + `assets/js/lef-auth.js`): un solo formulario para todos;
@@ -92,14 +106,17 @@ matrícula `LEF-AAAA-NNNNN`), `get_enrollment_confirmation`, `admin_assign_modul
 
 ### FASE 2 — Portal + facturación
 
-**Hecho hoy ✅** (sin Wompi, operación manual):
+**Hecho ✅** (operación manual, sin Wompi todavía):
 - Tablas `subscriptions` + `payments`; funciones `record_payment`, `freeze_overdue_subscriptions`,
-  `get_my_billing`, `admin_billing_overview`.
+  `get_my_billing`, `admin_billing_overview`, `admin_reverse_payment`, `admin_delete_student`.
 - **Portal del estudiante** (`portal.html` + `assets/js/lef-portal.js`): login, pestaña
-  **Facturación** — mensualidad, estado (al día/en mora/congelada), próximo pago, historial.
-  Botones de pago en línea visibles pero deshabilitados ("próximamente").
-- **Pestaña Pagos del admin**: crea suscripción por estudiante, registra pagos manuales
-  (efectivo/transferencia/…), congela/activa, botón "congelar cuentas vencidas".
+  **Facturación** — mensualidad, estado (al día/en mora/congelada), próximo pago, historial
+  con nº de recibo. Botones de pago en línea visibles pero deshabilitados ("próximamente").
+- **Pestaña Pagos del admin**: crea suscripción por estudiante (con datos del pagador),
+  registra pagos manuales (efectivo/transferencia/…), ver pagos y reversar, congela/activa,
+  botón "congelar cuentas vencidas".
+- **Libro contable** (ver abajo): documento del estudiante obligatorio, pagador separado,
+  pagos inmutables con consecutivo, borrado de estudiante conservando historial.
 
 **Modelo contable (implementado en `20260827240000`):**
 - **Estudiante** ≠ **Pagador**. El documento del estudiante es obligatorio (TI/CC/CE/PP,
@@ -209,7 +226,7 @@ vive únicamente local y NO está en Git.
    - El carrusel del hero en `index.html` ya usa 14 fotos reales (`photo-materials.jpg` + `photo-materials1.jpg`...`13.jpg`)
    - Hay dos fotos sin usar en `assets/` (`pexels-thirdman-5649522.jpg`, `pexels-yankrukov-8199706.jpg`) — preguntarle al cliente si son para alguna sección específica
 2. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
-3. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` es solo visual ("próximamente"); falta la integración funcional real. (Se hará sobre Supabase Edge Functions cuando haya credenciales de Wompi.)
+3. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
 4. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
 5. **LinkedIn** — falta el link real de la cuenta cuando exista.
 6. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
@@ -229,11 +246,13 @@ vive únicamente local y NO está en Git.
 ## Estado al cerrar esta sesión (28 ago 2026)
 
 - ✅ Sitio migrado a Vercel + Supabase, dominio apuntando, Fase 1 completa y probada en vivo.
-- ✅ Base de Fase 2 (portal + facturación manual) lista.
-- ✅ Migración `20260827240000` (documento del estudiante + libro contable + borrado de
-  estudiante conservando historial) escrita. **Falta aplicarla a Supabase y desplegar.**
-- ⏳ También sin aplicar: `20260827230000_cascadas_admin.sql`.
-- ⏳ Wompi: el cliente ya tiene la cuenta, pero la integración de pagos en línea se
-  **aplazó** por decisión del usuario (28 ago 2026) — ver "Pendiente ⏳".
-- ⏳ Jorge Rada sin módulo (ver datos de prueba).
+- ✅ Fase 2 (portal + facturación manual) + libro contable listos.
+- ✅ Migraciones `20260827230000` y `20260827240000` **aplicadas** a Supabase y **desplegado**
+  a Vercel (commits `888c5b3`, `0276352`). Pendiente `git push` al repo.
+- ⏳ **Probar en vivo** (con `Ctrl+Shift+R`): inscripción con documento, borrado de estudiante,
+  datos del pagador y reversos en Pagos.
+- ⏳ Wompi: el cliente ya tiene la cuenta; integración de pagos en línea **aplazada** por
+  decisión del usuario — ver FASE 2 → "Pendiente ⏳ (Wompi)".
+- ⏳ Datos de prueba: Ana Gómez con documento `CC PENDIENTE`; Jorge Rada sin módulo y con
+  documento `CC PENDIENTE`.
 - ⏳ Contenido bilingüe de FAQ/política/términos; imágenes reales; revisión legal.
