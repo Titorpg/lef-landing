@@ -1,7 +1,7 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 28 de agosto de 2026 (sesión: libro contable de pagos, documento del
-estudiante obligatorio, borrado de estudiante conservando historial — aplicado y desplegado)
+Última actualización: 30 de agosto de 2026 (sesión: portada — se quitó la foto/nombre/cargo
+del fundador y se puso el logo LEF grande, manteniendo las frases rotativas — desplegado)
 
 ## 🔗 Enlaces
 
@@ -215,7 +215,12 @@ vive únicamente local y NO está en Git.
 - **Facebook:** https://www.facebook.com/profile.php?id=100067494009346 (perfil real)
 - **Instagram:** @Lefcenter (usuario dado por el cliente, no verificado)
 - **LinkedIn:** solo el ícono — no existe cuenta/link real todavía, aparece atenuado y sin click ("Próximamente")
-- **Fundador:** Luis Antonio Caballero Torrez, Fundador y Director Académico — foto en `assets/photo-founder.png` (headshot **generado con IA**, no es una foto real todavía) y 6 frases suyas en la sección del fundador (1 dada por el cliente + 5 escritas por Claude en el mismo tono, bilingües).
+- **Sección del fundador (`#founder`):** ya **no** muestra foto, nombre ni cargo del fundador
+  (se quitó el 30 ago 2026 por decisión del usuario). Ahora lleva el logo horizontal de LEF
+  en grande (`.founder-logo`) y debajo las **6 frases rotativas** (1 dada por el cliente + 5
+  escritas por Claude en el mismo tono, bilingües), que inserta `initFounderQuotes()` en
+  `script.js`. `assets/photo-founder.png` sigue en el repo pero ya no se usa; la clave i18n
+  `founder_role` quedó sin uso.
 
 ## Pendientes / cosas a revisar
 
@@ -243,12 +248,23 @@ vive únicamente local y NO está en Git.
   de JS no se ve, `Ctrl+Shift+R` una vez (afecta solo a quien ya había cargado la versión vieja).
 - **Assets:** imágenes/íconos en `assets/`. Falta un ícono propio de "login" (hoy es un SVG inline).
 
-## Estado al cerrar esta sesión (28 ago 2026)
+## Estado al cerrar esta sesión (30 ago 2026)
+
+- ✅ Portada: quitada la foto + nombre + cargo del fundador; en su lugar el logo LEF grande.
+  Las frases rotativas se mantienen. Cambios en `index.html` y `style.css`.
+- ✅ Commit `a3535d8` + `git push` a GitHub (se subieron también los 4 commits que estaban
+  pendientes de push desde la sesión anterior).
+- ✅ Desplegado a producción con `npx vercel deploy --prod` → alias `www.lefcenter.com`
+  (deploy `dpl_J5fMsqZCQz3Xsa2hWQpryV5aSRTj`). Verificado en vivo.
+- ♻️ Recordatorio: **no hay auto-deploy**. Commit/push a GitHub NO publica nada; hay que
+  correr `npx vercel deploy --prod --yes --token <VERCEL_TOKEN> --scope lefcenter` a mano.
+
+## Estado al cerrar la sesión anterior (28 ago 2026)
 
 - ✅ Sitio migrado a Vercel + Supabase, dominio apuntando, Fase 1 completa y probada en vivo.
 - ✅ Fase 2 (portal + facturación manual) + libro contable listos.
 - ✅ Migraciones `20260827230000` y `20260827240000` **aplicadas** a Supabase y **desplegado**
-  a Vercel (commits `888c5b3`, `0276352`). Pendiente `git push` al repo.
+  a Vercel (commits `888c5b3`, `0276352`). ✅ `git push` hecho el 30 ago 2026.
 - ⏳ **Probar en vivo** (con `Ctrl+Shift+R`): inscripción con documento, borrado de estudiante,
   datos del pagador y reversos en Pagos.
 - ⏳ Wompi: el cliente ya tiene la cuenta; integración de pagos en línea **aplazada** por
