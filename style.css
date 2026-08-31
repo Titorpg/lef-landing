@@ -424,6 +424,9 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 /* ---------- system note (sistema.html) ---------- */
 .system-note{margin-top:36px;border-left:3px solid var(--azul);padding:4px 0 4px 22px;}
 .system-note p{color:var(--grafito);font-size:16.5px;line-height:1.7;max-width:820px;}
+.system-points{list-style:none;margin-top:22px;display:flex;flex-direction:column;gap:16px;max-width:820px;}
+.system-points li{display:flex;gap:12px;align-items:flex-start;font-size:16.5px;color:var(--grafito);line-height:1.5;}
+.system-points svg{width:20px;height:20px;flex:none;color:var(--azul);margin-top:2px;}
 
 /* ---------- branded image placeholders (logo overlay) ---------- */
 .offer-photo{position:relative;}
