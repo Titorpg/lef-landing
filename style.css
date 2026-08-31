@@ -415,8 +415,8 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .c1-block{margin-top:56px;padding-top:52px;border-top:1px solid var(--niebla);}
 .c1-block h3{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:clamp(24px,3vw,34px);margin-bottom:10px;}
 .c1-block > p{color:var(--grafito);font-size:16.5px;max-width:640px;margin-bottom:26px;}
-.c1-layout{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap;}
-.c1-perks{list-style:none;display:flex;flex-direction:column;gap:20px;flex:1 1 260px;min-width:240px;padding-top:10px;}
+.c1-layout{display:flex;gap:44px;align-items:stretch;flex-wrap:wrap;}
+.c1-perks{list-style:none;display:flex;flex-direction:column;justify-content:space-between;gap:16px;flex:1 1 260px;min-width:240px;padding-top:10px;}
 .c1-perks li{display:flex;gap:12px;align-items:flex-start;font-size:15.5px;color:var(--grafito);line-height:1.5;}
 .c1-perks svg{width:20px;height:20px;flex:none;color:var(--azul);margin-top:2px;}
 .level-card.level-card-extra{
