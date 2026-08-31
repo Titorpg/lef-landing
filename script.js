@@ -530,6 +530,67 @@ function initFounderQuotes(){
   });
 }
 
+function initTestimonialCarousels(){
+  const wraps = document.querySelectorAll(".testimonial-track-wrap");
+  if (!wraps.length) return;
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const SPEED = isCoarsePointer ? 46 : 22; // px per second
+
+  wraps.forEach(wrap => {
+    const track = wrap.querySelector(".testimonial-track");
+    if (!track) return;
+
+    let halfWidth = track.scrollWidth / 2;
+    window.addEventListener("resize", () => { halfWidth = track.scrollWidth / 2; });
+
+    let dragging = false;
+    let lastTs = null;
+    let startX = 0;
+    let startScroll = 0;
+
+    function wrapScroll(){
+      if (halfWidth <= 0) return;
+      if (wrap.scrollLeft >= halfWidth) wrap.scrollLeft -= halfWidth;
+      else if (wrap.scrollLeft < 0) wrap.scrollLeft += halfWidth;
+    }
+
+    function step(ts){
+      if (lastTs === null) lastTs = ts;
+      const dt = ts - lastTs;
+      lastTs = ts;
+      if (!dragging && !prefersReduced && halfWidth > 0) {
+        wrap.scrollLeft += (SPEED * dt) / 1000;
+        wrapScroll();
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    wrap.addEventListener("pointerdown", e => {
+      dragging = true;
+      lastTs = null;
+      startX = e.clientX;
+      startScroll = wrap.scrollLeft;
+      wrap.classList.add("is-dragging");
+      wrap.setPointerCapture(e.pointerId);
+    });
+    wrap.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      wrap.scrollLeft = startScroll - (e.clientX - startX);
+      wrapScroll();
+    });
+    const release = () => {
+      dragging = false;
+      lastTs = null;
+      wrap.classList.remove("is-dragging");
+    };
+    wrap.addEventListener("pointerup", release);
+    wrap.addEventListener("pointercancel", release);
+    wrap.addEventListener("pointerleave", () => { if (dragging) release(); });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initLoginLink();
   initLang();
@@ -537,6 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initDrawer();
   initHeroCarousel();
   initFounderQuotes();
+  initTestimonialCarousels();
   document.querySelectorAll("nav.links a, .drawer nav.links a").forEach(a => {
     if (a.getAttribute("href") === location.pathname.split("/").pop() || (location.pathname.endsWith("/") && a.getAttribute("href") === "index.html")) {
       a.classList.add("active");

@@ -132,12 +132,15 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .testimonial-section{overflow:hidden;}
 .testimonial-section .wrap{margin-bottom:32px;}
 .testimonial-track-wrap{
-  overflow:hidden;width:100%;
+  overflow-x:auto;overflow-y:hidden;width:100%;cursor:grab;
+  scroll-behavior:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;-ms-overflow-style:none;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
   mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
 }
-.testimonial-track{display:flex;gap:20px;width:max-content;animation:testimonial-scroll 42s linear infinite;padding:0 6vw;}
-.testimonial-track:hover{animation-play-state:paused;}
+.testimonial-track-wrap::-webkit-scrollbar{display:none;}
+.testimonial-track-wrap.is-dragging{cursor:grabbing;}
+.testimonial-track{display:flex;gap:20px;width:max-content;padding:0 6vw;user-select:none;-webkit-user-select:none;}
 .testimonial-card{
   flex:0 0 320px;background:var(--papel);border:1px solid rgba(16,16,16,.1);border-radius:16px;
   padding:26px 24px;display:flex;flex-direction:column;gap:14px;
@@ -147,8 +150,6 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .testimonial-card .author{display:flex;flex-direction:column;gap:2px;}
 .testimonial-card .author .name{font-weight:600;font-size:14.5px;color:var(--ink);}
 .testimonial-card .author .meta{font-size:12.5px;color:var(--grafito);}
-@keyframes testimonial-scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-@media(prefers-reduced-motion:reduce){.testimonial-track{animation:none;}}
 @media(max-width:640px){.testimonial-card{flex-basis:270px;}}
 
 /* ---------- HERO ---------- */
@@ -430,7 +431,7 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 }
 .level-card.level-card-extra .code{background:var(--azul);}
 .level-card.level-card-extra ul{border-top-color:rgba(16,16,16,.14);}
-.c1-note{margin-top:22px;color:var(--grafito);font-size:15.5px;line-height:1.6;max-width:640px;}
+.c1-note{margin-top:38px;color:var(--grafito);font-size:15.5px;line-height:1.6;max-width:900px;}
 
 /* ---------- system note (sistema.html) ---------- */
 .system-note{margin-top:36px;border-left:3px solid var(--azul);padding:4px 0 4px 22px;}
