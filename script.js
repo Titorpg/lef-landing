@@ -533,9 +533,8 @@ function initFounderQuotes(){
 function initTestimonialCarousels(){
   const wraps = document.querySelectorAll(".testimonial-track-wrap");
   if (!wraps.length) return;
-  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const SPEED = isCoarsePointer ? 46 : 22; // px per second
+  const SPEED = isCoarsePointer ? 55 : 22; // px per second
 
   wraps.forEach(wrap => {
     const track = wrap.querySelector(".testimonial-track");
@@ -559,7 +558,7 @@ function initTestimonialCarousels(){
       if (lastTs === null) lastTs = ts;
       const dt = ts - lastTs;
       lastTs = ts;
-      if (!dragging && !prefersReduced && halfWidth > 0) {
+      if (!dragging && halfWidth > 0) {
         wrap.scrollLeft += (SPEED * dt) / 1000;
         wrapScroll();
       }
