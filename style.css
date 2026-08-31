@@ -132,15 +132,12 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .testimonial-section{overflow:hidden;}
 .testimonial-section .wrap{margin-bottom:32px;}
 .testimonial-track-wrap{
-  overflow-x:auto;overflow-y:hidden;width:100%;cursor:grab;
-  scroll-behavior:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;
-  scrollbar-width:none;-ms-overflow-style:none;
+  overflow:hidden;width:100%;cursor:grab;touch-action:pan-y;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
   mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
 }
-.testimonial-track-wrap::-webkit-scrollbar{display:none;}
 .testimonial-track-wrap.is-dragging{cursor:grabbing;}
-.testimonial-track{display:flex;gap:20px;width:max-content;padding:0 6vw;user-select:none;-webkit-user-select:none;}
+.testimonial-track{display:flex;gap:20px;width:max-content;padding:0 6vw;user-select:none;-webkit-user-select:none;will-change:transform;}
 .testimonial-card{
   flex:0 0 320px;background:var(--papel);border:1px solid rgba(16,16,16,.1);border-radius:16px;
   padding:26px 24px;display:flex;flex-direction:column;gap:14px;

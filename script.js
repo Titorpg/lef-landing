@@ -543,43 +543,67 @@ function initTestimonialCarousels(){
     let halfWidth = track.scrollWidth / 2;
     window.addEventListener("resize", () => { halfWidth = track.scrollWidth / 2; });
 
+    let offset = 0;
     let dragging = false;
     let draggingSince = 0;
     let startX = 0;
-    let startScroll = 0;
+    let startOffset = 0;
 
-    function wrapScroll(){
-      if (halfWidth <= 0) return;
-      if (wrap.scrollLeft >= halfWidth) wrap.scrollLeft -= halfWidth;
-      else if (wrap.scrollLeft < 0) wrap.scrollLeft += halfWidth;
+    function wrapOffset(v){
+      if (halfWidth <= 0) return 0;
+      let r = v % halfWidth;
+      if (r < 0) r += halfWidth;
+      return r;
     }
-
-    const TICK_MS = 40;
-    setInterval(() => {
-      // Safety net: never let a missed pointerup/cancel freeze autoplay forever.
+    function render(){
+      track.style.transform = `translateX(${-offset}px)`;
+    }
+    function advance(deltaMs){
       if (dragging && Date.now() - draggingSince > 4000) {
         dragging = false;
         wrap.classList.remove("is-dragging");
       }
       if (!dragging && halfWidth > 0) {
-        wrap.scrollLeft += (SPEED * TICK_MS) / 1000;
-        wrapScroll();
+        offset = wrapOffset(offset + (SPEED * deltaMs) / 1000);
+        render();
       }
-    }, TICK_MS);
+    }
+
+    // Smooth path: GPU-composited transform driven by requestAnimationFrame.
+    let rafLastTs = null;
+    let lastAliveAt = Date.now();
+    function rafTick(ts){
+      if (rafLastTs !== null) advance(ts - rafLastTs);
+      rafLastTs = ts;
+      lastAliveAt = Date.now();
+      requestAnimationFrame(rafTick);
+    }
+    requestAnimationFrame(rafTick);
+
+    // Resilience path: if rAF stalls (tab treated as background/inactive by the
+    // browser), setInterval keeps advancing so the carousel never freezes.
+    setInterval(() => {
+      const now = Date.now();
+      const sinceAlive = now - lastAliveAt;
+      if (sinceAlive > 200) {
+        advance(sinceAlive);
+        lastAliveAt = now;
+      }
+    }, 250);
 
     wrap.addEventListener("pointerdown", e => {
       dragging = true;
       draggingSince = Date.now();
       startX = e.clientX;
-      startScroll = wrap.scrollLeft;
+      startOffset = offset;
       wrap.classList.add("is-dragging");
       try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
     });
     wrap.addEventListener("pointermove", e => {
       if (!dragging) return;
       draggingSince = Date.now();
-      wrap.scrollLeft = startScroll - (e.clientX - startX);
-      wrapScroll();
+      offset = wrapOffset(startOffset - (e.clientX - startX));
+      render();
     });
     const release = () => {
       dragging = false;
