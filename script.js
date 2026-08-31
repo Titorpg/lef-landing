@@ -544,6 +544,7 @@ function initTestimonialCarousels(){
     window.addEventListener("resize", () => { halfWidth = track.scrollWidth / 2; });
 
     let dragging = false;
+    let draggingSince = 0;
     let startX = 0;
     let startScroll = 0;
 
@@ -555,6 +556,11 @@ function initTestimonialCarousels(){
 
     const TICK_MS = 40;
     setInterval(() => {
+      // Safety net: never let a missed pointerup/cancel freeze autoplay forever.
+      if (dragging && Date.now() - draggingSince > 4000) {
+        dragging = false;
+        wrap.classList.remove("is-dragging");
+      }
       if (!dragging && halfWidth > 0) {
         wrap.scrollLeft += (SPEED * TICK_MS) / 1000;
         wrapScroll();
@@ -563,13 +569,15 @@ function initTestimonialCarousels(){
 
     wrap.addEventListener("pointerdown", e => {
       dragging = true;
+      draggingSince = Date.now();
       startX = e.clientX;
       startScroll = wrap.scrollLeft;
       wrap.classList.add("is-dragging");
-      wrap.setPointerCapture(e.pointerId);
+      try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
     });
     wrap.addEventListener("pointermove", e => {
       if (!dragging) return;
+      draggingSince = Date.now();
       wrap.scrollLeft = startScroll - (e.clientX - startX);
       wrapScroll();
     });
@@ -580,6 +588,9 @@ function initTestimonialCarousels(){
     wrap.addEventListener("pointerup", release);
     wrap.addEventListener("pointercancel", release);
     wrap.addEventListener("pointerleave", () => { if (dragging) release(); });
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
   });
 }
 
