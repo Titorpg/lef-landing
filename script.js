@@ -544,7 +544,6 @@ function initTestimonialCarousels(){
     window.addEventListener("resize", () => { halfWidth = track.scrollWidth / 2; });
 
     let dragging = false;
-    let lastTs = null;
     let startX = 0;
     let startScroll = 0;
 
@@ -554,21 +553,16 @@ function initTestimonialCarousels(){
       else if (wrap.scrollLeft < 0) wrap.scrollLeft += halfWidth;
     }
 
-    function step(ts){
-      if (lastTs === null) lastTs = ts;
-      const dt = ts - lastTs;
-      lastTs = ts;
+    const TICK_MS = 40;
+    setInterval(() => {
       if (!dragging && halfWidth > 0) {
-        wrap.scrollLeft += (SPEED * dt) / 1000;
+        wrap.scrollLeft += (SPEED * TICK_MS) / 1000;
         wrapScroll();
       }
-      requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
+    }, TICK_MS);
 
     wrap.addEventListener("pointerdown", e => {
       dragging = true;
-      lastTs = null;
       startX = e.clientX;
       startScroll = wrap.scrollLeft;
       wrap.classList.add("is-dragging");
@@ -581,7 +575,6 @@ function initTestimonialCarousels(){
     });
     const release = () => {
       dragging = false;
-      lastTs = null;
       wrap.classList.remove("is-dragging");
     };
     wrap.addEventListener("pointerup", release);
