@@ -137,9 +137,12 @@
       subs.forEach(function (s) {
         var overdue = s.status === "active" && s.next_due_date &&
           (new Date() > new Date(new Date(s.next_due_date).getTime() + (s.grace_days || 0) * 864e5));
+        // "Pendiente" = todavía no hay ningún pago confirmado de esta suscripción.
+        var hasPaid = pays.some(function (p) { return p.subscription_id === s.id && p.status === "approved"; });
         var badge = s.status === "frozen" ? '<span class="badge bad">cuenta congelada</span>'
-          : overdue ? '<span class="badge warn">pago pendiente</span>'
           : s.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
+          : (s.status === "active" && !hasPaid) ? '<span class="badge neutral">pendiente</span>'
+          : overdue ? '<span class="badge warn">pago pendiente</span>'
           : '<span class="badge ok">al día</span>';
 
         if (s.status === "frozen") {

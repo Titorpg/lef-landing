@@ -55,9 +55,9 @@
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 4600);
   }
-  function modal(title, bodyNode, onSave, saveLabel, danger) {
+  function modal(title, bodyNode, onSave, saveLabel, danger, wide) {
     var bg = h('<div class="pnl-modal-bg"></div>');
-    var box = h('<div class="pnl-modal"><h3>' + esc(title) + "</h3></div>");
+    var box = h('<div class="pnl-modal' + (wide ? " wide" : "") + '"><h3>' + esc(title) + "</h3></div>");
     box.appendChild(bodyNode);
     var err = h('<div class="pnl-alert err" style="display:none"></div>');
     box.appendChild(err);
@@ -269,13 +269,15 @@
 
       var activos = enr.filter(function (e) { return e.status !== "Cancelled"; });
       var nuevas = enr.filter(function (e) { return e.status === "Pending"; }).length;
-      var alDia = billing.filter(function (b) { return b.status === "active" && !b.is_overdue; }).length;
-      var mora = billing.filter(function (b) { return b.status === "active" && b.is_overdue; }).length;
+      // "Pendiente" = suscripción activa que todavía no tiene ningún pago confirmado.
+      var pendientes = billing.filter(function (b) { return b.status === "active" && !b.last_payment_at; }).length;
+      var alDia = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && !b.is_overdue; }).length;
+      var mora = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && b.is_overdue; }).length;
       var congeladas = billing.filter(function (b) { return b.status === "frozen"; }).length;
 
       var tiles = [["Estudiantes", studentCount], ["Profesores", teacherCount],
         ["Inscripciones activas", activos.length], ["Inscripciones nuevas", nuevas]];
-      if (isAdmin) { tiles.push(["Al día", alDia]); tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]); }
+      if (isAdmin) { tiles.push(["Pendientes", pendientes]); tiles.push(["Al día", alDia]); tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]); }
       main.appendChild(statRow(tiles));
 
       /* --- donut: TODOS los módulos activos, cada uno con su color --- */
@@ -529,8 +531,9 @@
         var t = tableWrap(["Estudiante / pagador", "Módulo", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
         rows.forEach(function (r) {
           var st = r.status === "frozen" ? '<span class="badge bad">congelada</span>'
-            : r.is_overdue ? '<span class="badge warn">en mora</span>'
             : r.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
+            : (r.status === "active" && !r.last_payment_at) ? '<span class="badge neutral">pendiente</span>'
+            : r.is_overdue ? '<span class="badge warn">en mora</span>'
             : '<span class="badge ok">al día</span>';
           var who = esc(r.student_name) +
             (r.student_deleted ? ' <span class="badge neutral">estudiante eliminado</span>' : "") +
@@ -564,7 +567,7 @@
 
   function verPagos(r) {
     var box = h('<div><p class="muted">Cargando…</p></div>');
-    modal("Pagos — " + r.student_name, box, null, "Cerrar");
+    modal("Pagos — " + r.student_name, box, null, "Cerrar", false, true);
     q("payments").select("*").eq("subscription_id", r.subscription_id).order("paid_at", { ascending: false })
       .then(function (res) {
         if (res.error) throw res.error;
