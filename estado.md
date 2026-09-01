@@ -3,8 +3,10 @@
 Última actualización: 1 de septiembre de 2026. **Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
 corregido y pago de prueba registrado con recibo `REC-…`. Además: modal "Ver pagos" ancho en
-escritorio y estado "pendiente" en suscripciones sin pago confirmado. El usuario aplicó
-`.claude/settings.local.json` para que Claude Code pueda desplegar directo (falta reiniciar).
+escritorio y estado "pendiente" en suscripciones sin pago confirmado. **Deploy directo de
+Claude Code verificado** (1 sep 2026): con `.claude/settings.local.json` aplicado y Claude
+reiniciado, `npx vercel deploy --prod` corre sin script aparte — deploy `dpl_GocDhz9Pz…`
+aliased a `www.lefcenter.com`, y los 6 commits pendientes subidos a `origin/main`.
 **Siguiente paso: pasar Wompi a producción** y borrar los datos de prueba. Ver "Estado al
 cerrar esta sesión (1 sep 2026)".
 
@@ -351,6 +353,11 @@ vive únicamente local y NO está en Git.
     es aparte.
 - ⏳ **Pendiente:** pasar Wompi a **producción** (llaves `pub_prod_...` + URL de eventos en
   el ambiente de producción de Wompi) y borrar los pagos/estudiantes de prueba.
+- ✅ **Deploy directo verificado** (más tarde, 1 sep 2026): tras reiniciar Claude Code con
+  `.claude/settings.local.json` en su sitio, `npx vercel deploy --prod --yes --scope lefcenter`
+  corre directo desde el chat (deploy `dpl_GocDhz9Pz…`, READY, alias `www.lefcenter.com`) y
+  `git push` subió los 6 commits pendientes a `origin/main`. Ya no hace falta `./deploy.ps1`
+  ni una terminal aparte para publicar el frontend.
 
 ## Estado al cerrar esta sesión (31 ago 2026)
 
