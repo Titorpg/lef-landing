@@ -1,8 +1,11 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 31 de agosto de 2026 (sesión larga de ajustes visuales en Home/Niveles/
-Sistema/Qué ofrecemos — todo desplegado — más una migración de Supabase **escrita pero sin
-aplicar todavía**; ver "Estado al cerrar esta sesión" al final para el detalle completo)
+Última actualización: 31 de agosto de 2026. Sesión larga: ajustes visuales en Home/Niveles/
+Sistema/Qué ofrecemos (desplegados) + arranque de **Fase 2 de Wompi** — portal del estudiante
+con 3 pestañas (Facturación con pago real, Mi curso, Mi cuenta) y las Edge Functions de Wompi
+ya desplegadas. **⚠️ El portal no funciona todavía**: falta aplicar una migración de Supabase
+a mano (ver "Pendientes" #1) — hasta entonces, el portal completo falla al cargar (pide una
+columna `avatar_url` que no existe aún). Ver "Estado al cerrar esta sesión" para el detalle.
 
 ## 🔗 Enlaces
 
@@ -132,25 +135,47 @@ RLS en todas las tablas. Trigger `payments_immutable` (pagos append-only).
   pagos**; **desliga** (student_id→NULL) las suscripciones/pagos con historial. No se reconecta
   si se recrea al estudiante.
 
-**Pendiente ⏳ (Wompi — APLAZADO por decisión del usuario, 28 ago 2026):**
-El cliente **ya tiene la cuenta Wompi**, pero se decide hacer la integración más adelante.
-Antes de empezar hay que reunir: llave pública, secreto de integridad, llave privada y
-secreto de eventos (sandbox + producción), y definir las 4 decisiones (abajo).
-1. Cargar llaves en `.env` (local) y secretos de Edge Function (Supabase).
-2. Cobro en línea: PSE + tarjeta (checkout Wompi). ¿Nequi/Bancolombia también?
-3. Guardar tarjeta tokenizada (payment_source) para cobro recurrente.
-4. Edge Function `wompi-webhook` (confirmación de pagos) + tabla `payment_methods`.
-   El webhook debe llenar `payments` **solo en estado final** (el trigger bloquea UPDATE) y
-   registrar campos de la pasarela: id de transacción, banco PSE / franquicia / últimos 4,
-   `payment_source_id`, monto en centavos, referencia de comercio, `status`/mensaje.
-5. Cobro mensual automático (pg_cron + Edge Function).
-6. Congelación automática de morosos (pg_cron) — la función ya existe, falta agendarla.
-7. Consentimiento de cobro recurrente + actualizar Términos/Política (revisión legal).
-8. **Decisión pendiente: ¿LEF emite factura electrónica ante la DIAN o documento
+**Wompi — FASE 1 en construcción (arrancó el 31 ago 2026, ya no está aplazada):**
+El cliente ya tiene la cuenta habilitada y decidió arrancar. Fase 1 = pago único de la
+mensualidad desde el **portal del estudiante** (no desde el formulario público) con el
+Widget oficial de Wompi (PSE + tarjeta); **sin** tokenización ni cobro automático mensual
+todavía — eso es Fase 2, más abajo, sigue pendiente igual que antes.
+
+Fase 1 — estado:
+1. ✅ Edge Functions `wompi-checkout` (calcula la firma de integridad del lado del
+   servidor) y `wompi-webhook` (verifica la firma de eventos y registra el pago) —
+   **ya desplegadas** en Supabase (commit `115dfa2`).
+2. ✅ Portal: pestaña Facturación con el botón "Pagar en línea" ya conectado al widget;
+   pestañas nuevas Mi curso y Mi cuenta. **Desplegado en Vercel.**
+3. ✅ Migración de base de datos escrita (`get_my_course`, `update_my_profile`,
+   `record_wompi_payment`, `profiles.avatar_url`, bucket de Storage `avatars`) —
+   **⏳ FALTA APLICARLA A MANO**, mismo procedimiento que la migración anterior. Hasta
+   que se aplique, **el portal completo no carga** (pide la columna `avatar_url`, que
+   todavía no existe).
+4. **⏳ Faltan las llaves de Wompi** (sandbox primero): llave pública (`pub_test_...`),
+   secreto de integridad (`test_integrity_...`) y secreto de eventos — se configuran como
+   secrets de Supabase (`npx supabase secrets set WOMPI_PUBLIC_KEY=... --project-ref
+   cemrxcatbxbcipxmsnjf`, igual con `WOMPI_INTEGRITY_SECRET` y `WOMPI_EVENTS_SECRET`) y
+   la URL del webhook (`https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/wompi-webhook`)
+   se registra en el dashboard de Wompi, sandbox y producción por separado. La llave
+   privada **no hace falta todavía** (es para reversos/consultas directas, fuera de
+   alcance de esta fase).
+5. ⏳ Probar un pago de sandbox de punta a punta una vez estén las llaves.
+6. ⏳ Cuando funcione en sandbox, repetir con llaves de producción (`pub_prod_...`) para
+   pasar a cobros reales.
+
+**Fase 2 — sigue pendiente (sin definir, para más adelante):**
+1. Guardar tarjeta tokenizada (payment_source) para cobro recurrente.
+2. Cobro mensual automático (pg_cron + Edge Function).
+3. Congelación automática de morosos (pg_cron) — la función ya existe, falta agendarla.
+4. Consentimiento de cobro recurrente + actualizar Términos/Política (revisión legal).
+5. **Decisión pendiente: ¿LEF emite factura electrónica ante la DIAN o documento
    equivalente?** Define si hay que integrar un proveedor externo (Siigo/Alegra/Factus)
    y guardar el CUFE / número de factura en cada pago.
-9. **Decisión pendiente:** ¿cobro recurrente automático o pago manual cada mes desde el portal?
-10. Decisiones pendientes: monto (fijo por curso o por estudiante), día de cobro, días de gracia.
+6. **Decisión pendiente:** ¿cobro recurrente automático o pago manual cada mes desde el portal?
+7. Decisiones pendientes: monto (fijo por curso o por estudiante — hoy ya es por estudiante,
+   vía `subscriptions.monthly_amount`), día de cobro, días de gracia (`billing_day`/
+   `grace_days` en `subscriptions` ya existen, solo falta la automatización).
 
 ### Datos de prueba en Supabase (borrar cuando entren los reales)
 - Profesores: María Rada, Luis Caballero, Daniela Ospino
@@ -187,7 +212,7 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 | `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
 | `login.html` | Inicio de sesión único (`assets/js/lef-auth.js`) — enruta por rol — no indexado |
 | `admin.html` | Panel administrativo (SPA, `assets/js/lef-admin.js`) — no indexado |
-| `portal.html` | Portal del estudiante — pestaña de facturación (`assets/js/lef-portal.js`) — no indexado |
+| `portal.html` | Portal del estudiante — 3 pestañas con router por hash (`assets/js/lef-portal.js`): Facturación (pago en línea con Wompi), Mi curso, Mi cuenta (foto/contraseña/datos) — no indexado |
 | `preguntas-frecuentes.html` | Acordeón de FAQ (contenido **inventado como placeholder**, ver abajo) |
 | `politica-privacidad.html` | Política de privacidad (borrador fundamentado en la Ley 1581 de 2012 de Colombia) |
 | `terminos-uso.html` | Términos de uso (borrador) |
@@ -225,7 +250,18 @@ vive únicamente local y NO está en Git.
 
 ## Pendientes / cosas a revisar
 
-1. **✅ HECHO — Migración de Supabase aplicada** (`supabase/migrations/20260831180000_inscripcion_horario_despues.sql`,
+1. **⏳⚠️ URGENTE — Migración del portal sin aplicar (rompe el portal completo)**
+   (`supabase/migrations/20260831190000_portal_curso_cuenta_wompi.sql`, commit `115dfa2`,
+   escrita el 31 ago 2026): agrega `get_my_course`, `update_my_profile`,
+   `record_wompi_payment`, la columna `profiles.avatar_url` y el bucket de Storage
+   `avatars`. **Hasta que se aplique, el portal del estudiante no carga en absoluto**
+   (la primera consulta al iniciar sesión pide la columna `avatar_url`, que todavía no
+   existe). Aplicarla a mano en el SQL Editor de Supabase (mismo procedimiento que la
+   migración anterior — ver sección Wompi más arriba para el detalle completo).
+2. **⏳ Llaves de Wompi (sandbox)** — faltan para que el botón "Pagar en línea" del
+   portal funcione: llave pública, secreto de integridad y secreto de eventos. Ver
+   sección Wompi más arriba para cómo configurarlas.
+3. **✅ HECHO — Migración de Supabase aplicada** (`supabase/migrations/20260831180000_inscripcion_horario_despues.sql`,
    commit `c0d3944`): aplicada por el usuario el 31 ago 2026 desde una terminal (HTTP 201,
    "Migración aplicada correctamente"), corriendo un script Node (`node apply-migration.js`,
    generado para la ocasión y borrado después de usarlo) que llama a la Management API de
@@ -233,26 +269,27 @@ vive únicamente local y NO está en Git.
    (bloqueo automático de seguridad, probado con Bash y PowerShell), así que cualquier
    migración futura necesita este mismo paso manual del usuario. `create_enrollment` ahora
    acepta `p_schedule_id` nulo y `get_enrollment_confirmation` no exige grupo asignado.
-2. **✅ HECHO — Botón "decidir horario después" en el asistente** (`assets/js/lef-enroll.js`
+   (Nota: desplegar Edge Functions con `npx supabase functions deploy` **sí** lo puede
+   hacer Claude directamente — el bloqueo es solo para la Management API de SQL.)
+4. **✅ HECHO — Botón "decidir horario después" en el asistente** (`assets/js/lef-enroll.js`
    paso 3, commit `96b3542`, desplegado): aparece siempre, tenga o no horarios el módulo; al
    elegirlo se habilita "Continuar" y el paso 4 / la pantalla final muestran "Por definir — lo
    coordinamos por WhatsApp". Probado en local hasta la pantalla de revisión.
-   **⏳ Falta probar el envío real de punta a punta en vivo** (ahora que la migración ya está
-   aplicada) — confirmar que aparece el número de matrícula y el botón "Continuar por
-   WhatsApp"; si se usa un estudiante de prueba, borrarlo después desde el panel admin.
-3. **✅ HECHO — Bug de "Atrás" arreglado** (commit `ff65a3e`, desplegado, encontrado por el
+   **⏳ Falta probar el envío real de punta a punta en vivo** — confirmar que aparece el
+   número de matrícula y el botón "Continuar por WhatsApp"; si se usa un estudiante de
+   prueba, borrarlo después desde el panel admin.
+5. **✅ HECHO — Bug de "Atrás" arreglado** (commit `ff65a3e`, desplegado, encontrado por el
    cliente al probar el punto anterior): el botón "Atrás" del paso 3 reutilizaba la validación
    del paso 1 y borraba nombre/documento/WhatsApp/correo al retroceder, dejando el asistente
    sin poder avanzar ni retroceder más. Ya retrocede sin tocar los datos.
-4. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
+6. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
    Qué ofrecemos) usa 6 reseñas de ejemplo escritas por Claude, no de estudiantes reales.
    Reemplazar en `script.js` (claves `testi_1_q`…`testi_6_m`) cuando el cliente tenga reseñas
    reales o quiera pedirlas.
-5. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
-6. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
-7. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
-8. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
-9. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
+7. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
+8. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
+9. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
+10. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
 
 ## Cómo seguir trabajando
 
