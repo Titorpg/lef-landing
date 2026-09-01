@@ -3,8 +3,9 @@
 Última actualización: 31 de agosto de 2026. Sesión larga: ajustes visuales en Home/Niveles/
 Sistema/Qué ofrecemos (desplegados) + arranque de **Fase 2 de Wompi** — portal del estudiante
 con 3 pestañas (Facturación con pago real, Mi curso, Mi cuenta) y las Edge Functions de Wompi
-ya desplegadas. **Migración del portal aplicada por el usuario el 31 ago 2026 (HTTP 201)** —
-el portal ya carga. Falta configurar las llaves de Wompi (sandbox) y las pruebas en vivo.
+ya desplegadas. **Migración del portal aplicada (HTTP 201) y llaves de Wompi sandbox
+configuradas el 1 sep 2026** — el portal carga y el backend de pagos sandbox está completo.
+**Siguiente paso: probar un pago de sandbox de punta a punta** (ver Wompi Fase 1, punto 5).
 
 ## 🔗 Enlaces
 
@@ -142,23 +143,29 @@ todavía — eso es Fase 2, más abajo, sigue pendiente igual que antes.
 
 Fase 1 — estado:
 1. ✅ Edge Functions `wompi-checkout` (calcula la firma de integridad del lado del
-   servidor) y `wompi-webhook` (verifica la firma de eventos y registra el pago) —
-   **ya desplegadas** en Supabase (commit `115dfa2`).
+   servidor, **con** verify_jwt) y `wompi-webhook` (verifica la firma de eventos y
+   registra el pago, **sin** verify_jwt — Wompi llama sin auth de Supabase) —
+   desplegadas en Supabase (`wompi-webhook` v5 con `--no-verify-jwt --use-api`).
 2. ✅ Portal: pestaña Facturación con el botón "Pagar en línea" ya conectado al widget;
    pestañas nuevas Mi curso y Mi cuenta. **Desplegado en Vercel.**
 3. ✅ Migración de base de datos (`get_my_course`, `update_my_profile`,
    `record_wompi_payment`, `profiles.avatar_url`, bucket de Storage `avatars`) —
    **APLICADA por el usuario el 31 ago 2026** (`node apply-migration.js`, HTTP 201).
    El portal ya carga.
-4. **⏳ Faltan las llaves de Wompi** (sandbox primero): llave pública (`pub_test_...`),
-   secreto de integridad (`test_integrity_...`) y secreto de eventos — se configuran como
-   secrets de Supabase (`npx supabase secrets set WOMPI_PUBLIC_KEY=... --project-ref
-   cemrxcatbxbcipxmsnjf`, igual con `WOMPI_INTEGRITY_SECRET` y `WOMPI_EVENTS_SECRET`) y
-   la URL del webhook (`https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/wompi-webhook`)
-   se registra en el dashboard de Wompi, sandbox y producción por separado. La llave
-   privada **no hace falta todavía** (es para reversos/consultas directas, fuera de
-   alcance de esta fase).
-5. ⏳ Probar un pago de sandbox de punta a punta una vez estén las llaves.
+4. ✅ Llaves de Wompi **sandbox** configuradas el 1 sep 2026 como secrets de Supabase
+   (`npx supabase secrets set` — este comando **sí** lo puede correr Claude, no está
+   bloqueado): `WOMPI_PUBLIC_KEY` (`pub_test_SwKPZBu7...`), `WOMPI_INTEGRITY_SECRET`
+   (`test_integrity_6AB9m8m4...`), `WOMPI_EVENTS_SECRET` (`test_events_mVWpVDDC...`).
+   URL de eventos registrada en Wompi (Sandbox → "Seguimiento de transacciones → URL de
+   Eventos"): `https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/wompi-webhook`.
+   La llave privada no hace falta todavía. **En producción hay que repetir todo con
+   llaves `pub_prod_...` / `prod_integrity_...` / `prod_events_...` y registrar la URL
+   en el ambiente de producción de Wompi por separado.**
+5. ⏳ **SIGUIENTE: probar un pago de sandbox de punta a punta** desde el portal (cuenta
+   demo Ana Gómez). Tarjetas de prueba de Wompi: aprobada `4242 4242 4242 4242`,
+   rechazada `4111 1111 1111 1111` (CVV y fecha cualquiera futura). Verificar que el
+   pago aparece en la pestaña Facturación con nº de recibo `REC-…` (lo registra el
+   webhook, no la redirección del navegador).
 6. ⏳ Cuando funcione en sandbox, repetir con llaves de producción (`pub_prod_...`) para
    pasar a cobros reales.
 
@@ -253,9 +260,10 @@ vive únicamente local y NO está en Git.
    aplicada por el usuario el 31 ago 2026 con `node apply-migration.js` (HTTP 201). Agregó
    `get_my_course`, `update_my_profile`, `record_wompi_payment`, `profiles.avatar_url` y el
    bucket de Storage `avatars`. El portal del estudiante ya carga. **⏳ Falta probarlo en vivo.**
-2. **⏳ Llaves de Wompi (sandbox)** — faltan para que el botón "Pagar en línea" del
-   portal funcione: llave pública, secreto de integridad y secreto de eventos. Ver
-   sección Wompi más arriba para cómo configurarlas.
+2. **✅ HECHO — Llaves de Wompi sandbox configuradas** (1 sep 2026): los 3 secrets en
+   Supabase + URL de eventos registrada en Wompi + `wompi-webhook` redesplegada sin
+   verify_jwt (v5). Ver sección Wompi Fase 1 arriba. **⏳ Falta la prueba de pago de
+   punta a punta** (punto 5 de esa sección) y luego repetir con llaves de producción.
 3. **✅ HECHO — Migración de Supabase aplicada** (`supabase/migrations/20260831180000_inscripcion_horario_despues.sql`,
    commit `c0d3944`): aplicada por el usuario el 31 ago 2026 desde una terminal (HTTP 201,
    "Migración aplicada correctamente"), corriendo un script Node (`node apply-migration.js`,
