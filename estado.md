@@ -1,11 +1,12 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 31 de agosto de 2026. Sesión larga: ajustes visuales en Home/Niveles/
-Sistema/Qué ofrecemos (desplegados) + arranque de **Fase 2 de Wompi** — portal del estudiante
-con 3 pestañas (Facturación con pago real, Mi curso, Mi cuenta) y las Edge Functions de Wompi
-ya desplegadas. **Migración del portal aplicada (HTTP 201) y llaves de Wompi sandbox
-configuradas el 1 sep 2026** — el portal carga y el backend de pagos sandbox está completo.
-**Siguiente paso: probar un pago de sandbox de punta a punta** (ver Wompi Fase 1, punto 5).
+Última actualización: 1 de septiembre de 2026. **Wompi Fase 1 (sandbox) funcionando de punta
+a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
+corregido y pago de prueba registrado con recibo `REC-…`. Además: modal "Ver pagos" ancho en
+escritorio y estado "pendiente" en suscripciones sin pago confirmado. El usuario aplicó
+`.claude/settings.local.json` para que Claude Code pueda desplegar directo (falta reiniciar).
+**Siguiente paso: pasar Wompi a producción** y borrar los datos de prueba. Ver "Estado al
+cerrar esta sesión (1 sep 2026)".
 
 ## 🔗 Enlaces
 
@@ -297,9 +298,12 @@ vive únicamente local y NO está en Git.
 ## Cómo seguir trabajando
 
 - **Para pedir cambios:** decime qué ajustar, edito los archivos localmente.
-- **Para publicar:** `npx vercel deploy --prod --yes --token <VERCEL_TOKEN> --scope lefcenter`
-  (token en `.env`). El sitio actualiza al toque. Luego `git add` + `commit` + `push` para
-  guardar en el repo. **No hay auto-deploy** — cada cambio hay que desplegarlo a mano.
+- **Para publicar:** `./deploy.ps1` (lee el token del `.env`), o directamente
+  `npx vercel deploy --prod --yes --scope lefcenter` (con `VERCEL_TOKEN` en el entorno —
+  ya lo pone `.claude/settings.local.json`). Desde que se aplicó ese archivo de permisos
+  (1 sep 2026), **Claude Code puede desplegar directo** tras reiniciarse. El sitio actualiza
+  al toque. Luego `git add` + `commit` + `push`. **No hay auto-deploy** — cada cambio se
+  despliega a mano.
 - **Backend:** las migraciones SQL se aplican vía la Management API de Supabase con
   `SUPABASE_ACCESS_TOKEN`. Las Edge Functions con `npx supabase functions deploy`.
   **Desde el 31 ago 2026, Claude Code ya no puede llamar esa API por su cuenta** (bloqueo
@@ -337,11 +341,14 @@ vive únicamente local y NO está en Git.
   reverso previo.
 - 🔧 **Scripts nuevos en la carpeta** (no se suben, `.claude/` y `*.ps1` sueltos):
   - `deploy.ps1` — publica a Vercel leyendo el token del `.env` (`./deploy.ps1`).
-  - `configurar-permisos-deploy.ps1` — **correr una vez**: autoriza a Claude Code a hacer
-    `npx vercel deploy` y `npx supabase functions deploy` / `secrets set` sin que el
-    clasificador de auto-mode los bloquee (escribe `.claude/settings.local.json`). Después,
-    reiniciar Claude Code. Claude no puede escribir ese archivo por su cuenta (frontera de
-    seguridad). Las migraciones SQL siguen siendo manuales igual que antes.
+  - `configurar-permisos-deploy.ps1` — **ya lo corrió el usuario el 1 sep 2026**: escribió
+    `.claude/settings.local.json` con reglas `permissions.allow` + `autoMode.allow` para
+    `npx vercel deploy` y `npx supabase functions deploy` / `secrets set`, y metió
+    `VERCEL_TOKEN` + `SUPABASE_ACCESS_TOKEN` en `env`. **Falta reiniciar Claude Code** para
+    que tome el archivo; a partir de ahí Claude debería poder desplegar directo (Vercel +
+    Edge Functions + secrets). Claude no puede editar ese archivo por su cuenta (frontera de
+    seguridad). **Las migraciones SQL siguen siendo manuales igual que antes** — ese bloqueo
+    es aparte.
 - ⏳ **Pendiente:** pasar Wompi a **producción** (llaves `pub_prod_...` + URL de eventos en
   el ambiente de producción de Wompi) y borrar los pagos/estudiantes de prueba.
 
