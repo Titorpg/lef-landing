@@ -34,12 +34,14 @@ Deno.serve(async (req) => {
   if (!eventsSecret) return json({ error: "wompi_sin_configurar" }, 500);
 
   const sig = event?.signature;
-  if (!sig || !Array.isArray(sig.properties) || !sig.checksum || !sig.timestamp) {
+  // Wompi manda `timestamp` en el nivel superior del evento, no dentro de `signature`.
+  const timestamp = event?.timestamp;
+  if (!sig || !Array.isArray(sig.properties) || !sig.checksum || timestamp == null) {
     return json({ error: "evento_invalido" }, 400);
   }
 
   const concatenated = sig.properties.map((p: string) => String(getPath(event.data, p) ?? "")).join("") +
-    String(sig.timestamp) + eventsSecret;
+    String(timestamp) + eventsSecret;
   const expected = await sha256Hex(concatenated);
 
   if (expected.toLowerCase() !== String(sig.checksum).toLowerCase()) {
