@@ -572,6 +572,9 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
 .wz-empty{border:1px dashed var(--niebla);border-radius:12px;padding:26px;text-align:center;color:var(--grafito);
   display:flex;flex-direction:column;gap:14px;align-items:center;}
 
+.wz-slot-skip{margin-top:14px;border-style:dashed;}
+.wz-slot-skip.is-on{border-style:solid;}
+
 .wz-review{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:22px;}
 .wz-review div{border-bottom:1px solid var(--niebla);padding-bottom:10px;}
 .wz-review dt{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--plata);font-weight:600;margin-bottom:2px;}

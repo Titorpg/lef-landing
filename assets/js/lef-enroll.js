@@ -23,6 +23,7 @@
     moduleId: null,
     schedules: null,
     scheduleId: null,
+    skipSchedule: false,
     submitting: false,
     result: null,
     error: ""
@@ -170,7 +171,7 @@
       body = '<p class="wz-loading">Cargando horarios…</p>';
     } else if (!state.schedules.length) {
       body = '<div class="wz-empty">' +
-        '<p>No hay horarios disponibles para este nivel por el momento. Puedes elegir otro nivel o escribirnos por WhatsApp.</p>' +
+        '<p>No hay horarios disponibles para este nivel por el momento. Puedes escribirnos por WhatsApp o continuar tu inscripción y coordinamos tu horario contigo.</p>' +
         '<a class="btn btn-whatsapp btn-sm" target="_blank" rel="noopener" href="' + waLink(
           "Hola, quiero inscribirme en el nivel " + (mod ? mod.level + " (" + mod.title + ")" : "") +
           " pero no veo horarios disponibles. ¿Me ayudan?") + '">' +
@@ -189,10 +190,16 @@
           "</button>";
       }).join("") + "</div>";
     }
+    var skipOn = state.skipSchedule;
+    body += '<button type="button" class="wz-slot wz-slot-skip' + (skipOn ? " is-on" : "") + '" data-act="skip-schedule">' +
+      '<span class="wz-slot-days">Prefiero decidir mi horario después</span>' +
+      '<span class="wz-slot-time">Continúa tu inscripción y coordinamos el horario contigo por WhatsApp.</span>' +
+      (skipOn ? '<span class="wz-mod-check">✓</span>' : "") +
+      "</button>";
     return head + body +
       '<div class="wz-nav">' +
         '<button type="button" class="btn btn-outline-dark" data-act="to-2">&larr; Atrás</button>' +
-        '<button type="button" class="btn btn-dark" data-act="to-4"' + (state.scheduleId ? "" : " disabled") + ">Continuar &rarr;</button>" +
+        '<button type="button" class="btn btn-dark" data-act="to-4"' + ((state.scheduleId || state.skipSchedule) ? "" : " disabled") + ">Continuar &rarr;</button>" +
       "</div>";
   }
 
@@ -206,8 +213,9 @@
       d.age ? ["Edad", d.age] : null,
       d.city ? ["Ciudad", d.city] : null,
       ["Nivel", mod ? "Módulo " + mod.module_number + " · " + mod.level + " — " + mod.title : ""],
-      ["Días", sc ? fmtDays(sc.days) : ""],
-      ["Horario", sc ? fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time) : ""]
+      sc ? ["Días", fmtDays(sc.days)] : null,
+      sc ? ["Horario", fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time)] :
+        ["Horario", "Por definir — lo coordinamos contigo por WhatsApp"]
     ].filter(Boolean);
     return '' +
       '<h2 class="wz-h">Revisa y confirma</h2>' +
@@ -225,22 +233,28 @@
 
   function viewResult() {
     var r = state.result;
+    var hasSchedule = r.schedule_days && r.schedule_days.length;
     var waMsg = "¡Hola! Acabo de inscribirme en LEF.\n" +
       "Matrícula: " + r.registration_number + "\n" +
       "Nombre: " + state.data.name + "\n" +
       "Nivel: " + (r.module_level || "") + " — " + (r.module_title || "") + "\n" +
-      "Horario: " + fmtDays(r.schedule_days) + ", " + fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time) + "\n" +
-      "Quedo atento(a) para confirmar el cupo y el pago.";
+      (hasSchedule ?
+        "Horario: " + fmtDays(r.schedule_days) + ", " + fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time) + "\n" +
+        "Quedo atento(a) para confirmar el cupo y el pago." :
+        "Todavía no elegí horario — quedo atento(a) para coordinarlo, confirmar el cupo y el pago.");
     return '<div class="wz-card wz-done">' +
       '<div class="wz-done-badge">✓</div>' +
       '<h2 class="wz-h">¡Inscripción registrada!</h2>' +
-      '<p class="wz-sub">Guarda tu número de matrícula. Nuestro equipo te contactará por WhatsApp para confirmar el cupo y el pago.</p>' +
+      '<p class="wz-sub">Guarda tu número de matrícula. Nuestro equipo te contactará por WhatsApp para ' +
+        (hasSchedule ? "confirmar el cupo y el pago." : "coordinar tu horario, confirmar el cupo y el pago.") + "</p>" +
       '<div class="wz-regnum">' + esc(r.registration_number) + "</div>" +
       '<dl class="wz-review">' +
         "<div><dt>Nombre</dt><dd>" + esc(r.student_full_name || state.data.name) + "</dd></div>" +
         "<div><dt>Nivel</dt><dd>" + esc((r.module_level || "") + " — " + (r.module_title || "")) + "</dd></div>" +
-        "<div><dt>Días</dt><dd>" + esc(fmtDays(r.schedule_days)) + "</dd></div>" +
-        "<div><dt>Horario</dt><dd>" + esc(fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time)) + "</dd></div>" +
+        (hasSchedule ?
+          "<div><dt>Días</dt><dd>" + esc(fmtDays(r.schedule_days)) + "</dd></div>" +
+          "<div><dt>Horario</dt><dd>" + esc(fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time)) + "</dd></div>" :
+          "<div><dt>Horario</dt><dd>Por definir — te contactaremos por WhatsApp para coordinarlo</dd></div>") +
         (r.teacher_full_name ? "<div><dt>Profesor(a)</dt><dd>" + esc(r.teacher_full_name) + "</dd></div>" : "") +
       "</dl>" +
       '<a class="btn btn-whatsapp" target="_blank" rel="noopener" href="' + waLink(waMsg) + '">' +
@@ -288,12 +302,14 @@
       b.addEventListener("click", function () {
         state.moduleId = b.getAttribute("data-mod");
         state.scheduleId = null;
+        state.skipSchedule = false;
         render();
       });
     });
     mount.querySelectorAll("[data-slot]").forEach(function (b) {
       b.addEventListener("click", function () {
         state.scheduleId = b.getAttribute("data-slot");
+        state.skipSchedule = false;
         render();
       });
     });
@@ -328,8 +344,13 @@
       loadSchedules().then(render).catch(function () { state.error = "No pudimos cargar los horarios. Intenta de nuevo."; render(); });
       return;
     }
+    if (act === "skip-schedule") {
+      state.scheduleId = null;
+      state.skipSchedule = !state.skipSchedule;
+      return render();
+    }
     if (act === "to-4") {
-      if (!state.scheduleId) return;
+      if (!state.scheduleId && !state.skipSchedule) return;
       go(4);
       return;
     }
