@@ -438,9 +438,7 @@ h2.sec-title{font-family:'Archivo Black',sans-serif;text-transform:uppercase;fon
   display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
 }
 .payment-card .t{font-weight:600;font-size:17px;display:block;margin-bottom:6px;}
-.payment-card p{color:var(--carbon);font-size:14.5px;max-width:420px;}
-.payment-card .btn[disabled]{opacity:.6;cursor:not-allowed;}
-.payment-card .btn[disabled]:hover{opacity:.6;}
+.payment-card p{color:var(--carbon);font-size:14.5px;max-width:480px;}
 
 /* ---------- close ---------- */
 .close{padding:80px 0;text-align:center;}

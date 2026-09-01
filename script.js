@@ -135,9 +135,8 @@ const I18N = {
     qual_btn1: "Enroll",
     qual_q2: "Have you studied before but feel it hasn't worked?",
     qual_a2: "Groups of max. 8, flexible schedules, 1-hour classes. Formative assessment — no pressure, no elimination exams.",
-    payment_t: "Payment gateway",
-    payment_p: "Soon you'll be able to pay for your enrollment securely online through Wompi.",
-    payment_cta: "Pay with Wompi (coming soon)",
+    payment_t: "Payment methods",
+    payment_p: "LEF accepts PSE and credit/debit card through Wompi, securely. Payment is made after enrolling, from your student portal.",
     diff_eyebrow: "What sets us apart",
     founder_role: "Founder and Academic Director",
     founder_quotes: [
@@ -338,9 +337,8 @@ const I18N = {
     qual_btn1: "Inscribirse",
     qual_q2: "¿Ya has estudiado antes pero sientes que algo no ha funcionado?",
     qual_a2: "Grupos de máx. 8, horarios flexibles, clases de 1 hora. Evaluación formativa — sin presión, sin exámenes eliminatorios.",
-    payment_t: "Pasarela de pagos",
-    payment_p: "Próximamente podrás pagar tu inscripción directamente en línea, de forma segura, a través de Wompi.",
-    payment_cta: "Pagar con Wompi (próximamente)",
+    payment_t: "Medios de pago",
+    payment_p: "LEF acepta PSE y tarjeta de crédito/débito a través de Wompi, de forma segura. El pago se realiza después de inscribirte, desde tu portal de estudiante.",
     diff_eyebrow: "Nuestro diferencial",
     founder_role: "Fundador y Director Académico",
     founder_quotes: [
