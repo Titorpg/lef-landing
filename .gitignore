@@ -11,3 +11,8 @@ Thumbs.db
 supabase/.temp/
 
 .vercel
+
+# Scripts locales de ayuda (deploy, permisos, migraciones puntuales)
+deploy.ps1
+configurar-permisos-deploy.ps1
+apply-migration.js
