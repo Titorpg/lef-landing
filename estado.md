@@ -1,7 +1,8 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 30 de agosto de 2026 (sesión: portada — se quitó la foto/nombre/cargo
-del fundador y se puso el logo LEF grande, manteniendo las frases rotativas — desplegado)
+Última actualización: 31 de agosto de 2026 (sesión larga de ajustes visuales en Home/Niveles/
+Sistema/Qué ofrecemos — todo desplegado — más una migración de Supabase **escrita pero sin
+aplicar todavía**; ver "Estado al cerrar esta sesión" al final para el detalle completo)
 
 ## 🔗 Enlaces
 
@@ -179,10 +180,10 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 
 | Archivo | Contenido |
 |---|---|
-| `index.html` | Home: hero con carrusel de fotos y frase animada, "¿Qué hace LEF diferente?" (tarjetas + ruta de niveles con módulo C1), preguntas de calificación, frase ancla, sección del fundador (foto + cita rotativa), cierre + CTA |
-| `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos (títulos en inglés — mismos que en el panel/asistente — y descripciones en español), bloque de horas (16h+3h=19h) y bloque C1 |
-| `sistema.html` | Los 3 pilares del método + nota sobre el examen de validación (no punitivo) |
-| `ofrecemos.html` | Las 6 cosas que ofrece LEF (clases, club de conversación, materiales, plataforma, tutorías **al final de cada ciclo**, acompañamiento) |
+| `index.html` | Home: hero con carrusel de fotos y frase animada, "¿Qué hace LEF diferente?" (4 tarjetas con foto real de Pexels + ruta de niveles con módulo C1), preguntas de calificación (sin el recuadro "Verifica tu nivel", eliminado), frase ancla (franja azul, ya no negra), sección del fundador (logo + cita rotativa), cierre + CTA |
+| `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos, bloque de horas (16h+3h=19h), bloque **C1 rediseñado** (tarjeta igual a los niveles + panel "qué incluye" con 5 puntos, ambos se expanden juntos al hover) y **carrusel de reseñas** "Voces de LEF" al final (fondo azul) |
+| `sistema.html` | Los 3 pilares del método (con foto real de Pexels cada uno) + nota corta sobre el examen de validación dividida en 2 párrafos + 3 puntos con chulo (ya no hay franja negra "Tres pilares") + carrusel de reseñas |
+| `ofrecemos.html` | Las 6 cosas que ofrece LEF en tarjetas estilo "Sistema de aprendizaje" (sin foto, 2 columnas × 3 en escritorio) + 4 puntos con chulo (ya no hay foto suelta ni franja azul separada — el carrusel de reseñas ya es azul) |
 | `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
 | `login.html` | Inicio de sesión único (`assets/js/lef-auth.js`) — enruta por rol — no indexado |
 | `admin.html` | Panel administrativo (SPA, `assets/js/lef-admin.js`) — no indexado |
@@ -224,17 +225,27 @@ vive únicamente local y NO está en Git.
 
 ## Pendientes / cosas a revisar
 
-1. **Imágenes reales faltantes**:
-   - Los 3 pilares en `sistema.html` (recuadros "Imagen pendiente")
-   - Secciones de collage en `niveles.html` y `ofrecemos.html`
-   - La foto del fundador es un headshot generado con IA — reemplazar cuando haya una foto real
-   - El carrusel del hero en `index.html` ya usa 14 fotos reales (`photo-materials.jpg` + `photo-materials1.jpg`...`13.jpg`)
-   - Hay dos fotos sin usar en `assets/` (`pexels-thirdman-5649522.jpg`, `pexels-yankrukov-8199706.jpg`) — preguntarle al cliente si son para alguna sección específica
-2. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
-3. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
-4. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
-5. **LinkedIn** — falta el link real de la cuenta cuando exista.
-6. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
+1. **⏳ URGENTE — Migración de Supabase sin aplicar todavía** (`supabase/migrations/20260831180000_inscripcion_horario_despues.sql`,
+   commit `c0d3944`, escrita el 31 ago 2026): permite completar la inscripción sin elegir
+   horario ("decidir después") cuando un módulo no tiene horarios activos o ninguno le sirve
+   al estudiante. El bloqueo automático de Claude Code impide aplicar cambios de base de datos
+   en producción por su cuenta (ni por Bash ni por PowerShell) — **el usuario tiene que aplicarla
+   a mano**: copiar el contenido del archivo y pegarlo en el **SQL Editor** del proyecto
+   `lef-center-prod` en dashboard.supabase.com (funciona desde el navegador del celular
+   también). Hasta que se aplique, `create_enrollment` sigue exigiendo horario obligatorio.
+2. **⏳ Falta el botón "decidir horario después" en el asistente** (`assets/js/lef-enroll.js`,
+   paso 3 "Elige tu horario") — la migración del punto 1 ya lo soporta del lado de la base de
+   datos, pero el frontend todavía no tiene el botón/opción para que el estudiante lo use.
+   Implementar en la próxima sesión.
+3. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
+   Qué ofrecemos) usa 6 reseñas de ejemplo escritas por Claude, no de estudiantes reales.
+   Reemplazar en `script.js` (claves `testi_1_q`…`testi_6_m`) cuando el cliente tenga reseñas
+   reales o quiera pedirlas.
+4. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
+5. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
+6. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
+7. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
+8. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
 
 ## Cómo seguir trabajando
 
@@ -246,9 +257,61 @@ vive únicamente local y NO está en Git.
   `SUPABASE_ACCESS_TOKEN`. Las Edge Functions con `npx supabase functions deploy`.
 - **Caché:** el `vercel.json` deja que JS/CSS revaliden y cachea imágenes 1 año. Si un cambio
   de JS no se ve, `Ctrl+Shift+R` una vez (afecta solo a quien ya había cargado la versión vieja).
+  **Importante:** si se reemplaza el *contenido* de una imagen ya existente (no una nueva),
+  hay que guardarla con un **nombre de archivo distinto** — sobrescribir el mismo nombre deja
+  la versión vieja cacheada indefinidamente aunque el archivo en el repo ya sea el correcto.
 - **Assets:** imágenes/íconos en `assets/`. Falta un ícono propio de "login" (hoy es un SVG inline).
 
-## Estado al cerrar esta sesión (30 ago 2026)
+## Estado al cerrar esta sesión (31 ago 2026)
+
+Sesión larga de ajustes visuales pedidos por el cliente, en Home, Niveles, Sistema de
+aprendizaje y Qué ofrecemos. **Cada punto se desplegó a producción apenas se terminaba**
+(no quedó nada visual pendiente de publicar). Commits `c102077` → `c0d3944`.
+
+- ✅ **Home**: 4 imágenes reales (Pexels, horizontales) en "¿Qué hace LEF diferente?" con
+  overlay del logo; "Verifica tu nivel/Descubre tu nivel" azul unificado con el bloque C1, y
+  la franja "Aprender inglés es más..." pasó de negra a azul; footer sin botón de LinkedIn
+  (el cliente no usa esa red) y con "Teléfono" en vez de "WhatsApp" en Contacto; recuadro
+  "Verifica tu nivel" **eliminado** (decisión del cliente, sección sin uso).
+- ✅ **Legales y FAQ**: ya no se menciona ningún precio en ningún lado del sitio; política de
+  privacidad, términos de uso y FAQ ahora hablan de **Wompi** como la pasarela de pagos oficial
+  (política de privacidad tiene una sección nueva sobre terceros/Wompi).
+- ✅ **Niveles**: estadísticas (12/4/8/3) y texto de horas/nota más legibles (más grandes/oscuros);
+  el módulo **C1 rediseñado** como tarjeta de nivel + panel "qué incluye" (5 puntos), ambos con
+  la misma altura incluso cuando la tarjeta se expande al pasar el cursor (CSS `align-items:stretch`,
+  sin JS); **carrusel de reseñas** "Voces de LEF" reemplazó los 3 recuadros de imagen pendiente.
+- ✅ **Sistema de aprendizaje**: los 3 pilares ya tienen foto real (Pexels); se quitó la franja
+  negra "Tres pilares, un solo sistema" y su mensaje pasó a 3 puntos con chulo debajo de una
+  nota más corta (dividida en 2 párrafos, antes era un solo párrafo muy largo); carrusel de
+  reseñas al final.
+- ✅ **Qué ofrecemos**: las 6 casillas ahora usan el mismo formato que "Sistema de aprendizaje"
+  (tarjeta con badge circular, sin foto), 2 columnas × 3 en escritorio; se quitó la foto suelta
+  que quedaba flotando al lado; el mensaje de la franja azul pasó a 4 puntos con chulo debajo
+  de las casillas, y se eliminó esa franja azul (el carrusel de reseñas de abajo ya es azul).
+- ✅ **Carrusel de reseñas** (componente compartido, usado en Niveles/Sistema/Qué ofrecemos):
+  varias vueltas hasta quedar bien —
+  1. Reescrito de animación CSS a JS con auto-scroll infinito real y arrastre manual
+     (mouse/dedo) — al soltar retoma el movimiento solo.
+  2. Encontrado y corregido un bug real: si el navegador no dispara `pointerup` al soltar
+     (por lo que fuera), la bandera de "arrastrando" quedaba atascada para siempre y el
+     autoplay se congelaba tras la primera interacción. Se agregaron seguros (listeners de
+     respaldo a nivel `window`, vigilante de 4s).
+  3. Vuelto a animar con CSS `transform` (acelerado por GPU) en vez de `scrollLeft`, porque
+     este último se sentía "lagueado" — mismo resultado fluido que el original, con arrastre.
+  4. Ya no respeta la preferencia de accesibilidad "reducir movimiento" del sistema — decisión
+     explícita del cliente, para que el carrusel siempre se mueva solo.
+  - Velocidad: más lenta en escritorio, algo más rápida en móvil que antes.
+- ⏳ **Migración de Supabase escrita pero SIN APLICAR** — ver "Pendientes / cosas a revisar" #1.
+  Permite inscribirse sin elegir horario ("decidir después"). El bloqueo de seguridad de
+  Claude Code impide aplicar cambios de base de datos en producción de forma autónoma (se
+  intentó con Bash y PowerShell, ambos bloqueados); el usuario no tuvo acceso al SQL Editor de
+  Supabase durante la sesión para aplicarla a mano. **Falta además** el botón "decidir horario
+  después" en el frontend del asistente (`assets/js/lef-enroll.js`, paso 3) — ni siquiera se
+  empezó, quedó pendiente para la próxima sesión junto con la migración.
+- ♻️ Recordatorio: **no hay auto-deploy**. Cada cambio de HTML/CSS/JS se publicó a mano con
+  `npx vercel deploy --prod --yes --token <VERCEL_TOKEN> --scope lefcenter` después de cada commit.
+
+## Estado al cerrar la sesión anterior (30 ago 2026)
 
 - ✅ Portada: quitada la foto + nombre + cargo del fundador; en su lugar el logo LEF grande.
   Las frases rotativas se mantienen. Cambios en `index.html` y `style.css`.
