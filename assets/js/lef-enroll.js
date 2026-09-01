@@ -332,6 +332,7 @@
   function handle(act) {
     if (act === "to-1") return go(1);
     if (act === "to-2") {
+      if (state.step !== 1) { go(2); return; } // volviendo desde un paso posterior: no releer/validar el paso 1
       readStep1();
       if (!step1Valid()) { state.error = "Revisa el nombre, el documento, el WhatsApp y el correo."; return render(); }
       go(2);
