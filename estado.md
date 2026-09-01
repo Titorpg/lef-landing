@@ -232,11 +232,16 @@ vive únicamente local y NO está en Git.
    en producción por su cuenta (ni por Bash ni por PowerShell) — **el usuario tiene que aplicarla
    a mano**: copiar el contenido del archivo y pegarlo en el **SQL Editor** del proyecto
    `lef-center-prod` en dashboard.supabase.com (funciona desde el navegador del celular
-   también). Hasta que se aplique, `create_enrollment` sigue exigiendo horario obligatorio.
-2. **⏳ Falta el botón "decidir horario después" en el asistente** (`assets/js/lef-enroll.js`,
-   paso 3 "Elige tu horario") — la migración del punto 1 ya lo soporta del lado de la base de
-   datos, pero el frontend todavía no tiene el botón/opción para que el estudiante lo use.
-   Implementar en la próxima sesión.
+   también). Hasta que se aplique, `create_enrollment` sigue exigiendo horario obligatorio —
+   el botón "decidir después" (ver siguiente punto) ya está desplegado y funciona en la UI,
+   pero al enviar el formulario sin horario falla de forma controlada (sin guardar nada) con
+   el mensaje "Ese horario acaba de llenarse" — mensaje existente, un poco impreciso para este
+   caso puntual, pero deja de aparecer apenas se aplique la migración.
+2. **✅ HECHO — Botón "decidir horario después" en el asistente** (`assets/js/lef-enroll.js`
+   paso 3, commit `96b3542`, desplegado): aparece siempre, tenga o no horarios el módulo; al
+   elegirlo se habilita "Continuar" y el paso 4 / la pantalla final muestran "Por definir — lo
+   coordinamos por WhatsApp". Probado en local hasta la pantalla de revisión — falta la prueba
+   de punta a punta (envío real) una vez esté aplicada la migración del punto 1.
 3. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
    Qué ofrecemos) usa 6 reseñas de ejemplo escritas por Claude, no de estudiantes reales.
    Reemplazar en `script.js` (claves `testi_1_q`…`testi_6_m`) cuando el cliente tenga reseñas
@@ -301,13 +306,17 @@ aprendizaje y Qué ofrecemos. **Cada punto se desplegó a producción apenas se 
   4. Ya no respeta la preferencia de accesibilidad "reducir movimiento" del sistema — decisión
      explícita del cliente, para que el carrusel siempre se mueva solo.
   - Velocidad: más lenta en escritorio, algo más rápida en móvil que antes.
+- ✅ **Asistente de inscripción**: agregado el botón "Prefiero decidir mi horario después" en
+  el paso 3 (`assets/js/lef-enroll.js`, commit `96b3542`) — aparece siempre, con o sin horarios
+  disponibles; habilita "Continuar" y el paso 4/pantalla final muestran "Por definir — lo
+  coordinamos por WhatsApp". Desplegado y probado en local hasta la pantalla de revisión.
 - ⏳ **Migración de Supabase escrita pero SIN APLICAR** — ver "Pendientes / cosas a revisar" #1.
-  Permite inscribirse sin elegir horario ("decidir después"). El bloqueo de seguridad de
-  Claude Code impide aplicar cambios de base de datos en producción de forma autónoma (se
-  intentó con Bash y PowerShell, ambos bloqueados); el usuario no tuvo acceso al SQL Editor de
-  Supabase durante la sesión para aplicarla a mano. **Falta además** el botón "decidir horario
-  después" en el frontend del asistente (`assets/js/lef-enroll.js`, paso 3) — ni siquiera se
-  empezó, quedó pendiente para la próxima sesión junto con la migración.
+  Es el otro lado de lo anterior: permite que `create_enrollment` reciba horario nulo y cree
+  una inscripción "solo módulo". El bloqueo de seguridad de Claude Code impide aplicar cambios
+  de base de datos en producción de forma autónoma (se intentó con Bash y PowerShell, ambos
+  bloqueados); el usuario no tuvo acceso al SQL Editor de Supabase durante la sesión para
+  aplicarla a mano. Hasta que se aplique, enviar el formulario sin horario falla de forma
+  controlada (sin guardar nada), con el mensaje de horario lleno ya existente.
 - ♻️ Recordatorio: **no hay auto-deploy**. Cada cambio de HTML/CSS/JS se publicó a mano con
   `npx vercel deploy --prod --yes --token <VERCEL_TOKEN> --scope lefcenter` después de cada commit.
 
