@@ -242,15 +242,19 @@ vive únicamente local y NO está en Git.
    elegirlo se habilita "Continuar" y el paso 4 / la pantalla final muestran "Por definir — lo
    coordinamos por WhatsApp". Probado en local hasta la pantalla de revisión — falta la prueba
    de punta a punta (envío real) una vez esté aplicada la migración del punto 1.
-3. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
+3. **✅ HECHO — Bug de "Atrás" arreglado** (commit `ff65a3e`, desplegado, encontrado por el
+   cliente al probar el punto anterior): el botón "Atrás" del paso 3 reutilizaba la validación
+   del paso 1 y borraba nombre/documento/WhatsApp/correo al retroceder, dejando el asistente
+   sin poder avanzar ni retroceder más. Ya retrocede sin tocar los datos.
+4. **Reseñas de "Voces de LEF" son inventadas** — el carrusel de testimonios (Niveles, Sistema,
    Qué ofrecemos) usa 6 reseñas de ejemplo escritas por Claude, no de estudiantes reales.
    Reemplazar en `script.js` (claves `testi_1_q`…`testi_6_m`) cuando el cliente tenga reseñas
    reales o quiera pedirlas.
-4. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
-5. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
-6. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
-7. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
-8. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
+5. **Preguntas frecuentes** — las 10 preguntas y respuestas son **inventadas** (se pidió así explícitamente mientras se define contenido real). Los métodos de pago y precios se dejaron genéricos a propósito ("se confirman por WhatsApp") porque no hay esa información real todavía.
+6. **Pasarela Wompi** — el botón/tarjeta en `inscripcion.html` y en el portal son solo visuales ("próximamente"); la integración funcional está **aplazada** (el cliente ya tiene la cuenta). Detalle y decisiones pendientes en FASE 2 → "Pendiente ⏳ (Wompi)".
+7. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
+8. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
+9. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
 
 ## Cómo seguir trabajando
 
