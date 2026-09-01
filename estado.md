@@ -3,9 +3,8 @@
 Última actualización: 31 de agosto de 2026. Sesión larga: ajustes visuales en Home/Niveles/
 Sistema/Qué ofrecemos (desplegados) + arranque de **Fase 2 de Wompi** — portal del estudiante
 con 3 pestañas (Facturación con pago real, Mi curso, Mi cuenta) y las Edge Functions de Wompi
-ya desplegadas. **⚠️ El portal no funciona todavía**: falta aplicar una migración de Supabase
-a mano (ver "Pendientes" #1) — hasta entonces, el portal completo falla al cargar (pide una
-columna `avatar_url` que no existe aún). Ver "Estado al cerrar esta sesión" para el detalle.
+ya desplegadas. **Migración del portal aplicada por el usuario el 31 ago 2026 (HTTP 201)** —
+el portal ya carga. Falta configurar las llaves de Wompi (sandbox) y las pruebas en vivo.
 
 ## 🔗 Enlaces
 
@@ -147,11 +146,10 @@ Fase 1 — estado:
    **ya desplegadas** en Supabase (commit `115dfa2`).
 2. ✅ Portal: pestaña Facturación con el botón "Pagar en línea" ya conectado al widget;
    pestañas nuevas Mi curso y Mi cuenta. **Desplegado en Vercel.**
-3. ✅ Migración de base de datos escrita (`get_my_course`, `update_my_profile`,
+3. ✅ Migración de base de datos (`get_my_course`, `update_my_profile`,
    `record_wompi_payment`, `profiles.avatar_url`, bucket de Storage `avatars`) —
-   **⏳ FALTA APLICARLA A MANO**, mismo procedimiento que la migración anterior. Hasta
-   que se aplique, **el portal completo no carga** (pide la columna `avatar_url`, que
-   todavía no existe).
+   **APLICADA por el usuario el 31 ago 2026** (`node apply-migration.js`, HTTP 201).
+   El portal ya carga.
 4. **⏳ Faltan las llaves de Wompi** (sandbox primero): llave pública (`pub_test_...`),
    secreto de integridad (`test_integrity_...`) y secreto de eventos — se configuran como
    secrets de Supabase (`npx supabase secrets set WOMPI_PUBLIC_KEY=... --project-ref
@@ -250,14 +248,11 @@ vive únicamente local y NO está en Git.
 
 ## Pendientes / cosas a revisar
 
-1. **⏳⚠️ URGENTE — Migración del portal sin aplicar (rompe el portal completo)**
-   (`supabase/migrations/20260831190000_portal_curso_cuenta_wompi.sql`, commit `115dfa2`,
-   escrita el 31 ago 2026): agrega `get_my_course`, `update_my_profile`,
-   `record_wompi_payment`, la columna `profiles.avatar_url` y el bucket de Storage
-   `avatars`. **Hasta que se aplique, el portal del estudiante no carga en absoluto**
-   (la primera consulta al iniciar sesión pide la columna `avatar_url`, que todavía no
-   existe). Aplicarla a mano en el SQL Editor de Supabase (mismo procedimiento que la
-   migración anterior — ver sección Wompi más arriba para el detalle completo).
+1. **✅ HECHO — Migración del portal aplicada**
+   (`supabase/migrations/20260831190000_portal_curso_cuenta_wompi.sql`, commit `115dfa2`):
+   aplicada por el usuario el 31 ago 2026 con `node apply-migration.js` (HTTP 201). Agregó
+   `get_my_course`, `update_my_profile`, `record_wompi_payment`, `profiles.avatar_url` y el
+   bucket de Storage `avatars`. El portal del estudiante ya carga. **⏳ Falta probarlo en vivo.**
 2. **⏳ Llaves de Wompi (sandbox)** — faltan para que el botón "Pagar en línea" del
    portal funcione: llave pública, secreto de integridad y secreto de eventos. Ver
    sección Wompi más arriba para cómo configurarlas.
