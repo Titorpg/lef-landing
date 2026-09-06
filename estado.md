@@ -1,13 +1,15 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 6 de septiembre de 2026. **Dos frentes con código listo, sin desplegar:**
-(1) **Endurecimiento del inicio de sesión** (sección 🔐 y `SEGURIDAD.md`): cerrada una escalada
-de privilegios crítica en RLS de `profiles`; MFA de admin, CAPTCHA, contraseñas por correo,
-auditoría. (2) **Formulario público → pre-inscripciones** (sección 📋): el formulario ya no
-crea estudiantes; guarda solicitudes que el admin revisa y convierte. Ambos necesitan que el
-usuario aplique migraciones a mano + (para el login) configure Resend/Turnstile/panel de
-Supabase, y que Claude despliegue. Commits `3d737a4` (login) y `c3167b6` (pre-inscripciones),
-**pusheados a `origin/main` pero SIN desplegar** — el sitio en vivo sigue igual.
+Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
+YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
+Editor de Supabase y frontend desplegado (`dpl_4EmfdGUNiKC7S53oq5V8AZSNoKfe`, commit
+`c3167b6`). El formulario ya no crea estudiantes directamente; guarda solicitudes en
+`preinscripciones` que el admin revisa desde la pestaña "Pre-inscritos" y convierte.
+
+**Endurecimiento del inicio de sesión — EN PAUSA** (sección 🔐 y `SEGURIDAD.md`): código
+listo (commit `3d737a4`, pusheado, sin desplegar) pero pausado porque el usuario necesita
+crear antes cuentas en algunos servicios (Resend, Cloudflare Turnstile). Cierra una escalada
+de privilegios crítica en RLS de `profiles`; retomar cuando el usuario tenga esas cuentas.
 
 **Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
@@ -214,7 +216,7 @@ Fase 1 — estado:
 4. Dominio: ya apunta a Vercel.
 5. Datos de prueba: borrarlos.
 
-## 📋 Formulario público → Pre-inscripciones (6 sep 2026) — código listo, sin desplegar
+## 📋 Formulario público → Pre-inscripciones (6 sep 2026) — EN VIVO ✅
 
 **Cambio de flujo:** el formulario público **ya no crea un estudiante ni una inscripción**.
 Ahora guarda una **pre-inscripción** en la tabla `preinscripciones`. El admin la ve en
@@ -223,18 +225,21 @@ del curso, pulsa **"Crear estudiante"**: ahí sí se crea el estudiante + inscri
 grupo, matrícula), reutilizando `create_enrollment`. Motivo: no todos los que llenan el
 formulario terminan entrando al curso.
 
-- `supabase/migrations/20260906140000_preinscripciones.sql` (NUEVA, aplicar a mano):
+- ✅ `supabase/migrations/20260906140000_preinscripciones.sql` — **aplicada por el usuario**
+  el 6 sep 2026 desde el SQL Editor de Supabase (pegado manual, no por Management API):
   tabla `preinscripciones` + RLS (staff lee, admin gestiona), `create_preinscripcion`
   (pública/anon, con anti-doble-envío de 24 h) y `admin_convert_preinscripcion`
   (solo admin, llama a `create_enrollment` y marca la solicitud como `convertido`).
-- `assets/js/lef-enroll.js` — `submit()` llama `create_preinscripcion`; pantalla final
+- ✅ `assets/js/lef-enroll.js` — `submit()` llama `create_preinscripcion`; pantalla final
   sin matrícula ("¡Recibimos tu solicitud!"); paso 4 dice "Enviar solicitud".
-- `assets/js/lef-admin.js` — pestañas Estudiantes / Pre-inscritos en la sección Estudiantes;
+- ✅ `assets/js/lef-admin.js` — pestañas Estudiantes / Pre-inscritos en la sección Estudiantes;
   tabla de solicitudes con "Crear estudiante" (modal: documento + módulo + horario),
   "Marcar contactado", "Descartar"; KPI "Pre-inscritos" en el Dashboard.
-- **Orden:** aplicar la migración **antes** de desplegar el frontend nuevo, o el formulario
-  público se rompe (`create_preinscripcion` no existiría). `get_enrollment_confirmation`
-  y `create_enrollment` siguen existiendo (los usa la conversión).
+- ✅ **Desplegado** (commit `c3167b6`, deploy `dpl_4EmfdGUNiKC7S53oq5V8AZSNoKfe`, 6 sep 2026).
+  `get_enrollment_confirmation` y `create_enrollment` siguen existiendo (los usa la conversión).
+- ⏳ **Falta probar en vivo**: enviar una solicitud desde `inscripcion.html`, verificar que
+  aparece en el panel (Estudiantes → Pre-inscritos) y que "Crear estudiante" funciona de
+  punta a punta. Borrar los datos de prueba después.
 
 ## 🔐 Endurecimiento del inicio de sesión (6 sep 2026) — EN CURSO
 
