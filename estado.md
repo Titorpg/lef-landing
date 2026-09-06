@@ -1,6 +1,12 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 1 de septiembre de 2026. **Wompi Fase 1 (sandbox) funcionando de punta
+Última actualización: 6 de septiembre de 2026. **Endurecimiento del inicio de sesión en
+curso** (ver sección 🔐 abajo y `SEGURIDAD.md`): cerrada una escalada de privilegios crítica
+en RLS de `profiles`; código listo para MFA de admin, CAPTCHA, contraseñas por correo y
+auditoría — pendiente que el usuario aplique migraciones + configure Resend/Turnstile/panel
+de Supabase, y que Claude despliegue.
+
+**Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
 corregido y pago de prueba registrado con recibo `REC-…`. Además: modal "Ver pagos" ancho en
 escritorio y estado "pendiente" en suscripciones sin pago confirmado. **Deploy directo de
@@ -205,6 +211,55 @@ Fase 1 — estado:
 4. Dominio: ya apunta a Vercel.
 5. Datos de prueba: borrarlos.
 
+## 🔐 Endurecimiento del inicio de sesión (6 sep 2026) — EN CURSO
+
+Guía operativa completa y checklist paso a paso: **`SEGURIDAD.md`** (en la raíz).
+
+**Hallazgo crítico:** la política RLS `"edita su propio profile"` (de la migración
+`20260831190000`) permitía a cualquier estudiante autenticado hacer
+`update profiles set role='admin'` y quedar como admin. Cerrado por la migración
+`20260906120000` (revoca UPDATE directo sobre `profiles`; el avatar ahora va por
+`update_my_avatar()` SECURITY DEFINER).
+
+**Cambios de código dejados listos (sin desplegar, pendiente review del usuario):**
+- `supabase/migrations/20260906120000_seguridad_profiles_rls.sql` — el fix crítico.
+- `supabase/migrations/20260906130000_seguridad_cuentas.sql` — `profiles.must_change_password`
+  + `password_changed_at`, `mark_my_password_changed()`, tabla `audit_log` (append-only,
+  la lee solo admin).
+- `supabase/functions/manage-users/index.ts` — CORS restringido a dominios LEF;
+  contraseñas generadas por el servidor (16 chars, 4 clases) y **enviadas por
+  correo con Resend**; `must_change_password=true` al alta y al reset; guardarraíl
+  "último admin activo" en set_role/set_active/delete_account; escribe en `audit_log`.
+- `supabase/functions/wompi-checkout/index.ts` — CORS restringido.
+- `assets/js/lef-security.js` (NUEVO) — política de contraseña (12 + may/min/dígito/símbolo),
+  candado post-login `LEFSec.enforce()`: cambio de contraseña obligatorio en el primer
+  ingreso + MFA/TOTP obligatorio para admin (inscripción con QR + reto de 6 dígitos).
+- `assets/js/lef-auth.js` — CAPTCHA Cloudflare Turnstile (opcional hasta poner la
+  site key), "¿olvidaste tu contraseña?" (`resetPasswordForEmail` → `recuperar.html`),
+  corre `LEFSec.enforce()` antes de enrutar.
+- `recuperar.html` + `assets/js/lef-recuperar.js` (NUEVOS) — página de destino del
+  enlace de recuperación.
+- `assets/js/lef-portal.js` — boot corre `enforce()`; "Cambiar contraseña" exige
+  contraseña actual (reautenticación) + política fuerte + `mark_my_password_changed()`.
+- `assets/js/lef-admin.js` — boot corre `enforce()`; nueva sección **Seguridad**
+  (cambiar mi contraseña + gestionar 2FA con QR en modal); los modales de crear
+  cuenta / restablecer ya no piden contraseña (se genera y se envía por correo,
+  se muestra como respaldo); `friendly()` traduce `ultimo_admin` y afines.
+- `supabase-config.js` — `window.LEF_AUTH_CONFIG.turnstileSiteKey` (vacío por ahora).
+- `login.html` / `portal.html` / `admin.html` — cargan `lef-security.js` (+ Turnstile en login).
+
+**Falta (del usuario):** cuenta Resend + DNS del dominio, clave Turnstile, aplicar
+las 2 migraciones, ajustes del panel de Supabase (registro público OFF, leaked
+password ON, política 12, MFA TOTP on, sesiones, JWT 1800s, CAPTCHA secret, SMTP
+Resend, rate limits). **Falta (de Claude):** `supabase secrets set` con las llaves,
+deploy de frontend + `manage-users` + `wompi-checkout`, poner la site key y redeploy.
+Todo el orden exacto está en `SEGURIDAD.md`.
+
+**Decisiones tomadas:** MFA obligatorio solo admin (profesores opcional desde su
+sección Seguridad); el correo de alta lleva contraseña temporal en texto plano a
+propósito (flujo pedido), acotado con cambio obligatorio en el primer ingreso;
+Resend y Turnstile (ambos gratis) confirmados por el usuario.
+
 ## Qué es esto
 
 Landing page multi-página para **LEF (Learn English Fluently)**, academia de inglés online en Barranquilla, Colombia. Sitio estático (HTML/CSS/JS, sin framework ni build), bilingüe (ES/EN con toggle), construido siguiendo `BRAND_GUIDELINES.md`.
@@ -296,6 +351,38 @@ vive únicamente local y NO está en Git.
 8. **Política de privacidad y Términos de uso** — son borradores fundamentados en investigación (Ley 1581/2012, estructura típica de plataformas educativas, y ahora también referencian a Wompi como pasarela), marcados como "documento en revisión" en la propia página. Deben pasar por revisión legal antes de darse por definitivos.
 9. **Fotos reales pendientes**: la foto del fundador (headshot generado con IA, ya no se usa en portada pero sigue en el repo) y todas las fotos de las 4 casillas de "Qué hace LEF diferente" (Home), los 3 pilares (Sistema de aprendizaje) son de banco de imágenes (Pexels), no de estudiantes/clases reales de LEF — reemplazar cuando haya material propio.
 10. **Contenido bilingüe incompleto** — el toggle EN/ES funciona en todo el header/footer y en las páginas principales (home, niveles, sistema, ofrecemos, inscripción, incluyendo todo lo agregado en esta sesión), pero el contenido de FAQ, política de privacidad y términos de uso sigue **solo en español**.
+11. **Integración con Google Workspace (Classroom / Meet / Calendar) — PENDIENTE, sin empezar.**
+    Conversado el 5–6 sep 2026; el usuario quiere avanzar pero primero necesita entenderlo
+    mejor, así que queda pausado. Lo definido hasta ahora:
+    - **No se cambia de proveedor de auth.** Lo que hay hoy NO es auth casera: es **Supabase
+      Auth** (GoTrue, contraseñas con bcrypt fuera de la BD de LEF, `manage-users` solo llama
+      a la API admin de Supabase y re-verifica el rol). Se descartó mudar a Clerk: obligaría a
+      re-arquitecturar el RLS, migrar usuarios y sumar otro procesador internacional, sin
+      beneficio real para este caso.
+    - **LEF SÍ tiene Google Workspace de pago con dominio propio** (`@lefcenter.com`) —
+      confirmado por el usuario.
+    - **Arquitectura acordada:** staff (admin/teacher) entra con "Iniciar con Google" (cuenta
+      `@lefcenter.com`), app OAuth tipo **Internal** → sin verificación de Google. Estudiantes
+      siguen con correo/contraseña en Supabase; se les invita a Classroom por correo y ven los
+      enlaces en el portal. Una **cuenta de servicio con delegación de dominio** hace todo el
+      trabajo de Classroom/Meet/Calendar desde Edge Functions (scopes `classroom.courses`,
+      `classroom.rosters`, `classroom.announcements`, `calendar.events`). Secrets de la cuenta
+      de servicio como secrets de Supabase (igual que Wompi).
+    - **Plan por fases:** F0 configuración en Google (la hace el usuario) · F1 login con Google
+      para staff · F2 helper de cuenta de servicio (JWT RS256 → access token con Web Crypto de
+      Deno) + Edge Function `google-classroom` + migración (`groups.classroom_course_id`,
+      `groups.meet_link`, `groups.calendar_event_id`) · F3 sync de roster · F4 Meet vía evento
+      de Calendar con `conferenceData` · F5 UI en admin (Académico → Grupos) y portal (Mi curso).
+    - **Cuotas de la Classroom API:** no es problema de capacidad para el volumen de LEF; solo
+      obliga a escribir las operaciones masivas (sync de roster) en lotes con reintento y
+      backoff exponencial ante HTTP 429 / 403 `rateLimitExceeded`, y a no sincronizar en cada
+      carga de página.
+    - **Endurecimiento de auth pendiente aparte (independiente de Google), por orden de
+      impacto:** (1) que el usuario fije su propia contraseña (invitación / magic link) en vez
+      de que el admin la escriba y la mande por WhatsApp; (2) "¿Olvidaste tu contraseña?" en el
+      portal (necesita SMTP propio); (3) activar leaked-password protection + política más
+      fuerte en el dashboard de Supabase; (4) MFA TOTP para admin y profesores; (5) cerrar el
+      CORS `*` de las Edge Functions al dominio de LEF.
 
 ## Cómo seguir trabajando
 

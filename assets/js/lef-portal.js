@@ -69,14 +69,18 @@
       if (!r.data.session) return window.location.replace("login.html");
       TOKEN = r.data.session.access_token;
       var uid = r.data.session.user.id;
-      sb.from("profiles").select("user_id,role,full_name,active,avatar_url").eq("user_id", uid).maybeSingle()
+      sb.from("profiles").select("user_id,role,full_name,active,avatar_url,must_change_password").eq("user_id", uid).maybeSingle()
         .then(function (p) {
           if (p.error || !p.data || !p.data.active) {
             return sb.auth.signOut().then(function () { window.location.replace("login.html"); });
           }
           if (p.data.role !== "student") return window.location.replace("admin.html");
           ME = p.data;
-          renderShell();
+          return window.LEFSec.enforce(sb, {
+            role: "student",
+            mustChangePassword: p.data.must_change_password,
+            mfaRequiredRoles: ["admin"]
+          }).then(function () { renderShell(); });
         });
     });
   }
@@ -292,7 +296,7 @@
       sb.storage.from("avatars").upload(path, file, { upsert: true }).then(function (up) {
         if (up.error) throw up.error;
         var publicUrl = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
-        return sb.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", ME.user_id).then(function (upd) {
+        return sb.rpc("update_my_avatar", { p_url: publicUrl }).then(function (upd) {
           if (upd.error) throw upd.error;
           ME.avatar_url = publicUrl;
           avatarBox.querySelector("[data-avatar-preview]").src = publicUrl;
@@ -309,8 +313,10 @@
     var pwBox = h(
       '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:24px">' +
       '<p style="font-weight:600;margin-bottom:10px">Cambiar contraseña</p>' +
+      field("Contraseña actual", '<input type="password" data-pw-cur autocomplete="current-password">') +
       field("Nueva contraseña", '<input type="password" data-pw-new autocomplete="new-password">') +
       field("Confirmar contraseña", '<input type="password" data-pw-confirm autocomplete="new-password">') +
+      window.LEFSec.passwordHintHtml() +
       '<button class="btn btn-blue" data-pw-save>Guardar contraseña</button>' +
       '<p class="muted" data-pw-msg style="font-size:12.5px;margin-top:8px"></p>' +
       "</div>"
@@ -318,18 +324,35 @@
     main.appendChild(pwBox);
     pwBox.querySelector("[data-pw-save]").addEventListener("click", function () {
       var msg = pwBox.querySelector("[data-pw-msg]");
+      var cur = pwBox.querySelector("[data-pw-cur]").value;
       var pw1 = pwBox.querySelector("[data-pw-new]").value;
       var pw2 = pwBox.querySelector("[data-pw-confirm]").value;
-      if (pw1.length < 8) { msg.textContent = "La contraseña debe tener al menos 8 caracteres."; return; }
+      if (!cur) { msg.textContent = "Escribe tu contraseña actual."; return; }
+      var chk = window.LEFSec.checkPassword(pw1);
+      if (!chk.ok) { msg.textContent = chk.msg; return; }
       if (pw1 !== pw2) { msg.textContent = "Las contraseñas no coinciden."; return; }
       msg.textContent = "Guardando…";
-      sb.auth.updateUser({ password: pw1 }).then(function (r) {
+      sb.auth.getUser().then(function (u) {
+        var email = u.data && u.data.user && u.data.user.email;
+        // Reautenticación: confirma que quien cambia la clave conoce la actual.
+        return sb.auth.signInWithPassword({ email: email, password: cur });
+      }).then(function (r) {
+        if (r.error) throw new Error("cur_mala");
+        return sb.auth.updateUser({ password: pw1 });
+      }).then(function (r) {
         if (r.error) throw r.error;
+        return sb.rpc("mark_my_password_changed");
+      }).then(function () {
         msg.textContent = "Contraseña actualizada.";
+        pwBox.querySelector("[data-pw-cur]").value = "";
         pwBox.querySelector("[data-pw-new]").value = "";
         pwBox.querySelector("[data-pw-confirm]").value = "";
       }).catch(function (e) {
-        msg.textContent = "No pudimos cambiar la contraseña: " + ((e && e.message) || e);
+        msg.textContent = e && e.message === "cur_mala"
+          ? "La contraseña actual no es correcta."
+          : /same_password|different from the old/i.test((e && e.message) || "")
+          ? "La contraseña nueva debe ser distinta de la actual."
+          : "No pudimos cambiar la contraseña: " + ((e && e.message) || e);
       });
     });
 

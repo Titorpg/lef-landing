@@ -9,6 +9,14 @@ window.LEF_SUPABASE = {
   key: "sb_publishable_4vocQgemt38keqyYugjLkQ_bwYy62Jj"
 };
 
+// Configuración del inicio de sesión.
+//   turnstileSiteKey: clave de sitio de Cloudflare Turnstile (CAPTCHA del login).
+//   Es PÚBLICA (va en el HTML). El "secret key" se pone en el panel de Supabase,
+//   nunca aquí. Mientras esté vacía, el login funciona sin CAPTCHA.
+window.LEF_AUTH_CONFIG = {
+  turnstileSiteKey: ""
+};
+
 // Crea un cliente de Supabase.
 //   lefClient()               -> anónimo, sin sesión (páginas públicas)
 //   lefClient({ session:true })-> guarda la sesión (panel admin / portal)

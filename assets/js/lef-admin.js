@@ -98,7 +98,11 @@
     LEF_PAYMENT_NOT_FOUND: "No se encontró el pago.",
     LEF_STUDENT_NOT_FOUND: "No se encontró el estudiante.",
     LEF_INVALID_DOC_TYPE: "Tipo de documento inválido.",
-    LEF_MISSING_FIELDS: "Faltan datos obligatorios (nombre, documento, WhatsApp o correo)."
+    LEF_MISSING_FIELDS: "Faltan datos obligatorios (nombre, documento, WhatsApp o correo).",
+    ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
+    email_invalido: "El correo no es válido.",
+    no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
+    requiere_admin: "Necesitas permisos de administrador para esta acción."
   };
   function friendly(e) {
     var m = (e && e.message) || String(e);
@@ -146,7 +150,11 @@
         }
         if (!["admin", "teacher"].includes(p.data.role)) return (window.location.replace("portal.html"));
         ME = p.data;
-        renderShell();
+        return window.LEFSec.enforce(sb, {
+          role: p.data.role,
+          mustChangePassword: p.data.must_change_password,
+          mfaRequiredRoles: ["admin"]
+        }).then(function () { renderShell(); });
       });
     });
   }
@@ -157,7 +165,8 @@
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
-    { id: "usuarios", label: "Usuarios", roles: ["admin"] }
+    { id: "usuarios", label: "Usuarios", roles: ["admin"] },
+    { id: "seguridad", label: "Seguridad", roles: ["admin", "teacher"] }
   ];
 
   function renderShell() {
@@ -194,7 +203,8 @@
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes,
-      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios
+      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
+      seguridad: secSeguridad
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
   }
@@ -447,14 +457,28 @@
     }, s ? "Guardar" : "Inscribir");
   }
 
+  // Muestra el resultado de crear/resetear una cuenta: si el correo salió y la
+  // contraseña temporal como respaldo (por si el correo no llega).
+  function showCreds(title, email, r) {
+    var sent = r && r.email_sent;
+    var pw = (r && r.password) || "—";
+    var b = h("<div>" +
+      '<p class="pnl-sub" style="margin-bottom:8px">' + (sent
+        ? "Se envió un correo a <strong>" + esc(email) + "</strong> con el usuario y la contraseña temporal."
+        : '<strong style="color:var(--bad)">El correo automático no se pudo enviar.</strong> Comparte estos datos con la persona por otro medio seguro.') + "</p>" +
+      '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(email) + "</strong><br>" +
+      'Contraseña temporal: <code style="font-size:14px">' + esc(pw) + "</code></p>" +
+      '<p class="pnl-sub">Al entrar por primera vez, el sistema le pedirá crear su contraseña personal.</p></div>');
+    modal(title, b, function () { return Promise.resolve(); }, "Entendido");
+  }
+
   function resetStudentPwd(s, prof) {
-    var np = "lef" + Math.random().toString(36).slice(2, 10);
-    var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
-      '<p class="pnl-sub">Compártela con el estudiante. Podrá cambiarla luego.</p></div>');
+    var bb = h('<div><p class="pnl-sub">Se enviará a <strong>' + esc(s.email) +
+      '</strong> un correo con una contraseña temporal nueva. Deberá crear su contraseña personal al entrar.</p></div>');
     modal("Restablecer contraseña — " + s.full_name, bb, function () {
-      return callFn({ action: "reset_password", user_id: prof.user_id, password: bb.querySelector("[name=p]").value })
-        .then(function () { toast("Contraseña actualizada."); });
-    }, "Guardar");
+      return callFn({ action: "reset_password", user_id: prof.user_id })
+        .then(function (r) { showCreds("Contraseña restablecida — " + s.full_name, s.email, r); });
+    }, "Enviar correo");
   }
 
   function deleteStudent(s, prof) {
@@ -490,21 +514,18 @@
   }
 
   function crearCuentaEstudiante(s) {
-    var pwd = "lef" + Math.random().toString(36).slice(2, 10);
     var body = h("<div>" +
       field("Nombre", '<input name="fn" value="' + esc(s.full_name) + '">') +
       field("Correo (usuario para entrar)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
-      field("Contraseña temporal", '<input name="pw" value="' + pwd + '">') +
-      '<p class="pnl-sub">Comparte estos datos con el estudiante. Entra en ' + esc(window.location.host) +
-      '/login y podrá cambiar la contraseña luego.</p></div>');
+      '<p class="pnl-sub">Se enviará un correo a esa dirección con el usuario y una contraseña temporal generada por el sistema. El estudiante deberá crear su contraseña personal al entrar por primera vez.</p></div>');
     modal("Crear cuenta de portal — " + s.full_name, body, function () {
+      var em = body.querySelector("[name=em]").value.trim();
       return callFn({
         action: "create_account", role: "student",
         full_name: body.querySelector("[name=fn]").value.trim(),
-        email: body.querySelector("[name=em]").value.trim(),
-        password: body.querySelector("[name=pw]").value,
+        email: em,
         student_id: s.id
-      }).then(function () { toast("Cuenta creada."); route(); });
+      }).then(function (r) { route(); showCreds("Cuenta creada — " + s.full_name, em, r); });
     }, "Crear cuenta");
   }
 
@@ -1026,6 +1047,126 @@
     });
   }
 
+  /* ============ SEGURIDAD (mi cuenta) ============ */
+  // Inscribe un TOTP dentro de un modal (no usa la toma de pantalla completa de LEFSec).
+  function enrollMfaModal(onDone) {
+    window.LEFSec.clearUnverified(sb).then(function () {
+      return sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "LEF-" + Date.now() });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var d = r.data;
+      var b = h("<div>" +
+        '<p class="pnl-sub" style="margin-bottom:10px">Escanea el código con Google Authenticator, Microsoft Authenticator, Authy o 1Password.</p>' +
+        '<div style="text-align:center;margin-bottom:10px">' + window.LEFSec.qrHtml(d.totp.qr_code, 170) + "</div>" +
+        '<p class="muted" style="font-size:12px;word-break:break-all;margin-bottom:10px">¿No puedes escanear? Clave: <strong>' + esc(d.totp.secret) + "</strong></p>" +
+        field("Código de 6 dígitos", '<input name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code">') +
+        "</div>");
+      modal("Activar verificación en dos pasos", b, function () {
+        var code = (b.querySelector("[name=code]").value || "").trim();
+        if (!/^\d{6}$/.test(code)) throw new Error("Son 6 dígitos.");
+        return sb.auth.mfa.challengeAndVerify({ factorId: d.id, code: code }).then(function (rr) {
+          if (rr.error) throw new Error("Código incorrecto o vencido.");
+          onDone && onDone();
+        });
+      }, "Activar");
+      // si el admin cierra el modal sin verificar, limpiamos el factor a medias
+      var bg = document.querySelector(".pnl-modal-bg");
+      if (bg) bg.addEventListener("click", function (e) {
+        if (e.target === bg) sb.auth.mfa.unenroll({ factorId: d.id }).catch(function () {});
+      });
+      var xBtn = bg && bg.querySelector("[data-x]");
+      if (xBtn) xBtn.addEventListener("click", function () {
+        sb.auth.mfa.unenroll({ factorId: d.id }).catch(function () {});
+      });
+    }).catch(function (e) { toast(friendly(e), "err"); });
+  }
+
+  function secSeguridad(main) {
+    head(main, "Seguridad", "Tu contraseña y la verificación en dos pasos de esta cuenta.");
+
+    // --- Contraseña ---
+    var pwBox = h('<div class="pnl-table-wrap" style="padding:20px;margin-bottom:22px;max-width:520px">' +
+      '<p style="font-weight:600;margin-bottom:10px">Cambiar mi contraseña</p>' +
+      field("Contraseña actual", '<input type="password" data-cur autocomplete="current-password">') +
+      field("Nueva contraseña", '<input type="password" data-n1 autocomplete="new-password">') +
+      field("Repite la contraseña", '<input type="password" data-n2 autocomplete="new-password">') +
+      window.LEFSec.passwordHintHtml() +
+      '<button class="btn btn-blue" data-save>Guardar contraseña</button>' +
+      '<p class="muted" data-msg style="font-size:12.5px;margin-top:8px"></p></div>');
+    main.appendChild(pwBox);
+    pwBox.querySelector("[data-save]").onclick = function () {
+      var msg = pwBox.querySelector("[data-msg]");
+      var cur = pwBox.querySelector("[data-cur]").value;
+      var n1 = pwBox.querySelector("[data-n1]").value;
+      var n2 = pwBox.querySelector("[data-n2]").value;
+      if (!cur) { msg.textContent = "Escribe tu contraseña actual."; return; }
+      var chk = window.LEFSec.checkPassword(n1);
+      if (!chk.ok) { msg.textContent = chk.msg; return; }
+      if (n1 !== n2) { msg.textContent = "Las contraseñas no coinciden."; return; }
+      msg.textContent = "Guardando…";
+      sb.auth.signInWithPassword({ email: ME.email, password: cur }).then(function (r) {
+        if (r.error) throw new Error("cur_mala");
+        return sb.auth.updateUser({ password: n1 });
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        return sb.rpc("mark_my_password_changed");
+      }).then(function () {
+        pwBox.querySelector("[data-cur]").value = pwBox.querySelector("[data-n1]").value = pwBox.querySelector("[data-n2]").value = "";
+        msg.textContent = "Contraseña actualizada.";
+      }).catch(function (e) {
+        msg.textContent = e && e.message === "cur_mala" ? "La contraseña actual no es correcta."
+          : /same_password|different from the old/i.test((e && e.message) || "") ? "La nueva debe ser distinta de la actual."
+          : friendly(e);
+      });
+    };
+
+    // --- Verificación en dos pasos ---
+    var mfaBox = h('<div class="pnl-table-wrap" style="padding:20px;max-width:520px">' +
+      '<p style="font-weight:600;margin-bottom:6px">Verificación en dos pasos (2FA)</p>' +
+      '<p class="pnl-sub" style="margin-bottom:12px">Un código de 6 dígitos de una app (Google Authenticator, Authy…) además de la contraseña. ' +
+      (ME.role === "admin" ? "<strong>Obligatoria para administradores.</strong>" : "Recomendada.") + "</p>" +
+      '<div data-mfa><p class="muted">Cargando…</p></div></div>');
+    main.appendChild(mfaBox);
+
+    function renderMfa() {
+      var host = mfaBox.querySelector("[data-mfa]");
+      host.innerHTML = '<p class="muted">Cargando…</p>';
+      window.LEFSec.mfaState(sb).then(function (st) {
+        host.innerHTML = "";
+        if (st.verifiedTotp.length) {
+          host.appendChild(h('<p><span class="badge ok">activa</span> ' + st.verifiedTotp.length + ' dispositivo(s) configurado(s).</p>'));
+          var list = h('<div style="margin:10px 0"></div>');
+          st.verifiedTotp.forEach(function (f) {
+            var row = h('<div style="display:flex;align-items:center;gap:10px;margin:4px 0">' +
+              '<span>' + esc(f.friendly_name || "Dispositivo") + "</span></div>");
+            row.appendChild(btn("Quitar", "btn-ghost", function () {
+              confirmDelete("Quitar dispositivo 2FA",
+                (ME.role === "admin" && st.verifiedTotp.length === 1)
+                  ? "Es tu único dispositivo. Como administrador, el sistema te pedirá configurar uno nuevo en el próximo ingreso."
+                  : "Ya no podrás generar códigos con este dispositivo.",
+                function () {
+                  return sb.auth.mfa.unenroll({ factorId: f.id }).then(function (r) {
+                    if (r.error) throw r.error; toast("Dispositivo quitado."); renderMfa();
+                  });
+                });
+            }));
+            list.appendChild(row);
+          });
+          host.appendChild(list);
+          host.appendChild(btn("Agregar otro dispositivo", "btn-blue", function () {
+            enrollMfaModal(function () { toast("Dispositivo agregado."); renderMfa(); });
+          }));
+        } else {
+          host.appendChild(h('<p><span class="badge bad">inactiva</span></p>'));
+          host.appendChild(btn("Activar ahora", "btn-dark", function () {
+            enrollMfaModal(function () { toast("2FA activada."); renderMfa(); });
+          }));
+        }
+      }).catch(function (e) { host.innerHTML = '<p class="pnl-alert err">' + esc(friendly(e)) + "</p>"; });
+    }
+    renderMfa();
+  }
+
   /* ============ USUARIOS ============ */
   function secUsuarios(main) {
     head(main, "Usuarios", "Todas las cuentas y personas del sistema, con su rol. Solo el administrador gestiona aquí.");
@@ -1041,21 +1182,20 @@
     bar.querySelector("[data-new]").onclick = function () {
       q("teachers").select("id,full_name").eq("active", true).then(function (tr) {
         var teachers = tr.data || [];
-        var pwd = "lef" + Math.random().toString(36).slice(2, 10);
         var b = h("<div>" +
           field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
           field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
-          field("Contraseña temporal", '<input name="p" value="' + pwd + '">') +
           field("Vincular a profesor (opcional)", '<select name="t"><option value="">—</option>' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
+          '<p class="pnl-sub">Se enviará un correo con el usuario y una contraseña temporal. La persona creará su contraseña personal al entrar. Los administradores además deben configurar verificación en dos pasos en el primer ingreso.</p>' +
           "</div>");
         modal("Nueva cuenta de staff", b, function () {
+          var em = b.querySelector("[name=e]").value.trim();
           return callFn({
             action: "create_account", role: b.querySelector("[name=r]").value,
             full_name: b.querySelector("[name=n]").value.trim(),
-            email: b.querySelector("[name=e]").value.trim(),
-            password: b.querySelector("[name=p]").value,
+            email: em,
             teacher_id: b.querySelector("[name=t]").value || null
-          }).then(function () { toast("Cuenta creada."); load(); });
+          }).then(function (r) { load(); showCreds("Cuenta creada", em, r); });
         }, "Crear");
       });
     };
@@ -1099,17 +1239,16 @@
           var cell = tr.children[5];
           if (r.kind === "profesor-sin-cuenta") {
             cell.appendChild(btn("Crear cuenta", "btn-blue", function () {
-              var pwd = "lef" + Math.random().toString(36).slice(2, 10);
               var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name) + '">') +
                 field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
-                field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + "</div>");
+                '<p class="pnl-sub">Se enviará un correo con el usuario y una contraseña temporal. Creará su contraseña personal al entrar.</p></div>');
               modal("Crear cuenta — " + r.name, b, function () {
+                var em = b.querySelector("[name=e]").value.trim();
                 return callFn({
                   action: "create_account", role: "teacher",
                   full_name: b.querySelector("[name=n]").value.trim(),
-                  email: b.querySelector("[name=e]").value.trim(),
-                  password: b.querySelector("[name=p]").value, teacher_id: r.teacher_id
-                }).then(function () { toast("Cuenta creada."); load(); });
+                  email: em, teacher_id: r.teacher_id
+                }).then(function (rr) { load(); showCreds("Cuenta creada — " + r.name, em, rr); });
               }, "Crear");
             }));
             t.body.appendChild(tr); return;
