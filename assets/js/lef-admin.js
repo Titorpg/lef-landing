@@ -463,26 +463,24 @@
     convertido: '<span class="badge ok">convertido</span>',
     descartado: '<span class="badge bad">descartado</span>'
   };
+  var LEVEL_ES = { beginner: "Principiante (A1–A2)", intermediate: "Intermedio (B1–B2)", advanced: "Avanzado (C1+)" };
+  var TIME_ES = { morning: "Mañana", afternoon: "Tarde", evening: "Noche" };
 
   function renderPreinscritos(main) {
     main.innerHTML = "";
     Promise.all([
-      q("preinscripciones").select("*, modules(level,title,module_number), schedules(days,start_time,end_time)")
+      q("preinscripciones").select("*")
         .neq("status", "convertido")
         .order("created_at", { ascending: false }),
       activeModules()
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       var rows = res[0].data || [], mods = res[1];
-      var t = tableWrap(["Fecha", "Nombre", "Contacto", "Nivel deseado", "Horario deseado", "Estado", "Acciones"]);
+      var t = tableWrap(["Fecha", "Nombre", "Contacto", "Nivel (autoeval.)", "Franja preferida", "Estado", "Acciones"]);
       rows.forEach(function (p) {
-        var m = p.modules, sc = p.schedules;
-        var modLabel = m ? m.level + " · " + m.title : "—";
-        var scLabel = p.wants_schedule_later ? "Decidir después"
-          : sc ? (days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "—";
         var tr = h("<tr><td>" + date(p.created_at) + "</td><td>" + esc(p.full_name) + "</td>" +
           '<td class="wrap">' + esc(p.whatsapp) + '<br><span class="muted" style="font-size:12px">' + esc(p.email) + "</span></td>" +
-          "<td>" + esc(modLabel) + "</td><td>" + esc(scLabel) + "</td>" +
+          "<td>" + esc(LEVEL_ES[p.level_estimate] || "—") + "</td><td>" + esc(TIME_ES[p.time_preference] || "—") + "</td>" +
           "<td>" + (PRE_STATUS_BADGE[p.status] || esc(p.status)) + '</td><td class="acts"></td></tr>');
         var cell = tr.children[6];
         if (ME.role === "admin" && (p.status === "nuevo" || p.status === "contactado")) {
@@ -518,8 +516,11 @@
       ? p.desired_module_id : mods[0].id;
     var pwd = "lef" + Math.random().toString(36).slice(2, 10);
     var b = h("<div>" +
-      '<p class="pnl-sub" style="margin-bottom:10px">Solicitud de <strong>' + esc(p.full_name) + "</strong><br>" +
+      '<p class="pnl-sub" style="margin-bottom:6px">Solicitud de <strong>' + esc(p.full_name) + "</strong><br>" +
       esc(p.whatsapp) + " · " + esc(p.email) + (p.age ? " · " + esc(p.age) + " años" : "") + (p.city ? " · " + esc(p.city) : "") + "</p>" +
+      '<p class="pnl-sub" style="margin-bottom:10px">Dice tener nivel <strong>' + esc(LEVEL_ES[p.level_estimate] || "sin especificar") +
+      "</strong> · prefiere la franja <strong>" + esc(TIME_ES[p.time_preference] || "sin especificar") +
+      '</strong> — es solo referencia del formulario, elige abajo el módulo y horario reales según tu conversación con la persona.</p>' +
       field("Tipo de documento", docSelect("dt", p.doc_type || "CC")) +
       field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
       field("Módulo", moduleSelect("mod", mods, defaultMod)) +

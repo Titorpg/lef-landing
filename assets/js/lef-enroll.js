@@ -1,8 +1,12 @@
-/* LEF — Asistente de inscripción (4 pasos)
-   Paso 1 Tus datos · Paso 2 Elige tu nivel · Paso 3 Elige tu horario · Paso 4 Revisar
-   Al enviar: create_preinscripcion -> queda en la lista de "Pre-inscritos" del panel.
-   El admin contacta a la persona y, si acuerdan el inicio, crea el estudiante desde
-   el panel (ahí se asigna cupo, grupo y matrícula). El formulario NO crea estudiantes. */
+/* LEF — Asistente de pre-inscripción (4 pasos)
+   Paso 1 Tus datos · Paso 2 Tu nivel (autoevaluación) · Paso 3 Franja horaria
+   (preferencia) · Paso 4 Revisar.
+   El nivel y la franja horaria son solo INDICADORES para el asesor — no
+   reservan cupo ni módulo. Al enviar: create_preinscripcion -> queda en la
+   lista de "Pre-inscritos" del panel. El admin contacta a la persona y, si
+   acuerdan el inicio, crea el estudiante desde el panel (ahí sí se elige el
+   módulo, el horario y el grupo reales, con cupo y matrícula). El formulario
+   NO crea estudiantes ni inscripciones. */
 (function () {
   "use strict";
 
@@ -12,20 +16,30 @@
   var WHATSAPP_NUMBER = (window.LEF_WHATSAPP || "573013240652");
   var sb = window.lefSupabase;
 
-  var DAY_ES = {
-    Monday: "Lunes", Tuesday: "Martes", Wednesday: "Miércoles", Thursday: "Jueves",
-    Friday: "Viernes", Saturday: "Sábado", Sunday: "Domingo"
-  };
-  var DAY_ORDER = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  var LEVELS = [
+    { id: "beginner", label: "Principiante", range: "A1 – A2",
+      desc: "Conoces lo básico: saludar, presentarte, contar, hablar de tu rutina. Te cuesta mantener una conversación completa en inglés." },
+    { id: "intermediate", label: "Intermedio", range: "B1 – B2",
+      desc: "Puedes conversar sobre temas cotidianos, entender textos o videos sencillos, y dar tu opinión, aunque cometas errores." },
+    { id: "advanced", label: "Avanzado", range: "C1 en adelante",
+      desc: "Te comunicas con fluidez en la mayoría de los temas, entiendes contenido complejo y buscas perfeccionar tu nivel." }
+  ];
+  var TIME_SLOTS = [
+    { id: "morning", label: "Mañana", range: "6:00 a.m. – 12:00 p.m.",
+      desc: "Ideal si estudias o trabajas en jornada de tarde o noche." },
+    { id: "afternoon", label: "Tarde", range: "12:00 p.m. – 6:00 p.m.",
+      desc: "La franja más solicitada — revisa que no choque con almuerzo o salida del colegio." },
+    { id: "evening", label: "Noche", range: "6:00 p.m. – 9:00 p.m.",
+      desc: "Pensada para quienes trabajan o estudian durante el día." }
+  ];
+  var LEVEL_BY_ID = {}; LEVELS.forEach(function (l) { LEVEL_BY_ID[l.id] = l; });
+  var TIME_BY_ID = {}; TIME_SLOTS.forEach(function (t) { TIME_BY_ID[t.id] = t; });
 
   var state = {
     step: 1,
     data: { name: "", docType: "CC", docNumber: "", phone: "", email: "", age: "", city: "" },
-    modules: null,
-    moduleId: null,
-    schedules: null,
-    scheduleId: null,
-    skipSchedule: false,
+    levelEstimate: null,
+    timePreference: null,
     submitting: false,
     result: null,
     error: ""
@@ -37,23 +51,6 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
-  function fmtTime(t) {
-    if (!t) return "";
-    var p = t.split(":"); var h = parseInt(p[0], 10); var m = p[1] || "00";
-    var ap = h >= 12 ? "p.m." : "a.m."; var h12 = h % 12 || 12;
-    return h12 + ":" + m + " " + ap;
-  }
-  function fmtDays(days) {
-    if (!days || !days.length) return "";
-    var sorted = days.slice().sort(function (a, b) { return DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b); });
-    return sorted.map(function (d) { return DAY_ES[d] || d; }).join(" · ");
-  }
-  function selectedModule() {
-    return (state.modules || []).find(function (m) { return m.id === state.moduleId; });
-  }
-  function selectedSchedule() {
-    return (state.schedules || []).find(function (s) { return s.schedule_id === state.scheduleId; });
-  }
 
   /* ---------- data ---------- */
   function rpc(fn, args) {
@@ -62,17 +59,6 @@
       if (res.error) throw res.error;
       return res.data;
     });
-  }
-  function loadModules() {
-    if (state.modules) return Promise.resolve();
-    return rpc("get_public_modules").then(function (rows) { state.modules = rows || []; });
-  }
-  function loadSchedules() {
-    state.schedules = null;
-    return rpc("get_schedule_availability", { p_module_id: state.moduleId })
-      .then(function (rows) {
-        state.schedules = (rows || []).filter(function (r) { return r.active; });
-      });
   }
 
   /* ---------- validation ---------- */
@@ -88,7 +74,7 @@
 
   /* ---------- render ---------- */
   function stepper() {
-    var labels = ["Tus datos", "Elige tu nivel", "Elige tu horario", "Revisar"];
+    var labels = ["Tus datos", "Tu nivel", "Franja horaria", "Revisar"];
     var done = state.result ? 5 : state.step;
     return '<ol class="wz-steps">' + labels.map(function (l, i) {
       var n = i + 1;
@@ -113,7 +99,7 @@
     var d = state.data;
     return '' +
       '<h2 class="wz-h">Cuéntanos sobre ti</h2>' +
-      '<p class="wz-sub">Usaremos esta información para confirmar tu cupo y contactarte por WhatsApp.</p>' +
+      '<p class="wz-sub">Usaremos esta información para contactarte por WhatsApp y continuar tu proceso.</p>' +
       '<div class="wz-grid">' +
         field("wz-name", "Nombre completo del estudiante", "text", d.name, true, "full") +
         docTypeField(d.docType) +
@@ -144,69 +130,48 @@
   }
 
   function viewStep2() {
-    if (!state.modules) return '<p class="wz-loading">Cargando niveles…</p>';
-    var cards = state.modules.map(function (m) {
-      var on = m.id === state.moduleId;
-      return '<button type="button" class="wz-mod' + (on ? " is-on" : "") + '" data-mod="' + m.id + '">' +
-        '<span class="wz-mod-tag">Módulo ' + m.module_number + " · " + esc(m.level) + "</span>" +
-        '<span class="wz-mod-title">' + esc(m.title) + "</span>" +
-        '<span class="wz-mod-desc">' + esc(m.description) + "</span>" +
+    var cards = LEVELS.map(function (l) {
+      var on = l.id === state.levelEstimate;
+      return '<button type="button" class="wz-mod' + (on ? " is-on" : "") + '" data-level="' + l.id + '">' +
+        '<span class="wz-mod-tag">' + esc(l.range) + "</span>" +
+        '<span class="wz-mod-title">' + esc(l.label) + "</span>" +
+        '<span class="wz-mod-desc">' + esc(l.desc) + "</span>" +
         (on ? '<span class="wz-mod-check">✓</span>' : "") +
         "</button>";
     }).join("");
     return '' +
-      '<h2 class="wz-h">¿Cuál es tu nivel de inglés?</h2>' +
-      '<p class="wz-sub">Selecciona el nivel que deseas cursar. Si no estás seguro, elige tu mejor opción — lo confirmamos en tu primera clase.</p>' +
+      '<h2 class="wz-h">¿Con cuál nivel de inglés te identificas mejor?</h2>' +
+      '<p class="wz-sub">Es solo una referencia para tu asesor — no define tu módulo final. Lo confirmamos contigo antes de empezar.</p>' +
       '<div class="wz-mods">' + cards + "</div>" +
       '<div class="wz-nav">' +
         '<button type="button" class="btn btn-outline-dark" data-act="to-1">&larr; Atrás</button>' +
-        '<button type="button" class="btn btn-dark" data-act="to-3"' + (state.moduleId ? "" : " disabled") + ">Continuar &rarr;</button>" +
+        '<button type="button" class="btn btn-dark" data-act="to-3"' + (state.levelEstimate ? "" : " disabled") + ">Continuar &rarr;</button>" +
       "</div>";
   }
 
   function viewStep3() {
-    var mod = selectedModule();
-    var head = '<h2 class="wz-h">Elige tu horario</h2>' +
-      '<p class="wz-sub">Horarios disponibles para <strong>' + esc(mod ? mod.level + " — " + mod.title : "") + "</strong>.</p>";
-    var body;
-    if (!state.schedules) {
-      body = '<p class="wz-loading">Cargando horarios…</p>';
-    } else if (!state.schedules.length) {
-      body = '<div class="wz-empty">' +
-        '<p>No hay horarios disponibles para este nivel por el momento. Puedes escribirnos por WhatsApp o continuar tu inscripción y coordinamos tu horario contigo.</p>' +
-        '<a class="btn btn-whatsapp btn-sm" target="_blank" rel="noopener" href="' + waLink(
-          "Hola, quiero inscribirme en el nivel " + (mod ? mod.level + " (" + mod.title + ")" : "") +
-          " pero no veo horarios disponibles. ¿Me ayudan?") + '">' +
-        '<img src="assets/icon-whatsapp-black.png" alt="" class="icn-inline">Escríbenos por WhatsApp</a>' +
-        "</div>";
-    } else {
-      body = '<div class="wz-slots">' + state.schedules.map(function (s) {
-        var on = s.schedule_id === state.scheduleId;
-        var full = s.is_full;
-        return '<button type="button" class="wz-slot' + (on ? " is-on" : "") + (full ? " is-full" : "") + '"' +
-          (full ? " disabled" : ' data-slot="' + s.schedule_id + '"') + ">" +
-          '<span class="wz-slot-days">' + esc(fmtDays(s.days)) + "</span>" +
-          '<span class="wz-slot-time">' + fmtTime(s.start_time) + " – " + fmtTime(s.end_time) + "</span>" +
-          '<span class="wz-slot-seats">' + (full ? "Sin cupos" : (s.available + " cupo" + (s.available === 1 ? "" : "s") + " disponible" + (s.available === 1 ? "" : "s"))) + "</span>" +
-          (on ? '<span class="wz-mod-check">✓</span>' : "") +
-          "</button>";
-      }).join("") + "</div>";
-    }
-    var skipOn = state.skipSchedule;
-    body += '<button type="button" class="wz-slot wz-slot-skip' + (skipOn ? " is-on" : "") + '" data-act="skip-schedule">' +
-      '<span class="wz-slot-days">Prefiero decidir mi horario después</span>' +
-      '<span class="wz-slot-time">Continúa tu inscripción y coordinamos el horario contigo por WhatsApp.</span>' +
-      (skipOn ? '<span class="wz-mod-check">✓</span>' : "") +
-      "</button>";
-    return head + body +
+    var cards = TIME_SLOTS.map(function (t) {
+      var on = t.id === state.timePreference;
+      return '<button type="button" class="wz-slot' + (on ? " is-on" : "") + '" data-time="' + t.id + '">' +
+        '<span class="wz-slot-days">' + esc(t.label) + "</span>" +
+        '<span class="wz-slot-time">' + esc(t.range) + "</span>" +
+        '<span class="wz-mod-desc">' + esc(t.desc) + "</span>" +
+        (on ? '<span class="wz-mod-check">✓</span>' : "") +
+        "</button>";
+    }).join("");
+    return '' +
+      '<h2 class="wz-h">¿En qué franja horaria te gustaría tomar tus clases?</h2>' +
+      '<p class="wz-sub">También es una preferencia, no una reserva — la disponibilidad depende del ciclo abierto y puede variar.</p>' +
+      '<div class="wz-slots">' + cards + "</div>" +
+      '<p class="wz-note">La franja que elijas nos ayuda a coordinar contigo, pero el horario final se confirma según los cupos y grupos disponibles al momento de tu inscripción — puede que no coincida exactamente con lo que elegiste aquí.</p>' +
       '<div class="wz-nav">' +
         '<button type="button" class="btn btn-outline-dark" data-act="to-2">&larr; Atrás</button>' +
-        '<button type="button" class="btn btn-dark" data-act="to-4"' + ((state.scheduleId || state.skipSchedule) ? "" : " disabled") + ">Continuar &rarr;</button>" +
+        '<button type="button" class="btn btn-dark" data-act="to-4"' + (state.timePreference ? "" : " disabled") + ">Continuar &rarr;</button>" +
       "</div>";
   }
 
   function viewStep4() {
-    var d = state.data, mod = selectedModule(), sc = selectedSchedule();
+    var d = state.data, lvl = LEVEL_BY_ID[state.levelEstimate], tp = TIME_BY_ID[state.timePreference];
     var rows = [
       ["Nombre", d.name],
       ["Documento", (DOC_LABEL[d.docType] || d.docType) + ": " + d.docNumber],
@@ -214,14 +179,12 @@
       ["Correo", d.email],
       d.age ? ["Edad", d.age] : null,
       d.city ? ["Ciudad", d.city] : null,
-      ["Nivel", mod ? "Módulo " + mod.module_number + " · " + mod.level + " — " + mod.title : ""],
-      sc ? ["Días", fmtDays(sc.days)] : null,
-      sc ? ["Horario", fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time)] :
-        ["Horario", "Por definir — lo coordinamos contigo por WhatsApp"]
+      ["Nivel (tu autoevaluación)", lvl ? lvl.label + " (" + lvl.range + ")" : ""],
+      ["Franja preferida", tp ? tp.label + " · " + tp.range : ""]
     ].filter(Boolean);
     return '' +
       '<h2 class="wz-h">Revisa y envía</h2>' +
-      '<p class="wz-sub">Verifica que todo esté correcto. Al enviar, nuestro equipo revisará tu solicitud y te contactará por WhatsApp para confirmar disponibilidad y coordinar el inicio.</p>' +
+      '<p class="wz-sub">Verifica que todo esté correcto. Esto es una solicitud de pre-inscripción: no se genera matrícula todavía. Un asesor de LEF revisará tus datos y te contactará por WhatsApp para continuar.</p>' +
       '<dl class="wz-review">' + rows.map(function (r) {
         return "<div><dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd></div>";
       }).join("") + "</dl>" +
@@ -234,27 +197,20 @@
   }
 
   function viewResult() {
-    var d = state.data, mod = selectedModule(), sc = selectedSchedule();
-    var hasSchedule = !!sc;
-    var waMsg = "¡Hola! Acabo de enviar mi solicitud de inscripción en LEF.\n" +
+    var d = state.data, lvl = LEVEL_BY_ID[state.levelEstimate], tp = TIME_BY_ID[state.timePreference];
+    var waMsg = "¡Hola! Acabo de enviar mi solicitud de pre-inscripción en LEF.\n" +
       "Nombre: " + d.name + "\n" +
-      "Nivel: " + (mod ? mod.level + " — " + mod.title : "") + "\n" +
-      (hasSchedule ?
-        "Horario que me interesa: " + fmtDays(sc.days) + ", " + fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time) + "\n" :
-        "Todavía no elegí horario — quisiera coordinarlo con ustedes.\n") +
-      "Quedo atento(a) a la información para empezar.";
+      "Nivel con el que me identifico: " + (lvl ? lvl.label : "") + "\n" +
+      "Franja horaria de mi preferencia: " + (tp ? tp.label : "") + "\n" +
+      "Quedo atento(a) a que un asesor se comunique conmigo.";
     return '<div class="wz-card wz-done">' +
       '<div class="wz-done-badge">✓</div>' +
-      '<h2 class="wz-h">¡Recibimos tu solicitud!</h2>' +
-      '<p class="wz-sub">Nuestro equipo la revisará y te contactará por WhatsApp para resolver tus dudas, ' +
-        'confirmar la disponibilidad y coordinar el inicio de tu curso. También puedes escribirnos tú ahora.</p>' +
+      '<h2 class="wz-h">¡Gracias! Recibimos tu solicitud</h2>' +
+      '<p class="wz-sub">Un asesor de LEF se pondrá en contacto contigo pronto por WhatsApp para continuar con tu proceso de inscripción. También puedes escribirnos tú ahora.</p>' +
       '<dl class="wz-review">' +
         "<div><dt>Nombre</dt><dd>" + esc(d.name) + "</dd></div>" +
-        "<div><dt>Nivel</dt><dd>" + esc(mod ? mod.level + " — " + mod.title : "") + "</dd></div>" +
-        (hasSchedule ?
-          "<div><dt>Días</dt><dd>" + esc(fmtDays(sc.days)) + "</dd></div>" +
-          "<div><dt>Horario</dt><dd>" + esc(fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time)) + "</dd></div>" :
-          "<div><dt>Horario</dt><dd>Por definir — lo coordinamos contigo por WhatsApp</dd></div>") +
+        "<div><dt>Nivel</dt><dd>" + esc(lvl ? lvl.label + " (" + lvl.range + ")" : "") + "</dd></div>" +
+        "<div><dt>Franja preferida</dt><dd>" + esc(tp ? tp.label : "") + "</dd></div>" +
       "</dl>" +
       '<a class="btn btn-whatsapp" target="_blank" rel="noopener" href="' + waLink(waMsg) + '">' +
         '<img src="assets/icon-whatsapp-black.png" alt="" class="icn-inline">Escríbenos por WhatsApp</a>' +
@@ -297,18 +253,15 @@
       });
     });
 
-    mount.querySelectorAll("[data-mod]").forEach(function (b) {
+    mount.querySelectorAll("[data-level]").forEach(function (b) {
       b.addEventListener("click", function () {
-        state.moduleId = b.getAttribute("data-mod");
-        state.scheduleId = null;
-        state.skipSchedule = false;
+        state.levelEstimate = b.getAttribute("data-level");
         render();
       });
     });
-    mount.querySelectorAll("[data-slot]").forEach(function (b) {
+    mount.querySelectorAll("[data-time]").forEach(function (b) {
       b.addEventListener("click", function () {
-        state.scheduleId = b.getAttribute("data-slot");
-        state.skipSchedule = false;
+        state.timePreference = b.getAttribute("data-time");
         render();
       });
     });
@@ -335,22 +288,15 @@
       readStep1();
       if (!step1Valid()) { state.error = "Revisa el nombre, el documento, el WhatsApp y el correo."; return render(); }
       go(2);
-      loadModules().then(render).catch(function () { state.error = "No pudimos cargar los niveles. Intenta de nuevo."; render(); });
       return;
     }
     if (act === "to-3") {
-      if (!state.moduleId) return;
+      if (!state.levelEstimate) return;
       go(3);
-      loadSchedules().then(render).catch(function () { state.error = "No pudimos cargar los horarios. Intenta de nuevo."; render(); });
       return;
     }
-    if (act === "skip-schedule") {
-      state.scheduleId = null;
-      state.skipSchedule = !state.skipSchedule;
-      return render();
-    }
     if (act === "to-4") {
-      if (!state.scheduleId && !state.skipSchedule) return;
+      if (!state.timePreference) return;
       go(4);
       return;
     }
@@ -370,9 +316,8 @@
       p_doc_number: d.docNumber ? d.docNumber.trim() : null,
       p_age: d.age ? parseInt(d.age, 10) : null,
       p_city: d.city ? d.city.trim() : null,
-      p_module_id: state.moduleId,
-      p_schedule_id: state.scheduleId,
-      p_wants_schedule_later: !!state.skipSchedule
+      p_level_estimate: state.levelEstimate,
+      p_time_preference: state.timePreference
     }).then(function (id) {
       state.result = { id: id };
       state.submitting = false;
