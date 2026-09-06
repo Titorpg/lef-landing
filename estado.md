@@ -524,8 +524,18 @@ vive únicamente local y NO está en Git.
     Edge Functions + secrets). Claude no puede editar ese archivo por su cuenta (frontera de
     seguridad). **Las migraciones SQL siguen siendo manuales igual que antes** — ese bloqueo
     es aparte.
-- ⏳ **Pendiente:** pasar Wompi a **producción** (llaves `pub_prod_...` + URL de eventos en
-  el ambiente de producción de Wompi) y borrar los pagos/estudiantes de prueba.
+- ✅ **Wompi en PRODUCCIÓN** (6 sep 2026): el usuario sacó las llaves reales del dashboard de
+  Wompi y las pasó por chat; configuradas como secrets de Supabase (`WOMPI_PUBLIC_KEY`
+  `pub_prod_...`, `WOMPI_INTEGRITY_SECRET` `prod_integrity_...`, `WOMPI_EVENTS_SECRET`
+  `prod_events_...`) y `wompi-checkout`/`wompi-webhook` redesplegadas para tomarlas. El
+  código no tenía nada sandbox-específico (la firma/verificación no dependen del ambiente,
+  solo de qué llave se usa) — no hizo falta tocar el código, solo secrets + redeploy.
+  **A PARTIR DE AHORA LOS PAGOS SON REALES.**
+  - ⏳ **Falta que el usuario registre la URL de eventos en el ambiente de PRODUCCIÓN de
+    Wompi** (es un paso aparte del de sandbox, en el dashboard de Wompi): mismo endpoint,
+    `https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/wompi-webhook`.
+  - ⏳ **Falta borrar los datos de prueba** (estudiante Ana Gómez y los pagos de sandbox)
+    antes de que entren estudiantes reales, para no confundir el libro contable.
 - ✅ **Deploy directo verificado** (más tarde, 1 sep 2026): tras reiniciar Claude Code con
   `.claude/settings.local.json` en su sitio, `npx vercel deploy --prod --yes --scope lefcenter`
   corre directo desde el chat (deploy `dpl_GocDhz9Pz…`, READY, alias `www.lefcenter.com`) y
