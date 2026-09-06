@@ -80,6 +80,19 @@
   function confirmDelete(title, message, onConfirm) {
     return modal(title, h('<p class="pnl-sub" style="margin-bottom:4px">' + esc(message) + "</p>"), onConfirm, "Eliminar", true);
   }
+  // Como reversarPago: pide un motivo obligatorio antes de una acción irreversible
+  // sobre facturación (queda anotado en el Registro de eventos).
+  function promptReason(title, message, saveLabel, onConfirm) {
+    var b = h("<div>" +
+      (message ? '<p class="pnl-sub" style="margin-bottom:10px">' + message + "</p>" : "") +
+      field("Motivo (obligatorio, queda en el Registro de eventos)", '<input name="reason" placeholder="Ej.: pago de prueba, dato duplicado, error de captura">') +
+      "</div>");
+    return modal(title, b, function () {
+      var reason = (b.querySelector("[name=reason]").value || "").trim();
+      if (reason.length < 3) throw new Error("Escribe el motivo.");
+      return onConfirm(reason);
+    }, saveLabel || "Confirmar", true);
+  }
   function field(label, inputHtml) { return '<label class="fld"><span>' + esc(label) + "</span>" + inputHtml + "</label>"; }
   function moduleSelect(name, mods, selectedId) {
     return '<select name="' + name + '">' + mods.map(function (m) {
@@ -106,6 +119,7 @@
     LEF_ALREADY_CONVERTED: "Esta solicitud ya fue convertida en estudiante.",
     LEF_PREINSCRIPCION_NOT_FOUND: "No se encontró la solicitud.",
     LEF_REQUIRES_ADMIN: "Solo un administrador puede hacer esto.",
+    LEF_REASON_REQUIRED: "Escribe el motivo — queda anotado en el Registro de eventos.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
     email_invalido: "El correo no es válido.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
@@ -168,7 +182,8 @@
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
-    { id: "usuarios", label: "Usuarios", roles: ["admin"] }
+    { id: "usuarios", label: "Usuarios", roles: ["admin"] },
+    { id: "registro", label: "Registro de eventos", roles: ["admin"] }
   ];
 
   function renderShell() {
@@ -205,7 +220,8 @@
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes,
-      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios
+      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
+      registro: secRegistro
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
   }
@@ -737,11 +753,12 @@
             cell.appendChild(btn("Registrar pago", "btn-blue", function () { registrarPago(r); }));
             cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students, mods); }));
             cell.appendChild(btn("Eliminar", "btn-danger", function () {
-              confirmDelete("Eliminar suscripción", "Solo se puede si no tiene pagos registrados. Si los tiene, revérsalos primero o elimina al estudiante (el historial se conserva).", function () {
-                return q("subscriptions").delete().eq("id", r.subscription_id).then(function (d) {
-                  if (d.error) throw d.error; toast("Suscripción eliminada."); route();
+              promptReason("Eliminar suscripción",
+                "Si tiene pagos registrados, bórralos primero desde “Ver pagos” (cada uno pide su propio motivo).",
+                "Eliminar", function (reason) {
+                  return rpc("admin_delete_subscription", { p_subscription_id: r.subscription_id, p_reason: reason })
+                    .then(function () { toast("Suscripción eliminada."); route(); });
                 });
-              });
             }));
           }
           t.body.appendChild(tr);
@@ -776,10 +793,46 @@
           if (!isReversal && !isReversed && p.status === "approved") {
             tr.children[6].appendChild(btn("Reversar", "btn-danger", function () { reversarPago(p); }));
           }
+          tr.children[6].appendChild(btn("Editar", "btn-ghost", function () { editarPago(p, function () { verPagos(r); }); }));
+          tr.children[6].appendChild(btn("Eliminar", "btn-danger", function () { eliminarPago(p, function () { verPagos(r); }); }));
           tbl.body.appendChild(tr);
         });
         box.appendChild(tbl.wrap);
       }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function editarPago(p, onDone) {
+    var b = h("<div>" +
+      '<p class="pnl-sub" style="margin-bottom:10px">Corrige un dato mal capturado del pago ' + esc(p.receipt_number || p.id) + '. Queda anotado en el Registro de eventos.</p>' +
+      field("Monto (COP)", '<input name="amt" type="number" min="0" value="' + p.amount + '">') +
+      field("Método", '<select name="m">' + Object.keys(METHOD_ES).map(function (k) {
+        return '<option value="' + k + '"' + (k === p.method ? " selected" : "") + ">" + esc(METHOD_ES[k]) + "</option>";
+      }).join("") + "</select>") +
+      field("Mes cubierto", '<input name="pm" type="month" value="' + (p.period_month || "").slice(0, 7) + '">') +
+      field("Notas", '<input name="note" value="' + esc(p.notes || "") + '">') +
+      field("Motivo de la corrección (obligatorio, queda en el Registro de eventos)", '<input name="reason" placeholder="Ej.: monto mal digitado">') +
+      "</div>");
+    modal("Editar pago", b, function () {
+      var reason = (b.querySelector("[name=reason]").value || "").trim();
+      if (reason.length < 3) throw new Error("Escribe el motivo de la corrección.");
+      return rpc("admin_update_payment", {
+        p_payment_id: p.id, p_reason: reason,
+        p_amount: +b.querySelector("[name=amt]").value || null,
+        p_method: b.querySelector("[name=m]").value,
+        p_period_month: b.querySelector("[name=pm]").value + "-01",
+        p_notes: b.querySelector("[name=note]").value.trim() || null
+      }).then(function () { toast("Pago corregido."); onDone && onDone(); });
+    }, "Guardar corrección");
+  }
+
+  function eliminarPago(p, onDone) {
+    promptReason("Eliminar pago",
+      "Se borra de verdad el recibo " + esc(p.receipt_number || p.id) + " (" + money(p.amount, p.currency) +
+      "). No se puede deshacer — si el pago sí ocurrió y solo quieres corregirlo, usa “Editar”, y si el estudiante ya no debe ese cobro, usa “Reversar”.",
+      "Eliminar", function (reason) {
+        return rpc("admin_delete_payment", { p_payment_id: p.id, p_reason: reason })
+          .then(function () { toast("Pago eliminado."); onDone && onDone(); });
+      });
   }
 
   function reversarPago(p) {
@@ -903,6 +956,35 @@
         p_notes: body.querySelector("[name=note]").value.trim() || null
       }, payer)).then(function () { toast("Pago registrado."); route(); });
     }, "Registrar");
+  }
+
+  /* ============ REGISTRO DE EVENTOS ============ */
+  var AUDIT_ACTION_ES = {
+    "payment.delete": "Pago eliminado", "payment.update": "Pago editado",
+    "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada"
+  };
+  function secRegistro(main) {
+    head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
+    rpc("admin_list_audit_log", { p_limit: 300 }).then(function (rows) {
+      rows = rows || [];
+      var t = tableWrap(["Fecha", "Quién", "Acción", "Motivo", "Detalle"]);
+      rows.forEach(function (r) {
+        var detailBtn = h('<button class="btn btn-sm btn-ghost">Ver</button>');
+        var td = h("<td></td>"); td.appendChild(detailBtn);
+        var tr = h("<tr><td>" + date(r.created_at) + " " + new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) +
+          "</td><td>" + esc(r.actor_email || "—") + "</td><td>" + esc(AUDIT_ACTION_ES[r.action] || r.action) +
+          '</td><td class="wrap">' + esc(r.reason) + "</td></tr>");
+        tr.appendChild(td);
+        detailBtn.onclick = function () {
+          var pre = h('<pre style="white-space:pre-wrap;font-size:12px;max-height:60vh;overflow:auto;background:var(--niebla);padding:12px;border-radius:8px">' +
+            esc(JSON.stringify(r.details, null, 2)) + "</pre>");
+          modal("Detalle — " + (AUDIT_ACTION_ES[r.action] || r.action), pre, function () { return Promise.resolve(); }, "Cerrar");
+        };
+        t.body.appendChild(tr);
+      });
+      if (!rows.length) t.body.appendChild(h('<tr><td colspan="5" class="muted">Sin eventos registrados todavía.</td></tr>'));
+      main.appendChild(t.wrap);
+    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
   /* ============ ACADÉMICO ============ */
