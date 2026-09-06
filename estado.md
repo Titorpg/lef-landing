@@ -16,6 +16,14 @@ cuando envolvía a 2 líneas — ahora el nombre trunca) y agregado un selector 
 de caricatura (3 M / 3 F, ilustraciones propias en `assets/avatars/`) como alternativa a
 subir foto propia en "Mi cuenta". Todo desplegado (commit `14cbfe0`).
 
+✅ **Cerrada la escalada de privilegios en `profiles`** (migración `20260906200000`,
+aplicada y desplegada) — pieza aislada del endurecimiento del login (que sigue en pausa),
+adelantada porque bloqueaba construir "Mi cuenta" del admin de forma segura. Ya no se
+puede hacer `update profiles set role='admin'` desde el cliente. Nueva pestaña **Mi
+cuenta** para el admin: foto (subir o elegir un dibujo, mismo selector del portal),
+nombre, correo (vía `manage-users`) y contraseña. El header del panel admin ahora
+también muestra el avatar.
+
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
 Editor de Supabase y frontend desplegado (`dpl_4EmfdGUNiKC7S53oq5V8AZSNoKfe`, commit
@@ -313,17 +321,36 @@ pondrá en contacto pronto.
 
 Guía operativa completa y checklist paso a paso: **`SEGURIDAD.md`** (en la raíz).
 
-**Hallazgo crítico:** la política RLS `"edita su propio profile"` (de la migración
-`20260831190000`) permitía a cualquier estudiante autenticado hacer
-`update profiles set role='admin'` y quedar como admin. Cerrado por la migración
-`20260906120000` (revoca UPDATE directo sobre `profiles`; el avatar ahora va por
-`update_my_avatar()` SECURITY DEFINER).
+**Hallazgo crítico — ✅ YA CERRADO EN VIVO (6 sep 2026):** la política RLS
+`"edita su propio profile"` (de la migración `20260831190000`) permitía a cualquier
+estudiante autenticado hacer `update profiles set role='admin'` y quedar como admin.
+Se cerró **por separado del resto de este frente** (que sigue en pausa) con la
+migración `20260906200000_seguridad_profiles_y_mi_cuenta.sql` — revoca UPDATE directo
+sobre `profiles`; el avatar y el nombre ahora van por `update_my_avatar()` /
+`update_my_name()` SECURITY DEFINER. Se adelantó (en vez de esperar a Resend/Turnstile)
+porque hacía falta para construir la pestaña "Mi cuenta" del admin sin extender el
+patrón inseguro. La migración vieja `20260906120000` (mismo fix, sin `update_my_name`)
+queda obsoleta, no hace falta aplicarla.
+
+⚠️ **Choque pendiente de resolver antes de retomar:** `20260906130000_seguridad_cuentas.sql`
+también crea una tabla `audit_log`, pero con columnas DISTINTAS
+(`id bigint`, `at`, `target_user_id`, `target_email`, `detail`, `ip`) a la que ya existe en
+producción desde el 6 sep 2026 para el Registro de eventos de pagos
+(`20260906180000_registro_eventos_pagos.sql`: `id uuid`, `created_at`, `target_table`,
+`target_id`, `reason` not null, `details`). Como esa tabla ya existe, el
+`create table if not exists` de `20260906130000` no hará nada, y el `manage-users` nuevo
+(que espera sus propias columnas) fallaría al escribir. **Antes de aplicar
+`20260906130000`, hay que adaptarla para reusar la tabla `audit_log` que ya existe**
+(mismas columnas: `actor_user_id`, `actor_email`, `action`, `target_table`, `target_id`,
+`reason`, `details`) en vez de crear una segunda con otro esquema.
 
 **Cambios de código dejados listos (sin desplegar, pendiente review del usuario):**
-- `supabase/migrations/20260906120000_seguridad_profiles_rls.sql` — el fix crítico.
+- ~~`supabase/migrations/20260906120000_seguridad_profiles_rls.sql`~~ — **obsoleta**, el
+  mismo fix (sin `update_my_name`) ya se aplicó por separado como `20260906200000`. No
+  aplicar esta.
 - `supabase/migrations/20260906130000_seguridad_cuentas.sql` — `profiles.must_change_password`
   + `password_changed_at`, `mark_my_password_changed()`, tabla `audit_log` (append-only,
-  la lee solo admin).
+  la lee solo admin) — **ver choque de esquema arriba antes de aplicar**.
 - `supabase/functions/manage-users/index.ts` — CORS restringido a dominios LEF;
   contraseñas generadas por el servidor (16 chars, 4 clases) y **enviadas por
   correo con Resend**; `must_change_password=true` al alta y al reset; guardarraíl
