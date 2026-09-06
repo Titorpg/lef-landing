@@ -1,5 +1,11 @@
 # Estado del proyecto — Landing LEF
 
+**Wompi en PRODUCCIÓN desde el 6 sep 2026 — los pagos ya son reales.** Llaves `pub_prod_...`
+configuradas, URL de eventos registrada por el usuario en el ambiente de producción de
+Wompi, Edge Functions redesplegadas. Portal del estudiante muestra Nivel + módulo + barra
+de progreso del ciclo (migración `20260906170000` aplicada y desplegado). Pendiente: borrar
+los datos de facturación de prueba (Ana Gómez, pagos de sandbox) — en curso.
+
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
 Editor de Supabase y frontend desplegado (`dpl_4EmfdGUNiKC7S53oq5V8AZSNoKfe`, commit
