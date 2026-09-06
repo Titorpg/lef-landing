@@ -126,6 +126,8 @@
     LEF_ENROLLMENT_NOT_FOUND: "No se encontró la inscripción.",
     LEF_ENROLLMENT_CANCELLED: "Esa inscripción está cancelada.",
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
+    no_autenticado: "Tu sesión expiró. Vuelve a iniciar sesión.",
+    url_invalida: "Esa imagen no es válida.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
     email_invalido: "El correo no es válido.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
@@ -189,7 +191,8 @@
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
-    { id: "registro", label: "Registro de eventos", roles: ["admin"] }
+    { id: "registro", label: "Registro de eventos", roles: ["admin"] },
+    { id: "micuenta", label: "Mi cuenta", roles: ["admin"] }
   ];
 
   function renderShell() {
@@ -198,7 +201,9 @@
     app.appendChild(h(
       '<div class="pnl-top">' +
       '<a class="brand" href="#dashboard"><img src="assets/logo-horizontal.png" alt="LEF"></a>' +
-      '<div class="who">' + esc(ME.full_name || ME.email) + " · " + esc(ROLE_ES[ME.role] || ME.role) +
+      '<div class="who">' +
+      '<img src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none">' +
+      '<span class="name-text">' + esc(ME.full_name || ME.email) + "</span> · " + esc(ROLE_ES[ME.role] || ME.role) +
       ' <button class="link" data-logout>Salir</button></div>' +
       "</div>"
     ));
@@ -227,7 +232,7 @@
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes,
       pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
-      registro: secRegistro
+      registro: secRegistro, micuenta: secMiCuenta
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
   }
@@ -991,6 +996,123 @@
       if (!rows.length) t.body.appendChild(h('<tr><td colspan="5" class="muted">Sin eventos registrados todavía.</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  /* ============ MI CUENTA (admin) ============ */
+  var ACCOUNT_AVATAR_GALLERY = [
+    "assets/avatars/m1.svg", "assets/avatars/m2.svg", "assets/avatars/m3.svg",
+    "assets/avatars/f1.svg", "assets/avatars/f2.svg", "assets/avatars/f3.svg"
+  ];
+  function secMiCuenta(main) {
+    head(main, "Mi cuenta", "Tu foto, nombre, correo y contraseña.");
+
+    // --- Foto de perfil ---
+    var avatarBox = h(
+      '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:22px;max-width:520px">' +
+      '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">' +
+      '<img data-avatar-preview src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--niebla)">' +
+      '<div><label class="fld" style="margin-bottom:6px"><span>Foto de perfil</span><input type="file" accept="image/*" data-avatar-input></label>' +
+      '<button type="button" class="link" data-avatar-toggle style="font-size:13px">O elegí un dibujo</button>' +
+      '<p class="muted" data-avatar-msg style="font-size:12.5px"></p></div>' +
+      "</div>" +
+      '<div data-avatar-gallery hidden style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">' +
+      ACCOUNT_AVATAR_GALLERY.map(function (src) {
+        return '<img data-avatar-pick src="' + src + '" alt="" style="width:52px;height:52px;border-radius:50%;cursor:pointer;border:2px solid transparent">';
+      }).join("") +
+      "</div></div>"
+    );
+    main.appendChild(avatarBox);
+
+    function setAvatar(url, msgEl) {
+      return rpc("update_my_avatar", { p_url: url }).then(function () {
+        ME.avatar_url = url;
+        avatarBox.querySelector("[data-avatar-preview]").src = url;
+        var topImg = document.querySelector(".pnl-top .who img");
+        if (topImg) topImg.src = url;
+        msgEl.textContent = "Foto actualizada.";
+      });
+    }
+    avatarBox.querySelector("[data-avatar-toggle]").onclick = function () {
+      avatarBox.querySelector("[data-avatar-gallery]").hidden = !avatarBox.querySelector("[data-avatar-gallery]").hidden;
+    };
+    avatarBox.querySelectorAll("[data-avatar-pick]").forEach(function (img) {
+      img.onclick = function () {
+        var msg = avatarBox.querySelector("[data-avatar-msg]");
+        msg.textContent = "Guardando…";
+        setAvatar(img.getAttribute("src"), msg).catch(function (err) { msg.textContent = friendly(err); });
+      };
+    });
+    avatarBox.querySelector("[data-avatar-input]").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var msg = avatarBox.querySelector("[data-avatar-msg]");
+      msg.textContent = "Subiendo…";
+      var path = ME.user_id + "/" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      sb.storage.from("avatars").upload(path, file, { upsert: true }).then(function (up) {
+        if (up.error) throw up.error;
+        var publicUrl = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+        return setAvatar(publicUrl, msg);
+      }).catch(function (err) { msg.textContent = "No pudimos subir la foto: " + ((err && err.message) || err); });
+    });
+
+    // --- Nombre ---
+    var nameBox = h('<div class="pnl-table-wrap" style="padding:20px;margin-bottom:22px;max-width:520px">' +
+      '<p style="font-weight:600;margin-bottom:10px">Nombre</p>' +
+      field("Nombre completo", '<input name="fn" value="' + esc(ME.full_name || "") + '">') +
+      '<button class="btn btn-blue" data-save-name>Guardar nombre</button>' +
+      '<p class="muted" data-name-msg style="font-size:12.5px;margin-top:8px"></p></div>');
+    main.appendChild(nameBox);
+    nameBox.querySelector("[data-save-name]").onclick = function () {
+      var msg = nameBox.querySelector("[data-name-msg]");
+      var val = nameBox.querySelector("[name=fn]").value.trim();
+      if (val.length < 2) { msg.textContent = "Escribe tu nombre."; return; }
+      msg.textContent = "Guardando…";
+      rpc("update_my_name", { p_full_name: val }).then(function () {
+        ME.full_name = val;
+        var nameEl = document.querySelector(".pnl-top .who .name-text");
+        if (nameEl) nameEl.textContent = val;
+        msg.textContent = "Nombre actualizado.";
+      }).catch(function (err) { msg.textContent = friendly(err); });
+    };
+
+    // --- Correo ---
+    var emailBox = h('<div class="pnl-table-wrap" style="padding:20px;margin-bottom:22px;max-width:520px">' +
+      '<p style="font-weight:600;margin-bottom:10px">Correo (usuario para entrar)</p>' +
+      field("Correo", '<input name="em" type="email" value="' + esc(ME.email || "") + '">') +
+      '<button class="btn btn-blue" data-save-email>Guardar correo</button>' +
+      '<p class="muted" data-email-msg style="font-size:12.5px;margin-top:8px">Cambiarlo cambia con qué correo entrás al panel.</p></div>');
+    main.appendChild(emailBox);
+    emailBox.querySelector("[data-save-email]").onclick = function () {
+      var msg = emailBox.querySelector("[data-email-msg]");
+      var val = emailBox.querySelector("[name=em]").value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) { msg.textContent = "El correo no es válido."; return; }
+      msg.textContent = "Guardando…";
+      callFn({ action: "update_email", user_id: ME.user_id, email: val }).then(function () {
+        ME.email = val;
+        msg.textContent = "Correo actualizado.";
+      }).catch(function (err) { msg.textContent = friendly(err); });
+    };
+
+    // --- Contraseña ---
+    var pwBox = h('<div class="pnl-table-wrap" style="padding:20px;max-width:520px">' +
+      '<p style="font-weight:600;margin-bottom:10px">Cambiar contraseña</p>' +
+      field("Nueva contraseña", '<input type="password" name="p1" autocomplete="new-password">') +
+      field("Confirmar contraseña", '<input type="password" name="p2" autocomplete="new-password">') +
+      '<button class="btn btn-blue" data-save-pw>Guardar contraseña</button>' +
+      '<p class="muted" data-pw-msg style="font-size:12.5px;margin-top:8px"></p></div>');
+    main.appendChild(pwBox);
+    pwBox.querySelector("[data-save-pw]").onclick = function () {
+      var msg = pwBox.querySelector("[data-pw-msg]");
+      var p1 = pwBox.querySelector("[name=p1]").value, p2 = pwBox.querySelector("[name=p2]").value;
+      if (p1.length < 8) { msg.textContent = "La contraseña debe tener al menos 8 caracteres."; return; }
+      if (p1 !== p2) { msg.textContent = "Las contraseñas no coinciden."; return; }
+      msg.textContent = "Guardando…";
+      sb.auth.updateUser({ password: p1 }).then(function (r) {
+        if (r.error) throw r.error;
+        pwBox.querySelector("[name=p1]").value = pwBox.querySelector("[name=p2]").value = "";
+        msg.textContent = "Contraseña actualizada.";
+      }).catch(function (err) { msg.textContent = "No pudimos cambiar la contraseña: " + ((err && err.message) || err); });
+    };
   }
 
   /* ============ ACADÉMICO ============ */

@@ -327,8 +327,8 @@
     main.appendChild(avatarBox);
 
     function setAvatar(url, msgEl) {
-      return sb.from("profiles").update({ avatar_url: url }).eq("user_id", ME.user_id).then(function (upd) {
-        if (upd.error) throw upd.error;
+      return sb.rpc("update_my_avatar", { p_url: url }).then(function (r) {
+        if (r.error) throw r.error;
         ME.avatar_url = url;
         avatarBox.querySelector("[data-avatar-preview]").src = url;
         var topImg = document.querySelector(".pnl-top .who img");
