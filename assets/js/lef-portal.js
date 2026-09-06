@@ -93,8 +93,9 @@
       '<div class="pnl-top">' +
       '<a class="brand" href="index.html"><img src="assets/logo-horizontal.png" alt="LEF"><span class="tag">Mi cuenta</span></a>' +
       '<div class="who">' +
-      '<img src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover">' +
-      esc(ME.full_name || "") + ' <button class="link" data-logout>Salir</button></div></div>'
+      '<img src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none">' +
+      '<span class="name-text">' + esc(ME.full_name || "") + '</span>' +
+      ' <button class="link" data-logout>Salir</button></div></div>'
     ));
     var wrap = h('<div class="pnl-wrap"><nav class="pnl-nav"></nav><main class="pnl-main"></main></div>');
     var nav = wrap.querySelector(".pnl-nav");
@@ -304,14 +305,50 @@
     main.innerHTML = '<h1 class="pnl-h">Mi cuenta</h1><p class="pnl-sub">Tu foto, contraseña y datos de contacto.</p>';
 
     // --- Foto de perfil ---
+    var AVATAR_GALLERY = [
+      "assets/avatars/m1.svg", "assets/avatars/m2.svg", "assets/avatars/m3.svg",
+      "assets/avatars/f1.svg", "assets/avatars/f2.svg", "assets/avatars/f3.svg"
+    ];
     var avatarBox = h(
-      '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">' +
+      '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:24px">' +
+      '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">' +
       '<img data-avatar-preview src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--niebla)">' +
       '<div><label class="fld" style="margin-bottom:6px"><span>Foto de perfil</span><input type="file" accept="image/*" data-avatar-input></label>' +
+      '<button type="button" class="link" data-avatar-toggle style="font-size:13px">O elegí un dibujo</button>' +
       '<p class="muted" data-avatar-msg style="font-size:12.5px"></p></div>' +
+      "</div>" +
+      '<div data-avatar-gallery hidden style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">' +
+      AVATAR_GALLERY.map(function (src) {
+        return '<img data-avatar-pick src="' + src + '" alt="" style="width:52px;height:52px;border-radius:50%;cursor:pointer;border:2px solid transparent">';
+      }).join("") +
+      "</div>" +
       "</div>"
     );
     main.appendChild(avatarBox);
+
+    function setAvatar(url, msgEl) {
+      return sb.from("profiles").update({ avatar_url: url }).eq("user_id", ME.user_id).then(function (upd) {
+        if (upd.error) throw upd.error;
+        ME.avatar_url = url;
+        avatarBox.querySelector("[data-avatar-preview]").src = url;
+        var topImg = document.querySelector(".pnl-top .who img");
+        if (topImg) topImg.src = url;
+        msgEl.textContent = "Foto actualizada.";
+      });
+    }
+
+    avatarBox.querySelector("[data-avatar-toggle]").addEventListener("click", function () {
+      avatarBox.querySelector("[data-avatar-gallery]").hidden = !avatarBox.querySelector("[data-avatar-gallery]").hidden;
+    });
+    avatarBox.querySelectorAll("[data-avatar-pick]").forEach(function (img) {
+      img.addEventListener("click", function () {
+        var msg = avatarBox.querySelector("[data-avatar-msg]");
+        msg.textContent = "Guardando…";
+        setAvatar(img.getAttribute("src"), msg).catch(function (err) {
+          msg.textContent = "No pudimos guardar la foto: " + ((err && err.message) || err);
+        });
+      });
+    });
     avatarBox.querySelector("[data-avatar-input]").addEventListener("change", function (e) {
       var file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -321,14 +358,7 @@
       sb.storage.from("avatars").upload(path, file, { upsert: true }).then(function (up) {
         if (up.error) throw up.error;
         var publicUrl = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
-        return sb.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", ME.user_id).then(function (upd) {
-          if (upd.error) throw upd.error;
-          ME.avatar_url = publicUrl;
-          avatarBox.querySelector("[data-avatar-preview]").src = publicUrl;
-          var topImg = document.querySelector(".pnl-top .who img");
-          if (topImg) topImg.src = publicUrl;
-          msg.textContent = "Foto actualizada.";
-        });
+        return setAvatar(publicUrl, msg);
       }).catch(function (err) {
         msg.textContent = "No pudimos subir la foto: " + ((err && err.message) || err);
       });
