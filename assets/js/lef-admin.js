@@ -120,6 +120,12 @@
     LEF_PREINSCRIPCION_NOT_FOUND: "No se encontró la solicitud.",
     LEF_REQUIRES_ADMIN: "Solo un administrador puede hacer esto.",
     LEF_REASON_REQUIRED: "Escribe el motivo — queda anotado en el Registro de eventos.",
+    LEF_GROUP_FULL: "Ese grupo ya está lleno.",
+    LEF_GROUP_INACTIVE: "Ese grupo está desactivado.",
+    LEF_MODULE_MISMATCH: "El estudiante y el grupo no son del mismo módulo.",
+    LEF_ENROLLMENT_NOT_FOUND: "No se encontró la inscripción.",
+    LEF_ENROLLMENT_CANCELLED: "Esa inscripción está cancelada.",
+    LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
     email_invalido: "El correo no es válido.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
@@ -1248,7 +1254,12 @@
           return q("groups").insert({
             schedule_id: b.querySelector("[name=s]").value, module_id: opt.dataset.mod,
             teacher_id: b.querySelector("[name=t]").value, capacity: +b.querySelector("[name=c]").value || 8
-          }).then(function (i) { if (i.error) throw i.error; toast("Grupo creado."); acGrupos(box); });
+          }).select().single().then(function (i) {
+            if (i.error) throw i.error;
+            toast("Grupo creado.");
+            acGrupos(box);
+            gestionarGrupoEstudiantes(i.data);
+          });
         });
       };
       var t = tableWrap(["Módulo", "Ciclo", "Horario", "Profesor", "Cupo", "Inscritos", "Estado", "Acciones"]);
@@ -1261,6 +1272,7 @@
           "</td><td>" + g.capacity + '</td><td style="font-weight:600">' + (counts[g.id] || 0) + "</td><td>" + estadoTxt +
           '</td><td class="acts"></td></tr>');
         var cell = tr.children[7];
+        cell.appendChild(btn("Estudiantes", "btn-blue", function () { gestionarGrupoEstudiantes(g); }));
         cell.appendChild(btn(g.active ? "Desactivar" : "Activar", "btn-ghost", function () {
           q("groups").update({ active: !g.active, deactivated_by_module: false }).eq("id", g.id)
             .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acGrupos(box); });
@@ -1292,6 +1304,72 @@
       });
       box.appendChild(t.wrap);
     });
+  }
+
+  // Elegir a mano qué estudiantes de un módulo entran a ESTE grupo en concreto
+  // (los que no se unen quedan "libres" para otro grupo del mismo horario/ciclo,
+  // o para esperar el siguiente). Modal persistente, como "Ver pagos".
+  function gestionarGrupoEstudiantes(g) {
+    var box = h('<div><p class="muted">Cargando…</p></div>');
+    modal("Estudiantes del grupo", box, null, "Cerrar", false, true);
+
+    function load() {
+      box.innerHTML = '<p class="muted">Cargando…</p>';
+      Promise.all([
+        q("groups").select("*,modules(level,title),schedules(days,start_time,end_time)").eq("id", g.id).single(),
+        q("enrollments").select("id,student_id,students(full_name,whatsapp,doc_type,doc_number)")
+          .eq("group_id", g.id).neq("status", "Cancelled"),
+        q("enrollments").select("id,student_id,students(full_name,whatsapp,doc_type,doc_number)")
+          .eq("module_id", g.module_id).is("group_id", null).neq("status", "Cancelled")
+      ]).then(function (res) {
+        if (res[0].error) throw res[0].error;
+        var grp = res[0].data, dentro = res[1].data || [], libres = res[2].data || [];
+        var sc = grp.schedules;
+        box.innerHTML = "";
+        box.appendChild(h(
+          '<p class="pnl-sub" style="margin-bottom:14px">' +
+          '<strong>' + esc(grp.modules ? grp.modules.level + " · " + grp.modules.title : "") + '</strong> — ' +
+          esc(sc ? days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time) : "sin horario") +
+          ' · cupo <strong>' + dentro.length + "/" + grp.capacity + "</strong></p>"
+        ));
+
+        box.appendChild(h('<h3 style="font-size:14px;margin-bottom:8px">En este grupo</h3>'));
+        var t1 = tableWrap(["Estudiante", "Documento", "WhatsApp", ""]);
+        dentro.forEach(function (e) {
+          var s = e.students;
+          var tr = h("<tr><td>" + esc(s.full_name) + "</td><td>" + esc((s.doc_type || "") + " " + (s.doc_number || "")) +
+            "</td><td>" + esc(s.whatsapp) + '</td><td class="acts"></td></tr>');
+          tr.children[3].appendChild(btn("Quitar del grupo", "btn-ghost", function () {
+            rpc("admin_unassign_group", { p_enrollment_id: e.id })
+              .then(function () { toast("Estudiante liberado."); load(); })
+              .catch(function (err) { toast(friendly(err), "err"); });
+          }));
+          t1.body.appendChild(tr);
+        });
+        if (!dentro.length) t1.body.appendChild(h('<tr><td colspan="4" class="muted">Todavía no hay estudiantes en este grupo.</td></tr>'));
+        box.appendChild(t1.wrap);
+
+        var lleno = dentro.length >= grp.capacity;
+        box.appendChild(h('<h3 style="font-size:14px;margin:18px 0 8px">Estudiantes libres de este módulo' + (lleno ? " (grupo lleno)" : "") + "</h3>"));
+        var t2 = tableWrap(["Estudiante", "Documento", "WhatsApp", ""]);
+        libres.forEach(function (e) {
+          var s = e.students;
+          var tr = h("<tr><td>" + esc(s.full_name) + "</td><td>" + esc((s.doc_type || "") + " " + (s.doc_number || "")) +
+            "</td><td>" + esc(s.whatsapp) + '</td><td class="acts"></td></tr>');
+          var joinBtn = btn("Unir al grupo", "btn-blue", function () {
+            rpc("admin_assign_group", { p_enrollment_id: e.id, p_group_id: g.id })
+              .then(function () { toast("Estudiante unido al grupo."); load(); })
+              .catch(function (err) { toast(friendly(err), "err"); });
+          });
+          joinBtn.disabled = lleno;
+          tr.children[3].appendChild(joinBtn);
+          t2.body.appendChild(tr);
+        });
+        if (!libres.length) t2.body.appendChild(h('<tr><td colspan="4" class="muted">No hay estudiantes de este módulo esperando grupo.</td></tr>'));
+        box.appendChild(t2.wrap);
+      }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+    }
+    load();
   }
 
   /* ============ SEGURIDAD (mi cuenta) — en pausa, ver estado.md ============ */
