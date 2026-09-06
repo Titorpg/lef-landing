@@ -7,7 +7,10 @@ de progreso del ciclo (migración `20260906170000`). Panel admin tiene **Registr
 eventos** + el admin ya puede editar/eliminar pagos y suscripciones con motivo obligatorio
 (migración `20260906180000`, ambas aplicadas y desplegadas). **Datos de prueba borrados**
 (Ana Gómez + Jorge Rada, con un script aparte que no pasa por el Registro de eventos — ver
-sección 💳 Wompi más abajo). La base queda lista para el primer pago real.
+sección 💳 Wompi más abajo). La base queda lista para el primer pago real. Académico →
+Grupos ahora deja asignar estudiantes a un grupo específico a mano (migración
+`20260906190000`, aplicada y desplegada) — botón "Estudiantes" por grupo, con "libres del
+módulo" para unir y "en el grupo" para quitar, respetando el cupo.
 
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
