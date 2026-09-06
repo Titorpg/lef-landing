@@ -273,6 +273,25 @@ un solo modal. La inscripción pasa sola a **activo** en cuanto se registra el p
   con un botón "Copiar" — funciona porque ahí es un toque real del usuario, no un evento
   sintético de automatización.
 
+**Ajuste (6 sep 2026) — nivel y horario del formulario ahora son indicadores, EN VIVO ✅:**
+pedido del usuario: el aspirante ya no elige un módulo ni un horario específico en
+`inscripcion.html`. Paso 2 pregunta con qué nivel se identifica mejor (Principiante A1-A2 /
+Intermedio B1-B2 / Avanzado C1+, cada uno con descripción) y paso 3 pregunta su franja
+horaria preferida (Mañana/Tarde/Noche, con descripción y una nota de que la disponibilidad
+real depende del ciclo). Ambos son solo referencia para el asesor — el admin sigue eligiendo
+el módulo/horario/grupo reales al convertir la solicitud (sin cambios ahí). Se quitó también
+la pantalla final con "inscripción registrada" + número de matrícula (ya no existía desde el
+cambio a pre-inscripciones, pero el usuario pidió confirmarlo); ahora dice que un asesor se
+pondrá en contacto pronto.
+- ✅ `supabase/migrations/20260906160000_preinscripcion_indicadores.sql` — aplicada. Agrega
+  `preinscripciones.level_estimate` / `time_preference`; recrea `create_preinscripcion` con
+  esos parámetros (soltando la firma vieja primero — agregar parámetros con "create or
+  replace" sin soltar antes deja una función sobrecargada en vez de reemplazarla).
+- ✅ `lef-enroll.js` reescrito (ya no llama a `get_public_modules` ni
+  `get_schedule_availability`); Pre-inscritos en el panel muestra "Nivel (autoeval.)" /
+  "Franja preferida"; el modal de "Crear estudiante" los muestra como referencia.
+- ✅ Desplegado (commit `5eee073`).
+
 ## 🔐 Endurecimiento del inicio de sesión (6 sep 2026) — EN CURSO
 
 Guía operativa completa y checklist paso a paso: **`SEGURIDAD.md`** (en la raíz).
