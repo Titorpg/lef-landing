@@ -1,10 +1,12 @@
 # Estado del proyecto — Landing LEF
 
-Última actualización: 6 de septiembre de 2026. **Endurecimiento del inicio de sesión en
-curso** (ver sección 🔐 abajo y `SEGURIDAD.md`): cerrada una escalada de privilegios crítica
-en RLS de `profiles`; código listo para MFA de admin, CAPTCHA, contraseñas por correo y
-auditoría — pendiente que el usuario aplique migraciones + configure Resend/Turnstile/panel
-de Supabase, y que Claude despliegue.
+Última actualización: 6 de septiembre de 2026. **Dos frentes con código listo, sin desplegar:**
+(1) **Endurecimiento del inicio de sesión** (sección 🔐 y `SEGURIDAD.md`): cerrada una escalada
+de privilegios crítica en RLS de `profiles`; MFA de admin, CAPTCHA, contraseñas por correo,
+auditoría. (2) **Formulario público → pre-inscripciones** (sección 📋): el formulario ya no
+crea estudiantes; guarda solicitudes que el admin revisa y convierte. Ambos necesitan que el
+usuario aplique migraciones a mano + (para el login) configure Resend/Turnstile/panel de
+Supabase, y que Claude despliegue. Commit WIP `3d737a4` (login) — el de pre-inscripciones va aparte.
 
 **Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
@@ -211,6 +213,28 @@ Fase 1 — estado:
 4. Dominio: ya apunta a Vercel.
 5. Datos de prueba: borrarlos.
 
+## 📋 Formulario público → Pre-inscripciones (6 sep 2026) — código listo, sin desplegar
+
+**Cambio de flujo:** el formulario público **ya no crea un estudiante ni una inscripción**.
+Ahora guarda una **pre-inscripción** en la tabla `preinscripciones`. El admin la ve en
+**Estudiantes → pestaña "Pre-inscritos"**, contacta a la persona y, si acuerdan el inicio
+del curso, pulsa **"Crear estudiante"**: ahí sí se crea el estudiante + inscripción (cupo,
+grupo, matrícula), reutilizando `create_enrollment`. Motivo: no todos los que llenan el
+formulario terminan entrando al curso.
+
+- `supabase/migrations/20260906140000_preinscripciones.sql` (NUEVA, aplicar a mano):
+  tabla `preinscripciones` + RLS (staff lee, admin gestiona), `create_preinscripcion`
+  (pública/anon, con anti-doble-envío de 24 h) y `admin_convert_preinscripcion`
+  (solo admin, llama a `create_enrollment` y marca la solicitud como `convertido`).
+- `assets/js/lef-enroll.js` — `submit()` llama `create_preinscripcion`; pantalla final
+  sin matrícula ("¡Recibimos tu solicitud!"); paso 4 dice "Enviar solicitud".
+- `assets/js/lef-admin.js` — pestañas Estudiantes / Pre-inscritos en la sección Estudiantes;
+  tabla de solicitudes con "Crear estudiante" (modal: documento + módulo + horario),
+  "Marcar contactado", "Descartar"; KPI "Pre-inscritos" en el Dashboard.
+- **Orden:** aplicar la migración **antes** de desplegar el frontend nuevo, o el formulario
+  público se rompe (`create_preinscripcion` no existiría). `get_enrollment_confirmation`
+  y `create_enrollment` siguen existiendo (los usa la conversión).
+
 ## 🔐 Endurecimiento del inicio de sesión (6 sep 2026) — EN CURSO
 
 Guía operativa completa y checklist paso a paso: **`SEGURIDAD.md`** (en la raíz).
@@ -272,7 +296,7 @@ Landing page multi-página para **LEF (Learn English Fluently)**, academia de in
 | `niveles.html` | Los 4 niveles CEFR (A1–B2) con los 12 módulos, bloque de horas (16h+3h=19h), bloque **C1 rediseñado** (tarjeta igual a los niveles + panel "qué incluye" con 5 puntos, ambos se expanden juntos al hover) y **carrusel de reseñas** "Voces de LEF" al final (fondo azul) |
 | `sistema.html` | Los 3 pilares del método (con foto real de Pexels cada uno) + nota corta sobre el examen de validación dividida en 2 párrafos + 3 puntos con chulo (ya no hay franja negra "Tres pilares") + carrusel de reseñas |
 | `ofrecemos.html` | Las 6 cosas que ofrece LEF en tarjetas estilo "Sistema de aprendizaje" (sin foto, 2 columnas × 3 en escritorio) + 4 puntos con chulo (ya no hay foto suelta ni franja azul separada — el carrusel de reseñas ya es azul) |
-| `inscripcion.html` | **Asistente de inscripción de 4 pasos** conectado a Supabase (`assets/js/lef-enroll.js`) + tarjeta de pasarela Wompi (solo visual) |
+| `inscripcion.html` | **Asistente de inscripción de 4 pasos** (`assets/js/lef-enroll.js`). Al enviar crea una **pre-inscripción** (no un estudiante); el admin la convierte desde el panel. + tarjeta de pasarela Wompi (solo visual) |
 | `login.html` | Inicio de sesión único (`assets/js/lef-auth.js`) — enruta por rol — no indexado |
 | `admin.html` | Panel administrativo (SPA, `assets/js/lef-admin.js`) — no indexado |
 | `portal.html` | Portal del estudiante — 3 pestañas con router por hash (`assets/js/lef-portal.js`): Facturación (pago en línea con Wompi), Mi curso, Mi cuenta (foto/contraseña/datos) — no indexado |

@@ -99,6 +99,13 @@
     LEF_STUDENT_NOT_FOUND: "No se encontró el estudiante.",
     LEF_INVALID_DOC_TYPE: "Tipo de documento inválido.",
     LEF_MISSING_FIELDS: "Faltan datos obligatorios (nombre, documento, WhatsApp o correo).",
+    "LEF_DUPLICATE_REGISTRATION": "Ya existe una inscripción con ese correo, WhatsApp o documento en el ciclo actual.",
+    LEF_CYCLE_CLOSED: "No hay un ciclo abierto para ese horario. Abre el ciclo en Académico o elige “sin horario por ahora”.",
+    LEF_NO_AVAILABLE_GROUP: "Ese horario ya no tiene cupo. Elige otro horario o déjalo sin horario por ahora.",
+    LEF_INVALID_MODULE: "El módulo elegido no está activo.",
+    LEF_ALREADY_CONVERTED: "Esta solicitud ya fue convertida en estudiante.",
+    LEF_PREINSCRIPCION_NOT_FOUND: "No se encontró la solicitud.",
+    LEF_REQUIRES_ADMIN: "Solo un administrador puede hacer esto.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
     email_invalido: "El correo no es válido.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
@@ -266,6 +273,7 @@
     if (isAdmin) {
       jobs.push(rpc("admin_billing_overview"));
       jobs.push(q("payments").select("amount,currency,method,status,paid_at,receipt_number,student_name,students(full_name)").order("paid_at", { ascending: false }).limit(8));
+      jobs.push(q("preinscripciones").select("id", { count: "exact", head: true }).in("status", ["nuevo", "contactado"]));
     }
 
     Promise.all(jobs).then(function (res) {
@@ -276,6 +284,7 @@
       var teacherCount = res[3].count || 0;
       var billing = isAdmin ? (res[4] || []) : [];
       var recentPays = isAdmin ? (res[5].data || []) : [];
+      var preCount = isAdmin ? (res[6] && res[6].count) || 0 : 0;
 
       var activos = enr.filter(function (e) { return e.status !== "Cancelled"; });
       var nuevas = enr.filter(function (e) { return e.status === "Pending"; }).length;
@@ -287,7 +296,11 @@
 
       var tiles = [["Estudiantes", studentCount], ["Profesores", teacherCount],
         ["Inscripciones activas", activos.length], ["Inscripciones nuevas", nuevas]];
-      if (isAdmin) { tiles.push(["Pendientes", pendientes]); tiles.push(["Al día", alDia]); tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]); }
+      if (isAdmin) {
+        tiles.push(["Pre-inscritos", preCount]);
+        tiles.push(["Pendientes", pendientes]); tiles.push(["Al día", alDia]);
+        tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]);
+      }
       main.appendChild(statRow(tiles));
 
       /* --- donut: TODOS los módulos activos, cada uno con su color --- */
@@ -361,13 +374,38 @@
 
   /* ============ ESTUDIANTES ============ */
   function secEstudiantes(main) {
-    head(main, "Estudiantes", "Personas inscritas. El admin gestiona sus datos, el módulo en que están y su cuenta de acceso.");
+    head(main, "Estudiantes", "Personas inscritas y solicitudes que llegan por el formulario público.");
+    var tabsBar = h('<div class="pnl-toolbar" data-tabs style="margin-bottom:14px"></div>');
+    var host = h("<div></div>");
+    main.appendChild(tabsBar); main.appendChild(host);
+    var current = secEstudiantes._tab || "estudiantes";
+
+    function paint() {
+      secEstudiantes._tab = current;
+      tabsBar.innerHTML = "";
+      [["estudiantes", "Estudiantes"],
+       ["preinscritos", "Pre-inscritos" + (secEstudiantes._preCount ? " (" + secEstudiantes._preCount + ")" : "")]
+      ].forEach(function (t) {
+        var b = h('<button class="btn btn-sm ' + (current === t[0] ? "btn-dark" : "btn-ghost") + '">' + t[1] + "</button>");
+        b.onclick = function () { current = t[0]; paint(); };
+        tabsBar.appendChild(b);
+      });
+      host.innerHTML = '<p class="muted">Cargando…</p>';
+      (current === "preinscritos" ? renderPreinscritos : renderStudentsList)(host);
+    }
+
+    q("preinscripciones").select("id", { count: "exact", head: true }).in("status", ["nuevo", "contactado"])
+      .then(function (r) { secEstudiantes._preCount = r.count || 0; paint(); })
+      .catch(function () { paint(); });
+  }
+
+  function renderStudentsList(main) {
     var toolbar;
     if (ME.role === "admin") {
       toolbar = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark" data-add>+ Estudiante</button>' +
         '<span class="muted" style="font-size:13px">Al agregar uno se elige su módulo y queda inscrito.</span></div>');
-      main.appendChild(toolbar);
-    }
+      main.innerHTML = ""; main.appendChild(toolbar);
+    } else { main.innerHTML = ""; }
     Promise.all([
       q("students").select("*").order("created_at", { ascending: false }),
       ME.role === "admin" ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
@@ -416,9 +454,116 @@
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="8" class="muted">Sin estudiantes todavía. Aparecerán al inscribirse por el formulario, o agrégalos con “+ Estudiante”.</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="8" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  var PRE_STATUS_BADGE = {
+    nuevo: '<span class="badge warn">nuevo</span>',
+    contactado: '<span class="badge neutral">contactado</span>',
+    convertido: '<span class="badge ok">convertido</span>',
+    descartado: '<span class="badge bad">descartado</span>'
+  };
+
+  function renderPreinscritos(main) {
+    main.innerHTML = "";
+    Promise.all([
+      q("preinscripciones").select("*, modules(level,title,module_number), schedules(days,start_time,end_time)")
+        .order("created_at", { ascending: false }),
+      activeModules()
+    ]).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      var rows = res[0].data || [], mods = res[1];
+      var t = tableWrap(["Fecha", "Nombre", "Contacto", "Nivel deseado", "Horario deseado", "Estado", "Acciones"]);
+      rows.forEach(function (p) {
+        var m = p.modules, sc = p.schedules;
+        var modLabel = m ? m.level + " · " + m.title : "—";
+        var scLabel = p.wants_schedule_later ? "Decidir después"
+          : sc ? (days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "—";
+        var tr = h("<tr><td>" + date(p.created_at) + "</td><td>" + esc(p.full_name) + "</td>" +
+          '<td class="wrap">' + esc(p.whatsapp) + '<br><span class="muted" style="font-size:12px">' + esc(p.email) + "</span></td>" +
+          "<td>" + esc(modLabel) + "</td><td>" + esc(scLabel) + "</td>" +
+          "<td>" + (PRE_STATUS_BADGE[p.status] || esc(p.status)) + '</td><td class="acts"></td></tr>');
+        var cell = tr.children[6];
+        if (ME.role === "admin" && (p.status === "nuevo" || p.status === "contactado")) {
+          cell.appendChild(btn("Crear estudiante", "btn-blue", function () { convertPreinscrito(p, mods); }));
+          if (p.status === "nuevo") {
+            cell.appendChild(btn("Marcar contactado", "btn-ghost", function () {
+              q("preinscripciones").update({ status: "contactado", handled_by: ME.user_id }).eq("id", p.id)
+                .then(function (u) { if (u.error) throw u.error; toast("Marcado como contactado."); route(); })
+                .catch(function (e) { toast(friendly(e), "err"); });
+            }));
+          }
+          cell.appendChild(btn("Descartar", "btn-danger", function () {
+            confirmDelete("Descartar solicitud",
+              "Se marca como descartada la solicitud de " + p.full_name + ". No se borra el registro.",
+              function () {
+                return q("preinscripciones").update({ status: "descartado", handled_by: ME.user_id }).eq("id", p.id)
+                  .then(function (u) { if (u.error) throw u.error; toast("Solicitud descartada."); route(); });
+              });
+          }));
+        } else if (p.status === "convertido") {
+          cell.innerHTML = '<span class="muted">estudiante creado</span>';
+        } else if (p.status === "descartado") {
+          cell.innerHTML = '<span class="muted">—</span>';
+        }
+        t.body.appendChild(tr);
+      });
+      if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin solicitudes todavía. Aparecen aquí cuando alguien completa el formulario público de inscripción.</td></tr>'));
+      main.appendChild(t.wrap);
+    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  function convertPreinscrito(p, mods) {
+    if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
+    var defaultMod = (p.desired_module_id && mods.some(function (m) { return m.id === p.desired_module_id; }))
+      ? p.desired_module_id : mods[0].id;
+    var b = h("<div>" +
+      '<p class="pnl-sub" style="margin-bottom:10px">Solicitud de <strong>' + esc(p.full_name) + "</strong><br>" +
+      esc(p.whatsapp) + " · " + esc(p.email) + (p.age ? " · " + esc(p.age) + " años" : "") + (p.city ? " · " + esc(p.city) : "") + "</p>" +
+      field("Tipo de documento", docSelect("dt", p.doc_type || "CC")) +
+      field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
+      field("Módulo", moduleSelect("mod", mods, defaultMod)) +
+      field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
+      '<p class="pnl-sub">Se crea el estudiante y su inscripción (con cupo, grupo y matrícula). La cuenta de portal se crea después, desde la lista de estudiantes.</p>' +
+      "</div>");
+    var schSel = b.querySelector("[name=sch]");
+    function loadSch(moduleId) {
+      schSel.innerHTML = '<option value="">Cargando…</option>';
+      rpc("get_schedule_availability", { p_module_id: moduleId }).then(function (list) {
+        var opts = '<option value="">Sin horario por ahora (se define después)</option>';
+        (list || []).filter(function (r) { return r.active; }).forEach(function (r) {
+          opts += '<option value="' + r.schedule_id + '"' +
+            (r.schedule_id === p.desired_schedule_id && !r.is_full ? " selected" : "") +
+            (r.is_full ? " disabled" : "") + ">" +
+            days(r.days) + " " + time(r.start_time) + "–" + time(r.end_time) +
+            (r.is_full ? " (sin cupos)" : " (" + r.available + " cupo" + (r.available === 1 ? "" : "s") + ")") + "</option>";
+        });
+        schSel.innerHTML = opts;
+        if (p.wants_schedule_later) schSel.value = "";
+      }).catch(function () { schSel.innerHTML = '<option value="">Sin horario por ahora (se define después)</option>'; });
+    }
+    loadSch(defaultMod);
+    b.querySelector("[name=mod]").onchange = function () { loadSch(this.value); };
+
+    modal("Crear estudiante desde la solicitud", b, function () {
+      var dn = b.querySelector("[name=dn]").value.trim();
+      if (!dn) throw new Error("El número de documento es obligatorio.");
+      return rpc("admin_convert_preinscripcion", {
+        p_id: p.id,
+        p_module_id: b.querySelector("[name=mod]").value,
+        p_schedule_id: b.querySelector("[name=sch]").value || null,
+        p_doc_type: b.querySelector("[name=dt]").value,
+        p_doc_number: dn,
+        p_age: p.age || null,
+        p_city: p.city || null
+      }).then(function (out) {
+        var row = Array.isArray(out) ? out[0] : out;
+        toast("Estudiante creado · matrícula " + (row && row.registration_number ? row.registration_number : ""));
+        route();
+      });
+    }, "Crear estudiante");
   }
 
   function editStudent(s, currentModuleId, mods) {

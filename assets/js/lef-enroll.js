@@ -1,6 +1,8 @@
 /* LEF — Asistente de inscripción (4 pasos)
    Paso 1 Tus datos · Paso 2 Elige tu nivel · Paso 3 Elige tu horario · Paso 4 Revisar
-   Al confirmar: create_enrollment -> pantalla con número de matrícula + WhatsApp. */
+   Al enviar: create_preinscripcion -> queda en la lista de "Pre-inscritos" del panel.
+   El admin contacta a la persona y, si acuerdan el inicio, crea el estudiante desde
+   el panel (ahí se asigna cupo, grupo y matrícula). El formulario NO crea estudiantes. */
 (function () {
   "use strict";
 
@@ -218,47 +220,44 @@
         ["Horario", "Por definir — lo coordinamos contigo por WhatsApp"]
     ].filter(Boolean);
     return '' +
-      '<h2 class="wz-h">Revisa y confirma</h2>' +
-      '<p class="wz-sub">Verifica que todo esté correcto. Al confirmar, generaremos tu número de matrícula.</p>' +
+      '<h2 class="wz-h">Revisa y envía</h2>' +
+      '<p class="wz-sub">Verifica que todo esté correcto. Al enviar, nuestro equipo revisará tu solicitud y te contactará por WhatsApp para confirmar disponibilidad y coordinar el inicio.</p>' +
       '<dl class="wz-review">' + rows.map(function (r) {
         return "<div><dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd></div>";
       }).join("") + "</dl>" +
-      '<label class="wz-consent"><input type="checkbox" id="wz-ok"> Acepto que LEF me contacte por WhatsApp y correo para completar mi inscripción.</label>' +
+      '<label class="wz-consent"><input type="checkbox" id="wz-ok"> Acepto que LEF me contacte por WhatsApp y correo para dar seguimiento a mi solicitud.</label>' +
       '<div class="wz-nav">' +
         '<button type="button" class="btn btn-outline-dark" data-act="to-3"' + (state.submitting ? " disabled" : "") + ">&larr; Atrás</button>" +
         '<button type="button" class="btn btn-dark" data-act="submit"' + (state.submitting ? " disabled" : "") + ">" +
-          (state.submitting ? "Enviando…" : "Confirmar inscripción") + "</button>" +
+          (state.submitting ? "Enviando…" : "Enviar solicitud") + "</button>" +
       "</div>";
   }
 
   function viewResult() {
-    var r = state.result;
-    var hasSchedule = r.schedule_days && r.schedule_days.length;
-    var waMsg = "¡Hola! Acabo de inscribirme en LEF.\n" +
-      "Matrícula: " + r.registration_number + "\n" +
-      "Nombre: " + state.data.name + "\n" +
-      "Nivel: " + (r.module_level || "") + " — " + (r.module_title || "") + "\n" +
+    var d = state.data, mod = selectedModule(), sc = selectedSchedule();
+    var hasSchedule = !!sc;
+    var waMsg = "¡Hola! Acabo de enviar mi solicitud de inscripción en LEF.\n" +
+      "Nombre: " + d.name + "\n" +
+      "Nivel: " + (mod ? mod.level + " — " + mod.title : "") + "\n" +
       (hasSchedule ?
-        "Horario: " + fmtDays(r.schedule_days) + ", " + fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time) + "\n" +
-        "Quedo atento(a) para confirmar el cupo y el pago." :
-        "Todavía no elegí horario — quedo atento(a) para coordinarlo, confirmar el cupo y el pago.");
+        "Horario que me interesa: " + fmtDays(sc.days) + ", " + fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time) + "\n" :
+        "Todavía no elegí horario — quisiera coordinarlo con ustedes.\n") +
+      "Quedo atento(a) a la información para empezar.";
     return '<div class="wz-card wz-done">' +
       '<div class="wz-done-badge">✓</div>' +
-      '<h2 class="wz-h">¡Inscripción registrada!</h2>' +
-      '<p class="wz-sub">Guarda tu número de matrícula. Nuestro equipo te contactará por WhatsApp para ' +
-        (hasSchedule ? "confirmar el cupo y el pago." : "coordinar tu horario, confirmar el cupo y el pago.") + "</p>" +
-      '<div class="wz-regnum">' + esc(r.registration_number) + "</div>" +
+      '<h2 class="wz-h">¡Recibimos tu solicitud!</h2>' +
+      '<p class="wz-sub">Nuestro equipo la revisará y te contactará por WhatsApp para resolver tus dudas, ' +
+        'confirmar la disponibilidad y coordinar el inicio de tu curso. También puedes escribirnos tú ahora.</p>' +
       '<dl class="wz-review">' +
-        "<div><dt>Nombre</dt><dd>" + esc(r.student_full_name || state.data.name) + "</dd></div>" +
-        "<div><dt>Nivel</dt><dd>" + esc((r.module_level || "") + " — " + (r.module_title || "")) + "</dd></div>" +
+        "<div><dt>Nombre</dt><dd>" + esc(d.name) + "</dd></div>" +
+        "<div><dt>Nivel</dt><dd>" + esc(mod ? mod.level + " — " + mod.title : "") + "</dd></div>" +
         (hasSchedule ?
-          "<div><dt>Días</dt><dd>" + esc(fmtDays(r.schedule_days)) + "</dd></div>" +
-          "<div><dt>Horario</dt><dd>" + esc(fmtTime(r.schedule_start_time) + " – " + fmtTime(r.schedule_end_time)) + "</dd></div>" :
-          "<div><dt>Horario</dt><dd>Por definir — te contactaremos por WhatsApp para coordinarlo</dd></div>") +
-        (r.teacher_full_name ? "<div><dt>Profesor(a)</dt><dd>" + esc(r.teacher_full_name) + "</dd></div>" : "") +
+          "<div><dt>Días</dt><dd>" + esc(fmtDays(sc.days)) + "</dd></div>" +
+          "<div><dt>Horario</dt><dd>" + esc(fmtTime(sc.start_time) + " – " + fmtTime(sc.end_time)) + "</dd></div>" :
+          "<div><dt>Horario</dt><dd>Por definir — lo coordinamos contigo por WhatsApp</dd></div>") +
       "</dl>" +
       '<a class="btn btn-whatsapp" target="_blank" rel="noopener" href="' + waLink(waMsg) + '">' +
-        '<img src="assets/icon-whatsapp-black.png" alt="" class="icn-inline">Continuar por WhatsApp</a>' +
+        '<img src="assets/icon-whatsapp-black.png" alt="" class="icn-inline">Escríbenos por WhatsApp</a>' +
       "</div>";
   }
 
@@ -363,37 +362,31 @@
     if (!ok || !ok.checked || state.submitting) return;
     state.submitting = true; state.error = ""; render();
     var d = state.data;
-    rpc("create_enrollment", {
+    rpc("create_preinscripcion", {
       p_full_name: d.name.trim(),
       p_whatsapp: d.phone.trim(),
       p_email: d.email.trim(),
+      p_doc_type: d.docType || null,
+      p_doc_number: d.docNumber ? d.docNumber.trim() : null,
+      p_age: d.age ? parseInt(d.age, 10) : null,
+      p_city: d.city ? d.city.trim() : null,
       p_module_id: state.moduleId,
       p_schedule_id: state.scheduleId,
-      p_doc_type: d.docType,
-      p_doc_number: d.docNumber.trim(),
-      p_age: d.age ? parseInt(d.age, 10) : null,
-      p_city: d.city ? d.city.trim() : null
-    }).then(function (rows) {
-      var row = Array.isArray(rows) ? rows[0] : rows;
-      return rpc("get_enrollment_confirmation", { p_id: row.enrollment_id });
-    }).then(function (conf) {
-      state.result = Array.isArray(conf) ? conf[0] : conf;
+      p_wants_schedule_later: !!state.skipSchedule
+    }).then(function (id) {
+      state.result = { id: id };
       state.submitting = false;
       render();
       window.scrollTo({ top: mount.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
     }).catch(function (err) {
       state.submitting = false;
       var msg = (err && err.message) || "";
-      if (msg.indexOf("LEF_DUPLICATE_REGISTRATION") === 0) {
-        state.error = "Ya existe una inscripción con este correo, WhatsApp o documento para el ciclo actual (" +
-          msg.split(":")[1] + "). Escríbenos por WhatsApp si necesitas ayuda.";
-      } else if (msg.indexOf("LEF_CYCLE_CLOSED") === 0) {
-        state.error = "El ciclo de inscripción está cerrado por ahora. Escríbenos por WhatsApp para más información.";
-      } else if (msg.indexOf("LEF_NO_AVAILABLE_GROUP") === 0 || msg.indexOf("LEF_GROUP_FULL") === 0) {
-        state.error = "Ese horario acaba de llenarse. Elige otro horario, por favor.";
-        state.scheduleId = null;
+      if (msg.indexOf("LEF_PREINSCRIPCION_RECIENTE") === 0) {
+        state.error = "Ya recibimos una solicitud tuya en las últimas horas. Nuestro equipo te contactará pronto — o escríbenos por WhatsApp.";
+      } else if (msg.indexOf("LEF_MISSING_FIELDS") === 0) {
+        state.error = "Faltan datos obligatorios. Revisa el nombre, el WhatsApp y el correo.";
       } else {
-        state.error = "No pudimos completar tu inscripción. Intenta de nuevo o escríbenos por WhatsApp.";
+        state.error = "No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.";
       }
       render();
     });
