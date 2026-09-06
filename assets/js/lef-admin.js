@@ -525,8 +525,9 @@
       field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
       field("Módulo", moduleSelect("mod", mods, defaultMod)) +
       field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
+      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="297500">') +
       field("Contraseña temporal del portal", '<input name="pw" value="' + pwd + '">') +
-      '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>) y su cuenta de portal, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que ingrese y pague.</p>' +
+      '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>), su cuenta de portal y su cobro de la mensualidad, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que entre y pague. Si quien paga no es el estudiante, corrige el pagador después desde Pagos → Editar.</p>' +
       "</div>");
     var schSel = b.querySelector("[name=sch]");
     function loadSch(moduleId) {
@@ -551,33 +552,46 @@
       var dn = b.querySelector("[name=dn]").value.trim();
       if (!dn) throw new Error("El número de documento es obligatorio.");
       var accountPwd = b.querySelector("[name=pw]").value;
+      var moduleId = b.querySelector("[name=mod]").value;
+      var docType = b.querySelector("[name=dt]").value;
+      var monthly = +b.querySelector("[name=amt]").value || 0;
       return rpc("admin_convert_preinscripcion", {
         p_id: p.id,
-        p_module_id: b.querySelector("[name=mod]").value,
+        p_module_id: moduleId,
         p_schedule_id: b.querySelector("[name=sch]").value || null,
-        p_doc_type: b.querySelector("[name=dt]").value,
+        p_doc_type: docType,
         p_doc_number: dn,
         p_age: p.age || null,
         p_city: p.city || null
       }).then(function (out) {
         var row = Array.isArray(out) ? out[0] : out;
-        return callFn({
-          action: "create_account", role: "student",
-          full_name: p.full_name, email: p.email,
-          password: accountPwd, student_id: row.student_id
-        }).then(function () {
-          route();
-          var info = h("<div>" +
-            '<p class="pnl-sub" style="margin-bottom:8px">Matrícula <strong>' + esc(row.registration_number) +
-            '</strong> creada — inscripción en <strong>pendiente de pago</strong>.</p>' +
-            '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(p.email) + "</strong><br>" +
-            'Contraseña temporal: <code style="font-size:14px">' + esc(accountPwd) + "</code></p>" +
-            '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se registre su primer pago.</p></div>');
-          modal("Estudiante creado", info, function () { return Promise.resolve(); }, "Entendido");
-        }).catch(function (accErr) {
-          route();
-          toast("Se creó la matrícula " + row.registration_number + ", pero la cuenta de portal falló (" +
-            friendly(accErr) + "). Créala desde Estudiantes con “Crear cuenta de portal”.", "err");
+        var today = new Date();
+        return q("subscriptions").insert({
+          student_id: row.student_id, enrollment_id: row.enrollment_id, module_id: moduleId,
+          monthly_amount: monthly, currency: "COP",
+          billing_day: Math.min(today.getDate(), 28), next_due_date: ymd(today.getFullYear(), today.getMonth(), today.getDate()),
+          payer_name: p.full_name, payer_doc_type: docType, payer_doc_number: dn,
+          payer_email: p.email, payer_phone: p.whatsapp
+        }).then(function (subRes) {
+          if (subRes.error) throw subRes.error;
+          return callFn({
+            action: "create_account", role: "student",
+            full_name: p.full_name, email: p.email,
+            password: accountPwd, student_id: row.student_id
+          }).then(function () {
+            route();
+            var info = h("<div>" +
+              '<p class="pnl-sub" style="margin-bottom:8px">Matrícula <strong>' + esc(row.registration_number) +
+              '</strong> creada — inscripción en <strong>pendiente de pago</strong>, mensualidad ' + esc(money(monthly, "COP")) + ' ya generada.</p>' +
+              '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(p.email) + "</strong><br>" +
+              'Contraseña temporal: <code style="font-size:14px">' + esc(accountPwd) + "</code></p>" +
+              '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se registre su primer pago.</p></div>');
+            modal("Estudiante creado", info, function () { return Promise.resolve(); }, "Entendido");
+          }).catch(function (accErr) {
+            route();
+            toast("Se creó la matrícula " + row.registration_number + " y su mensualidad, pero la cuenta de portal falló (" +
+              friendly(accErr) + "). Créala desde Estudiantes con “Crear cuenta de portal”.", "err");
+          });
         });
       });
     }, "Crear estudiante");
@@ -682,7 +696,7 @@
 
   /* ============ PAGOS ============ */
   function secPagos(main) {
-    head(main, "Pagos", "Suscripciones mensuales y estado de pago. El cobro en línea (Wompi) se habilitará en la Fase 2.");
+    head(main, "Pagos", "Suscripciones mensuales y estado de pago. El estudiante paga en línea con Wompi desde su portal, o registrás el pago aquí a mano.");
     var bar = h('<div class="pnl-toolbar">' +
       '<button class="btn btn-ghost btn-sm" data-freeze>Congelar cuentas vencidas</button>' +
       '<span class="muted" style="font-size:13px">La congelación automática se agenda en la Fase 2.</span></div>');
