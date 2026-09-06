@@ -10,7 +10,11 @@ eventos** + el admin ya puede editar/eliminar pagos y suscripciones con motivo o
 sección 💳 Wompi más abajo). La base queda lista para el primer pago real. Académico →
 Grupos ahora deja asignar estudiantes a un grupo específico a mano (migración
 `20260906190000`, aplicada y desplegada) — botón "Estudiantes" por grupo, con "libres del
-módulo" para unir y "en el grupo" para quitar, respetando el cupo.
+módulo" para unir y "en el grupo" para quitar, respetando el cupo. Portal del estudiante:
+arreglado el encabezado superpuesto en pantallas angostas (el avatar tapaba el nombre
+cuando envolvía a 2 líneas — ahora el nombre trunca) y agregado un selector de 6 avatares
+de caricatura (3 M / 3 F, ilustraciones propias en `assets/avatars/`) como alternativa a
+subir foto propia en "Mi cuenta". Todo desplegado (commit `14cbfe0`).
 
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
