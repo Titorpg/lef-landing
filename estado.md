@@ -7,9 +7,19 @@ Editor de Supabase y frontend desplegado (`dpl_4EmfdGUNiKC7S53oq5V8AZSNoKfe`, co
 `preinscripciones` que el admin revisa desde la pestaña "Pre-inscritos" y convierte.
 
 **Endurecimiento del inicio de sesión — EN PAUSA** (sección 🔐 y `SEGURIDAD.md`): código
-listo (commit `3d737a4`, pusheado, sin desplegar) pero pausado porque el usuario necesita
-crear antes cuentas en algunos servicios (Resend, Cloudflare Turnstile). Cierra una escalada
-de privilegios crítica en RLS de `profiles`; retomar cuando el usuario tenga esas cuentas.
+listo (commit `3d737a4`) pero pausado porque el usuario necesita crear antes cuentas en
+algunos servicios (Resend, Cloudflare Turnstile). Cierra una escalada de privilegios crítica
+en RLS de `profiles`; retomar cuando el usuario tenga esas cuentas.
+
+⚠️ **Incidente (6 sep 2026, resuelto):** el primer deploy de pre-inscripciones publicó sin
+querer también el frontend del login hardening (`lef-auth.js` pedía la columna
+`profiles.must_change_password`, que no existe porque esa migración no se aplicó) — el
+login quedó roto para **todas** las cuentas ("Esta cuenta no tiene acceso"). Corregido en
+el commit `b08c0da`: se revirtió `lef-auth.js`, `lef-portal.js` y las partes de seguridad de
+`lef-admin.js` (enforce(), sección Seguridad, altas de cuenta con contraseña generada por el
+servidor) a la versión anterior, dejando intacto lo de pre-inscripciones. Re-desplegado.
+`lef-security.js`, `lef-recuperar.js` y `recuperar.html` quedan en el repo sin usar (huérfanos,
+ninguna página los enlaza) para no perder el trabajo cuando se retome este frente.
 
 **Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
