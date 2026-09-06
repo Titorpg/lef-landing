@@ -149,13 +149,23 @@
           main.appendChild(h('<div class="pnl-alert err">Tu cuenta está <strong>congelada</strong> por falta de pago. Realiza el pago o contacta a LEF por WhatsApp para reactivarla.</div>'));
         }
 
-        main.appendChild(h(
-          '<div class="stat-row">' +
-          '<div class="stat"><div class="k">Mensualidad</div><div class="v">' + money(s.monthly_amount, s.currency) + "</div></div>" +
-          '<div class="stat"><div class="k">Estado</div><div class="v" style="font-size:16px">' + badge + "</div></div>" +
-          '<div class="stat"><div class="k">Próximo pago</div><div class="v" style="font-size:16px">' + date(s.next_due_date) + "</div></div>" +
-          "</div>"
-        ));
+        if (s.module_level) {
+          main.appendChild(h(
+            '<div class="course-hero">' +
+            '<div class="lvl-tag">Nivel · ' + esc(s.module_level) + " — " + esc(s.module_title) + "</div>" +
+            "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
+            '<div class="mod-name">' + badge + " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+            "</div>"
+          ));
+        } else {
+          main.appendChild(h(
+            '<div class="stat-row">' +
+            '<div class="stat"><div class="k">Mensualidad</div><div class="v">' + money(s.monthly_amount, s.currency) + "</div></div>" +
+            '<div class="stat"><div class="k">Estado</div><div class="v" style="font-size:16px">' + badge + "</div></div>" +
+            '<div class="stat"><div class="k">Próximo pago</div><div class="v" style="font-size:16px">' + date(s.next_due_date) + "</div></div>" +
+            "</div>"
+          ));
+        }
         if (s.description) main.appendChild(h('<p class="pnl-sub">' + esc(s.description) + "</p>"));
 
         var box = h('<div class="pnl-table-wrap" style="padding:20px;margin-bottom:24px">' +
@@ -233,12 +243,30 @@
   }
 
   /* ---------- Mi curso ---------- */
+  function levelOf(moduleLevel) { return (moduleLevel || "").split(".")[0]; }
+
+  function progressBar(startStr, endStr) {
+    if (!startStr || !endStr) {
+      return '<p class="pnl-sub">Tu ciclo todavía no tiene fechas asignadas — LEF te avisará cuando quede definido.</p>';
+    }
+    var start = new Date(startStr + "T00:00:00"), end = new Date(endStr + "T00:00:00"), now = new Date();
+    var total = end - start, elapsed = now - start;
+    var pct = total > 0 ? Math.max(0, Math.min(100, Math.round((elapsed / total) * 100))) : (now >= end ? 100 : 0);
+    var doneMsg = now >= end ? "Tu ciclo ya terminó — LEF actualizará tu siguiente módulo en breve."
+      : now < start ? "Tu ciclo todavía no empieza."
+      : "Va " + pct + "% del ciclo.";
+    return '<div class="course-progress">' +
+      '<div class="bar-labels"><span>' + date(startStr) + "</span><span>" + date(endStr) + "</span></div>" +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<p class="bar-note">' + esc(doneMsg) + "</p></div>";
+  }
+
   function renderCourse(main) {
     sb.rpc("get_my_course").then(function (r) {
       if (r.error) throw r.error;
       var rows = r.data || [];
       var c = rows[0];
-      main.innerHTML = '<h1 class="pnl-h">Mi curso</h1><p class="pnl-sub">El módulo en el que estás inscrito actualmente.</p>';
+      main.innerHTML = '<h1 class="pnl-h">Mi curso</h1><p class="pnl-sub">El nivel y el módulo en el que estás inscrito actualmente.</p>';
 
       if (!c) {
         main.appendChild(h('<div class="pnl-alert ok">Aún no tienes un módulo asignado. Escríbenos por WhatsApp si crees que esto es un error.</div>'));
@@ -246,13 +274,14 @@
       }
 
       main.appendChild(h(
-        '<div class="stat-row">' +
-        '<div class="stat"><div class="k">Nivel</div><div class="v" style="font-size:16px">' + esc(c.module_level) + "</div></div>" +
-        '<div class="stat"><div class="k">Módulo</div><div class="v" style="font-size:16px">' + esc(c.module_title) + "</div></div>" +
-        '<div class="stat"><div class="k">Matrícula</div><div class="v" style="font-size:16px">' + esc(c.registration_number) + "</div></div>" +
+        '<div class="course-hero">' +
+        '<div class="lvl-tag">Nivel · matrícula ' + esc(c.registration_number) + "</div>" +
+        "<h2>" + esc(levelOf(c.module_level)) + "</h2>" +
+        '<div class="mod-name">Módulo actual: ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
+        progressBar(c.cycle_start_date, c.cycle_end_date) +
         "</div>"
       ));
-      if (c.module_description) main.appendChild(h('<p class="pnl-sub">' + esc(c.module_description) + "</p>"));
+      if (c.module_description) main.appendChild(h('<p class="pnl-sub"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>"));
 
       if (c.schedule_days && c.schedule_days.length) {
         main.appendChild(h(

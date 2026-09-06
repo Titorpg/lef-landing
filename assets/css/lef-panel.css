@@ -144,6 +144,21 @@ td.acts .btn{margin:2px 4px 2px 0;}
   .stat{scroll-snap-align:start;}
 }
 
+/* ---- bloque grande de nivel/módulo (portal, Mi curso) ---- */
+.course-hero{border:1px solid var(--niebla);border-radius:16px;background:#fff;
+  padding:24px 26px;margin-bottom:22px;}
+.course-hero .lvl-tag{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--azul);font-weight:600;margin-bottom:6px;}
+.course-hero h2{font-family:'Archivo Black',sans-serif;font-size:clamp(24px,4vw,32px);
+  line-height:1.1;margin:0 0 4px;}
+.course-hero .mod-name{font-size:15px;color:var(--grafito);margin-bottom:18px;}
+.course-progress .bar-labels{display:flex;justify-content:space-between;
+  font-size:12px;color:var(--plata);margin-bottom:6px;font-variant-numeric:tabular-nums;}
+.course-progress .bar-track{height:10px;border-radius:6px;background:var(--niebla);overflow:hidden;}
+.course-progress .bar-fill{height:100%;background:var(--azul);border-radius:6px 0 0 6px;
+  transition:width .4s ease;}
+.course-progress .bar-note{font-size:12px;color:var(--plata);margin-top:6px;}
+
 @media(max-width:780px){
   .pnl-wrap{flex-direction:column;}
   .pnl-nav{width:100%;display:flex;gap:6px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--niebla);}
