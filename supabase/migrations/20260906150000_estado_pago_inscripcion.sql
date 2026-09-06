@@ -9,14 +9,16 @@
 -- (lo usan muchas funciones para filtrar inscripciones activas).
 
 -- ============================================================================
--- 1. Migrar los datos existentes antes de endurecer el check
+-- 1. Soltar el check viejo ANTES de migrar los datos (si no, el update de
+--    abajo choca con el check que todavía no permite los valores nuevos).
 -- ============================================================================
+alter table public.enrollments drop constraint if exists enrollments_status_check;
+
 update public.enrollments set status = 'PendingPayment'
   where status in ('Pending', 'Contacted', 'Confirmed');
 update public.enrollments set status = 'Active'
   where status = 'Paid';
 
-alter table public.enrollments drop constraint if exists enrollments_status_check;
 alter table public.enrollments add constraint enrollments_status_check
   check (status in ('PendingPayment', 'Active', 'Cancelled'));
 
