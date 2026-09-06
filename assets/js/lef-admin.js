@@ -157,11 +157,7 @@
         }
         if (!["admin", "teacher"].includes(p.data.role)) return (window.location.replace("portal.html"));
         ME = p.data;
-        return window.LEFSec.enforce(sb, {
-          role: p.data.role,
-          mustChangePassword: p.data.must_change_password,
-          mfaRequiredRoles: ["admin"]
-        }).then(function () { renderShell(); });
+        renderShell();
       });
     });
   }
@@ -172,8 +168,7 @@
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
-    { id: "usuarios", label: "Usuarios", roles: ["admin"] },
-    { id: "seguridad", label: "Seguridad", roles: ["admin", "teacher"] }
+    { id: "usuarios", label: "Usuarios", roles: ["admin"] }
   ];
 
   function renderShell() {
@@ -210,8 +205,7 @@
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes,
-      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
-      seguridad: secSeguridad
+      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
   }
@@ -602,28 +596,14 @@
     }, s ? "Guardar" : "Inscribir");
   }
 
-  // Muestra el resultado de crear/resetear una cuenta: si el correo salió y la
-  // contraseña temporal como respaldo (por si el correo no llega).
-  function showCreds(title, email, r) {
-    var sent = r && r.email_sent;
-    var pw = (r && r.password) || "—";
-    var b = h("<div>" +
-      '<p class="pnl-sub" style="margin-bottom:8px">' + (sent
-        ? "Se envió un correo a <strong>" + esc(email) + "</strong> con el usuario y la contraseña temporal."
-        : '<strong style="color:var(--bad)">El correo automático no se pudo enviar.</strong> Comparte estos datos con la persona por otro medio seguro.') + "</p>" +
-      '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(email) + "</strong><br>" +
-      'Contraseña temporal: <code style="font-size:14px">' + esc(pw) + "</code></p>" +
-      '<p class="pnl-sub">Al entrar por primera vez, el sistema le pedirá crear su contraseña personal.</p></div>');
-    modal(title, b, function () { return Promise.resolve(); }, "Entendido");
-  }
-
   function resetStudentPwd(s, prof) {
-    var bb = h('<div><p class="pnl-sub">Se enviará a <strong>' + esc(s.email) +
-      '</strong> un correo con una contraseña temporal nueva. Deberá crear su contraseña personal al entrar.</p></div>');
+    var np = "lef" + Math.random().toString(36).slice(2, 10);
+    var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
+      '<p class="pnl-sub">Compártela con el estudiante. Podrá cambiarla luego.</p></div>');
     modal("Restablecer contraseña — " + s.full_name, bb, function () {
-      return callFn({ action: "reset_password", user_id: prof.user_id })
-        .then(function (r) { showCreds("Contraseña restablecida — " + s.full_name, s.email, r); });
-    }, "Enviar correo");
+      return callFn({ action: "reset_password", user_id: prof.user_id, password: bb.querySelector("[name=p]").value })
+        .then(function () { toast("Contraseña actualizada."); });
+    }, "Guardar");
   }
 
   function deleteStudent(s, prof) {
@@ -659,18 +639,21 @@
   }
 
   function crearCuentaEstudiante(s) {
+    var pwd = "lef" + Math.random().toString(36).slice(2, 10);
     var body = h("<div>" +
       field("Nombre", '<input name="fn" value="' + esc(s.full_name) + '">') +
       field("Correo (usuario para entrar)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
-      '<p class="pnl-sub">Se enviará un correo a esa dirección con el usuario y una contraseña temporal generada por el sistema. El estudiante deberá crear su contraseña personal al entrar por primera vez.</p></div>');
+      field("Contraseña temporal", '<input name="pw" value="' + pwd + '">') +
+      '<p class="pnl-sub">Comparte estos datos con el estudiante. Entra en ' + esc(window.location.host) +
+      '/login y podrá cambiar la contraseña luego.</p></div>');
     modal("Crear cuenta de portal — " + s.full_name, body, function () {
-      var em = body.querySelector("[name=em]").value.trim();
       return callFn({
         action: "create_account", role: "student",
         full_name: body.querySelector("[name=fn]").value.trim(),
-        email: em,
+        email: body.querySelector("[name=em]").value.trim(),
+        password: body.querySelector("[name=pw]").value,
         student_id: s.id
-      }).then(function (r) { route(); showCreds("Cuenta creada — " + s.full_name, em, r); });
+      }).then(function () { toast("Cuenta creada."); route(); });
     }, "Crear cuenta");
   }
 
@@ -1192,7 +1175,7 @@
     });
   }
 
-  /* ============ SEGURIDAD (mi cuenta) ============ */
+  /* ============ SEGURIDAD (mi cuenta) — en pausa, ver estado.md ============ */
   // Inscribe un TOTP dentro de un modal (no usa la toma de pantalla completa de LEFSec).
   function enrollMfaModal(onDone) {
     window.LEFSec.clearUnverified(sb).then(function () {
@@ -1327,20 +1310,21 @@
     bar.querySelector("[data-new]").onclick = function () {
       q("teachers").select("id,full_name").eq("active", true).then(function (tr) {
         var teachers = tr.data || [];
+        var pwd = "lef" + Math.random().toString(36).slice(2, 10);
         var b = h("<div>" +
           field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
           field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
+          field("Contraseña temporal", '<input name="p" value="' + pwd + '">') +
           field("Vincular a profesor (opcional)", '<select name="t"><option value="">—</option>' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
-          '<p class="pnl-sub">Se enviará un correo con el usuario y una contraseña temporal. La persona creará su contraseña personal al entrar. Los administradores además deben configurar verificación en dos pasos en el primer ingreso.</p>' +
           "</div>");
         modal("Nueva cuenta de staff", b, function () {
-          var em = b.querySelector("[name=e]").value.trim();
           return callFn({
             action: "create_account", role: b.querySelector("[name=r]").value,
             full_name: b.querySelector("[name=n]").value.trim(),
-            email: em,
+            email: b.querySelector("[name=e]").value.trim(),
+            password: b.querySelector("[name=p]").value,
             teacher_id: b.querySelector("[name=t]").value || null
-          }).then(function (r) { load(); showCreds("Cuenta creada", em, r); });
+          }).then(function () { toast("Cuenta creada."); load(); });
         }, "Crear");
       });
     };
@@ -1384,16 +1368,17 @@
           var cell = tr.children[5];
           if (r.kind === "profesor-sin-cuenta") {
             cell.appendChild(btn("Crear cuenta", "btn-blue", function () {
+              var pwd = "lef" + Math.random().toString(36).slice(2, 10);
               var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name) + '">') +
                 field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
-                '<p class="pnl-sub">Se enviará un correo con el usuario y una contraseña temporal. Creará su contraseña personal al entrar.</p></div>');
+                field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + "</div>");
               modal("Crear cuenta — " + r.name, b, function () {
-                var em = b.querySelector("[name=e]").value.trim();
                 return callFn({
                   action: "create_account", role: "teacher",
                   full_name: b.querySelector("[name=n]").value.trim(),
-                  email: em, teacher_id: r.teacher_id
-                }).then(function (rr) { load(); showCreds("Cuenta creada — " + r.name, em, rr); });
+                  email: b.querySelector("[name=e]").value.trim(),
+                  password: b.querySelector("[name=p]").value, teacher_id: r.teacher_id
+                }).then(function () { toast("Cuenta creada."); load(); });
               }, "Crear");
             }));
             t.body.appendChild(tr); return;
