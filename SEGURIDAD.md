@@ -49,16 +49,21 @@ Fecha de este plan: 6 de septiembre de 2026.
 
 ---
 
-## PASO 3 — 👤 Aplicar las dos migraciones SQL
+## PASO 3 — 👤 Aplicar las migraciones SQL
 
 Como siempre: SQL Editor de <https://supabase.com/dashboard> (proyecto
 `lef-center-prod`) o el script Node. **En este orden**:
 
 1. `supabase/migrations/20260906120000_seguridad_profiles_rls.sql`
 2. `supabase/migrations/20260906130000_seguridad_cuentas.sql`
+3. `supabase/migrations/20260906140000_preinscripciones.sql`
+   *(cambio del formulario público → lista de "Pre-inscritos"; ver estado.md §📋.
+   No es de seguridad, pero se aplica en el mismo lote y debe ir antes del deploy.)*
 
 > Después de aplicar la 1ª, la **subida de foto de perfil** del portal deja de
 > funcionar hasta que se despliegue el frontend nuevo (PASO 5). Es solo la foto.
+> Después de la 3ª, el formulario público necesita el frontend nuevo (PASO 5)
+> para funcionar — hasta entonces daría error al enviar.
 
 Avísale a Claude cuando estén aplicadas.
 

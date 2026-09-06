@@ -6,7 +6,8 @@ de privilegios crítica en RLS de `profiles`; MFA de admin, CAPTCHA, contraseña
 auditoría. (2) **Formulario público → pre-inscripciones** (sección 📋): el formulario ya no
 crea estudiantes; guarda solicitudes que el admin revisa y convierte. Ambos necesitan que el
 usuario aplique migraciones a mano + (para el login) configure Resend/Turnstile/panel de
-Supabase, y que Claude despliegue. Commit WIP `3d737a4` (login) — el de pre-inscripciones va aparte.
+Supabase, y que Claude despliegue. Commits `3d737a4` (login) y `c3167b6` (pre-inscripciones),
+**pusheados a `origin/main` pero SIN desplegar** — el sitio en vivo sigue igual.
 
 **Wompi Fase 1 (sandbox) funcionando de punta
 a punta**: migración del portal aplicada (HTTP 201), llaves sandbox configuradas, webhook
@@ -272,12 +273,17 @@ Guía operativa completa y checklist paso a paso: **`SEGURIDAD.md`** (en la raí
 - `supabase-config.js` — `window.LEF_AUTH_CONFIG.turnstileSiteKey` (vacío por ahora).
 - `login.html` / `portal.html` / `admin.html` — cargan `lef-security.js` (+ Turnstile en login).
 
-**Falta (del usuario):** cuenta Resend + DNS del dominio, clave Turnstile, aplicar
-las 2 migraciones, ajustes del panel de Supabase (registro público OFF, leaked
-password ON, política 12, MFA TOTP on, sesiones, JWT 1800s, CAPTCHA secret, SMTP
-Resend, rate limits). **Falta (de Claude):** `supabase secrets set` con las llaves,
-deploy de frontend + `manage-users` + `wompi-checkout`, poner la site key y redeploy.
-Todo el orden exacto está en `SEGURIDAD.md`.
+**Para retomar (todo el detalle y orden en `SEGURIDAD.md`):**
+
+_Usuario:_ (1) cuenta Resend + registros DNS de `lefcenter.com` + API key; (2) widget
+Cloudflare Turnstile → site key + secret key; (3) aplicar **las 3 migraciones** a mano en
+orden: `20260906120000` → `20260906130000` → `20260906140000`; (4) ajustes del panel de
+Supabase: registro público OFF, leaked password ON, política 12, MFA TOTP on, sesiones,
+JWT 1800s, CAPTCHA secret, SMTP Resend, rate limits; (5) probar (checklist PASO 8); (6) commit.
+
+_Claude:_ (7) `supabase secrets set` (RESEND_API_KEY, RESEND_FROM, ALLOWED_ORIGINS,
+LEF_LOGIN_URL); (8) deploy de frontend + `manage-users` + `wompi-checkout`; (9) poner
+`turnstileSiteKey` en `supabase-config.js` y redeploy.
 
 **Decisiones tomadas:** MFA obligatorio solo admin (profesores opcional desde su
 sección Seguridad); el correo de alta lleva contraseña temporal en texto plano a
