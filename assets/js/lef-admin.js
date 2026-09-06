@@ -47,8 +47,8 @@
     }).join("") + "</select>";
   }
   var ROLE_ES = { admin: "Administrador", teacher: "Profesor", student: "Estudiante" };
-  var ENROLL_STATUS = ["Pending", "Contacted", "Confirmed", "Paid", "Cancelled"];
-  var ENROLL_ES = { Pending: "Nueva", Contacted: "Contactada", Confirmed: "Confirmada", Paid: "Pagada", Cancelled: "Cancelada" };
+  var ENROLL_STATUS = ["PendingPayment", "Active", "Cancelled"];
+  var ENROLL_ES = { PendingPayment: "Pendiente de pago", Active: "Activo", Cancelled: "Cancelada" };
 
   function toast(msg, kind) {
     var t = h('<div class="pnl-alert ' + (kind || "ok") + '" style="position:fixed;right:20px;bottom:20px;z-index:80;max-width:360px;box-shadow:0 8px 24px rgba(0,0,0,.15)">' + esc(msg) + "</div>");
@@ -281,15 +281,15 @@
       var preCount = isAdmin ? (res[6] && res[6].count) || 0 : 0;
 
       var activos = enr.filter(function (e) { return e.status !== "Cancelled"; });
-      var nuevas = enr.filter(function (e) { return e.status === "Pending"; }).length;
-      // "Pendiente" = suscripción activa que todavía no tiene ningún pago confirmado.
+      var nuevas = enr.filter(function (e) { return e.status === "PendingPayment"; }).length;
+      // "Pendiente" (suscripción) = suscripción activa que todavía no tiene ningún pago confirmado.
       var pendientes = billing.filter(function (b) { return b.status === "active" && !b.last_payment_at; }).length;
       var alDia = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && !b.is_overdue; }).length;
       var mora = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && b.is_overdue; }).length;
       var congeladas = billing.filter(function (b) { return b.status === "frozen"; }).length;
 
       var tiles = [["Estudiantes", studentCount], ["Profesores", teacherCount],
-        ["Inscripciones activas", activos.length], ["Inscripciones nuevas", nuevas]];
+        ["Inscripciones activas", activos.length], ["Inscripciones sin pago", nuevas]];
       if (isAdmin) {
         tiles.push(["Pre-inscritos", preCount]);
         tiles.push(["Pendientes", pendientes]); tiles.push(["Al día", alDia]);
@@ -416,24 +416,28 @@
       var mods = res[3];
       if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
 
-      var t = tableWrap(["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
+      var t = tableWrap(["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
       (res[0].data || []).forEach(function (s) {
         var prof = profByStudent[s.id];
         var enr = modByStudent[s.id];
         var modLabel = enr && enr.modules ? enr.modules.level + " · " + enr.modules.title : "—";
         var modColorDot = enr && enr.modules ? '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(enr.modules.module_number) + '"></span>' : "";
+        var enrBadge = !enr ? "—" : enr.status === "Active" ? '<span class="badge ok">activo</span>'
+          : enr.status === "PendingPayment" ? '<span class="badge warn">pendiente de pago</span>'
+          : '<span class="badge neutral">' + esc(ENROLL_ES[enr.status] || enr.status) + "</span>";
         var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
           : prof.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
         var tr = h([
           "<tr><td>", esc(s.full_name), "</td>",
           "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
           "<td>", modColorDot, esc(modLabel), "</td>",
+          "<td>", enrBadge, "</td>",
           "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
           "<td>", esc(s.city || "—"), "</td>",
           "<td>", estado, (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : ""), "</td>",
           '<td class="acts"></td></tr>'
         ].join(""));
-        var cell = tr.children[7];
+        var cell = tr.children[8];
         if (ME.role === "admin") {
           if (!prof) cell.appendChild(btn("Crear cuenta de portal", "btn-blue", function () { crearCuentaEstudiante(s); }));
           else {
@@ -448,7 +452,7 @@
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="8" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="9" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
@@ -513,6 +517,7 @@
     if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
     var defaultMod = (p.desired_module_id && mods.some(function (m) { return m.id === p.desired_module_id; }))
       ? p.desired_module_id : mods[0].id;
+    var pwd = "lef" + Math.random().toString(36).slice(2, 10);
     var b = h("<div>" +
       '<p class="pnl-sub" style="margin-bottom:10px">Solicitud de <strong>' + esc(p.full_name) + "</strong><br>" +
       esc(p.whatsapp) + " · " + esc(p.email) + (p.age ? " · " + esc(p.age) + " años" : "") + (p.city ? " · " + esc(p.city) : "") + "</p>" +
@@ -520,7 +525,8 @@
       field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
       field("Módulo", moduleSelect("mod", mods, defaultMod)) +
       field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
-      '<p class="pnl-sub">Se crea el estudiante y su inscripción (con cupo, grupo y matrícula). La cuenta de portal se crea después, desde la lista de estudiantes.</p>' +
+      field("Contraseña temporal del portal", '<input name="pw" value="' + pwd + '">') +
+      '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>) y su cuenta de portal, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que ingrese y pague.</p>' +
       "</div>");
     var schSel = b.querySelector("[name=sch]");
     function loadSch(moduleId) {
@@ -544,6 +550,7 @@
     modal("Crear estudiante desde la solicitud", b, function () {
       var dn = b.querySelector("[name=dn]").value.trim();
       if (!dn) throw new Error("El número de documento es obligatorio.");
+      var accountPwd = b.querySelector("[name=pw]").value;
       return rpc("admin_convert_preinscripcion", {
         p_id: p.id,
         p_module_id: b.querySelector("[name=mod]").value,
@@ -554,8 +561,24 @@
         p_city: p.city || null
       }).then(function (out) {
         var row = Array.isArray(out) ? out[0] : out;
-        toast("Estudiante creado · matrícula " + (row && row.registration_number ? row.registration_number : ""));
-        route();
+        return callFn({
+          action: "create_account", role: "student",
+          full_name: p.full_name, email: p.email,
+          password: accountPwd, student_id: row.student_id
+        }).then(function () {
+          route();
+          var info = h("<div>" +
+            '<p class="pnl-sub" style="margin-bottom:8px">Matrícula <strong>' + esc(row.registration_number) +
+            '</strong> creada — inscripción en <strong>pendiente de pago</strong>.</p>' +
+            '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(p.email) + "</strong><br>" +
+            'Contraseña temporal: <code style="font-size:14px">' + esc(accountPwd) + "</code></p>" +
+            '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se registre su primer pago.</p></div>');
+          modal("Estudiante creado", info, function () { return Promise.resolve(); }, "Entendido");
+        }).catch(function (accErr) {
+          route();
+          toast("Se creó la matrícula " + row.registration_number + ", pero la cuenta de portal falló (" +
+            friendly(accErr) + "). Créala desde Estudiantes con “Crear cuenta de portal”.", "err");
+        });
       });
     }, "Crear estudiante");
   }
