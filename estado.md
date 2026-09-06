@@ -3,8 +3,11 @@
 **Wompi en PRODUCCIÓN desde el 6 sep 2026 — los pagos ya son reales.** Llaves `pub_prod_...`
 configuradas, URL de eventos registrada por el usuario en el ambiente de producción de
 Wompi, Edge Functions redesplegadas. Portal del estudiante muestra Nivel + módulo + barra
-de progreso del ciclo (migración `20260906170000` aplicada y desplegado). Pendiente: borrar
-los datos de facturación de prueba (Ana Gómez, pagos de sandbox) — en curso.
+de progreso del ciclo (migración `20260906170000`). Panel admin tiene **Registro de
+eventos** + el admin ya puede editar/eliminar pagos y suscripciones con motivo obligatorio
+(migración `20260906180000`, ambas aplicadas y desplegadas). **Datos de prueba borrados**
+(Ana Gómez + Jorge Rada, con un script aparte que no pasa por el Registro de eventos — ver
+sección 💳 Wompi más abajo). La base queda lista para el primer pago real.
 
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
@@ -212,15 +215,16 @@ Fase 1 — estado:
    vía `subscriptions.monthly_amount`), día de cobro, días de gracia (`billing_day`/
    `grace_days` en `subscriptions` ya existen, solo falta la automatización).
 
-### Datos de prueba en Supabase (borrar cuando entren los reales)
+### Datos de prueba en Supabase
+- ✅ **Ana Gómez Prueba** y **Jorge Rada** (estudiantes/pagos de sandbox) — **borrados el
+  6 sep 2026**, antes del primer pago real, con un script SQL de una sola vez que el usuario
+  corrió a mano (apagó el trigger `trg_payments_immutable`, borró pagos/suscripción/
+  inscripción/estudiante/cuenta de portal de ambos, y volvió a prender el trigger). A
+  propósito no pasó por `admin_delete_payment`/`admin_delete_subscription` (que sí dejan
+  huella en `audit_log`) porque era limpieza de arranque, no una corrección real — el
+  Registro de eventos queda limpio para la entrega al cliente.
 - Profesores: María Rada, Luis Caballero, Daniela Ospino
 - Ciclo abierto "Sep - Oct 2026" + 5 horarios/grupos (A1.1 ×2, A1.3, A2.1, B1.1)
-- Estudiante demo: **Ana Gómez Prueba** (`ana.prueba@lef-test.com` / `AnaDemo2026!`) —
-  matrícula LEF-2026-00001, módulo A1.1, cuenta de portal activa, suscripción $180.000 con 1 pago.
-  Tras `20260827240000` su documento quedó como `CC PENDIENTE` (backfill) — editarlo.
-- Estudiante **Jorge Rada** (`jorgeradash@gmail.com`) — creado por el cliente probando el panel;
-  quedó **sin módulo** (se creó antes de la migración `20260827210000`). Editarlo y asignarle
-  módulo para que entre al conteo, o borrarlo.
 - Semilla: `supabase/seed_demo.sql`. Todo borrable desde el panel (Académico / Estudiantes / Usuarios).
 - Contraseña temporal del admin: `.env` → `ADMIN_TEMP_PASSWORD` (cambiar en la entrega).
 
@@ -351,6 +355,56 @@ LEF_LOGIN_URL); (8) deploy de frontend + `manage-users` + `wompi-checkout`; (9) 
 sección Seguridad); el correo de alta lleva contraseña temporal en texto plano a
 propósito (flujo pedido), acotado con cambio obligatorio en el primer ingreso;
 Resend y Turnstile (ambos gratis) confirmados por el usuario.
+
+## 💳 Wompi en producción + facturación con nivel/progreso + Registro de eventos (6 sep 2026)
+
+**Wompi pasó a producción.** Llaves reales (`pub_prod_...`, `prod_integrity_...`,
+`prod_events_...`) configuradas como secrets de Supabase el 6 sep 2026; `wompi-checkout`
+y `wompi-webhook` redesplegadas. El código no tenía nada sandbox-específico (la firma y
+verificación no dependen del ambiente, solo de qué llave se usa), así que no hubo que
+tocar nada más. El usuario registró la URL de eventos en el ambiente de Producción de
+Wompi (dashboard de Wompi, aparte del de Sandbox). **A partir de ahora los pagos son reales.**
+
+**Portal del estudiante — Nivel + módulo + progreso** (migración `20260906170000`):
+"Mi curso" muestra un bloque grande con el Nivel (ej. "A1", extraído de "A1.1"), el módulo
+activo, su descripción, y una barra de progreso calculada en el cliente con las fechas de
+inicio/fin del Ciclo (`cycles.start_date/end_date`) de la inscripción. Facturación muestra
+el mismo bloque grande con nivel + módulo + precio cuando la suscripción tiene módulo.
+`get_my_course()` y `get_my_billing()` se ampliaron para devolver esos datos.
+
+**Crear estudiante genera la mensualidad sola:** al convertir una pre-inscripción, además
+del estudiante + inscripción + cuenta de portal, se crea la suscripción (297.500 COP por
+defecto, editable, pagador = el estudiante salvo que se corrija después) — ya no hace
+falta el paso aparte en Pagos → Nueva suscripción, y desaparece el mensaje "aún no tienes
+mensualidad asignada" para los estudiantes nuevos.
+
+**Registro de eventos + pagos ya editables/borrables** (migración `20260906180000`):
+antes los pagos eran inmutables al 100% (trigger `trg_payments_immutable`, ni el admin
+podía tocar uno mal capturado — solo "Reversar"). Pedido del usuario: que sí se pueda
+corregir/borrar, pero con motivo obligatorio y dejando registro permanente ANTES de tocar
+el dato, en una tabla `audit_log` que **nadie puede editar ni borrar, ni el admin** (RLS
+solo permite SELECT a admin; se llena únicamente desde funciones `SECURITY DEFINER`).
+- Nueva pestaña **"Registro de eventos"** (solo admin): fecha, quién, acción, motivo,
+  detalle en JSON.
+- En "Ver pagos": cada pago tiene **Editar** y **Eliminar** (antes solo "Reversar"), ambos
+  piden motivo. "Eliminar suscripción" también pide motivo ahora
+  (`admin_delete_subscription` en vez de un DELETE directo del cliente).
+- El trigger de inmutabilidad se relajó solo para estas funciones vetadas
+  (`current_setting('lef.allow_admin_payment_edit')`) — un DELETE/UPDATE directo por fuera
+  de ellas sigue bloqueado.
+- **Limpieza de datos de prueba** (Ana Gómez, Jorge Rada): se hizo con un script SQL aparte
+  que el usuario corrió a mano, apagando el trigger un momento — a propósito NO pasó por
+  `admin_delete_payment` para no dejar huella de "actividad de prueba" en el Registro de
+  eventos que se entrega al cliente. Ver detalle en "Datos de prueba en Supabase" más abajo.
+
+**Pendiente (más grande, sin empezar):** que el sistema avance solo al siguiente módulo
+cuando el Ciclo actual vence (marcando el anterior "completado" con chulo verde en "Mis
+cursos"). El usuario confirmó que el reloj es el Ciclo de 2 meses que ya existe en
+Académico. Falta diseñar el historial de módulos completados sin romper las funciones que
+hoy asumen una sola inscripción "actual" por estudiante (dashboard, conteos de cupos,
+`get_my_course`, etc.) — probablemente una fila de `enrollments` nueva por módulo en vez
+de mutar la actual, lo cual toca bastantes queries. Retomar con cuidado, no fue parte de
+esta sesión.
 
 ## Qué es esto
 
