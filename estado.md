@@ -1,28 +1,54 @@
 # Estado del proyecto — Landing LEF
 
-**Wompi en PRODUCCIÓN desde el 6 sep 2026 — los pagos ya son reales.** Llaves `pub_prod_...`
-configuradas, URL de eventos registrada por el usuario en el ambiente de producción de
-Wompi, Edge Functions redesplegadas. Portal del estudiante muestra Nivel + módulo + barra
-de progreso del ciclo (migración `20260906170000`). Panel admin tiene **Registro de
-eventos** + el admin ya puede editar/eliminar pagos y suscripciones con motivo obligatorio
-(migración `20260906180000`, ambas aplicadas y desplegadas). **Datos de prueba borrados**
-(Ana Gómez + Jorge Rada, con un script aparte que no pasa por el Registro de eventos — ver
-sección 💳 Wompi más abajo). La base queda lista para el primer pago real. Académico →
-Grupos ahora deja asignar estudiantes a un grupo específico a mano (migración
-`20260906190000`, aplicada y desplegada) — botón "Estudiantes" por grupo, con "libres del
-módulo" para unir y "en el grupo" para quitar, respetando el cupo. Portal del estudiante:
-arreglado el encabezado superpuesto en pantallas angostas (el avatar tapaba el nombre
-cuando envolvía a 2 líneas — ahora el nombre trunca) y agregado un selector de 6 avatares
-de caricatura (3 M / 3 F, ilustraciones propias en `assets/avatars/`) como alternativa a
-subir foto propia en "Mi cuenta". Todo desplegado (commit `14cbfe0`).
+## Estado al cerrar esta sesión larga (6 sep 2026) — Wompi en producción + varias mejoras
 
-✅ **Cerrada la escalada de privilegios en `profiles`** (migración `20260906200000`,
-aplicada y desplegada) — pieza aislada del endurecimiento del login (que sigue en pausa),
-adelantada porque bloqueaba construir "Mi cuenta" del admin de forma segura. Ya no se
-puede hacer `update profiles set role='admin'` desde el cliente. Nueva pestaña **Mi
-cuenta** para el admin: foto (subir o elegir un dibujo, mismo selector del portal),
-nombre, correo (vía `manage-users`) y contraseña. El header del panel admin ahora
-también muestra el avatar.
+**✅ Wompi en PRODUCCIÓN — los pagos ya son reales.** Llaves `pub_prod_...` configuradas,
+URL de eventos registrada por el usuario en el ambiente de producción de Wompi, Edge
+Functions redesplegadas. Sin nada sandbox-específico en el código, solo cambiaron las
+llaves. Datos de prueba (Ana Gómez, Jorge Rada) borrados de pagos/suscripciones.
+
+**✅ Todo lo siguiente aplicado y desplegado hoy** (migraciones `20260906140000` a
+`20260906200000`, todas aplicadas por el usuario vía SQL Editor):
+- Formulario público → **pre-inscripciones**: ya no crea estudiantes directo, el admin
+  contacta y convierte desde el panel.
+- Nivel y franja horaria del formulario público son **solo indicadores** (autoevaluación
+  Principiante/Intermedio/Avanzado + preferencia Mañana/Tarde/Noche), no seleccionan
+  módulo/horario real — eso lo define el admin en la conversación.
+- "Crear estudiante" desde una solicitud crea en un solo paso: estudiante + inscripción
+  (**pendiente de pago**) + cuenta de portal + **mensualidad automática** (297.500 COP,
+  editable). La inscripción pasa sola a **activo** con el primer pago (manual o Wompi).
+- **Registro de eventos** (pestaña nueva, solo admin): el admin ya puede editar/eliminar
+  pagos y suscripciones (antes eran 100% inmutables) pero solo con motivo obligatorio,
+  que queda anotado ahí — nadie, ni el admin, puede tocar ese registro.
+- Académico → Grupos: botón **"Estudiantes"** por grupo para asignar a mano qué
+  estudiantes de un módulo entran a cada grupo (útil cuando hay más de 8 esperando cupo).
+- Portal del estudiante: "Mi curso" y Facturación muestran **Nivel + módulo + progreso /
+  precio** en grande; barra de progreso según las fechas del Ciclo.
+- **Cerrada la escalada de privilegios en `profiles`** (cualquiera podía auto-promoverse a
+  admin) — pieza aislada del endurecimiento del login, adelantada porque hacía falta para
+  lo siguiente sin repetir el patrón inseguro.
+- **Pestaña "Mi cuenta" para el admin**: foto (subir o elegir uno de 6 avatares de
+  caricatura originales, siempre visibles, sin botón para desplegarlos), nombre, correo,
+  contraseña. Mismo selector de avatares ya estaba en el portal del estudiante; de paso se
+  arregló ahí un encabezado que se superponía en pantallas angostas con nombres largos.
+
+**⏳ Pendiente (por orden de lo que se habló hoy):**
+1. **Progresión automática de módulos** — que al vencer el Ciclo actual (2 meses,
+   Académico), el sistema marque el módulo anterior como completado (chulo verde en "Mis
+   cursos") y active el siguiente solo. Confirmado que el reloj es el Ciclo existente, pero
+   falta diseñar el historial de módulos completados sin romper las funciones que hoy
+   asumen "una sola inscripción actual por estudiante" (dashboard, conteo de cupos,
+   `get_my_course`). No empezado a propósito — se pospuso para hacer antes los ajustes
+   visuales de esta sesión.
+2. **"¿Olvidaste tu contraseña?"** en el login — el usuario prefiere esperar a tener el
+   envío de correo configurado antes de construirlo (no depende de Resend/Turnstile
+   técnicamente, pero así lo pidió).
+3. **Endurecimiento del login** (MFA admin, CAPTCHA, contraseñas por correo) — sigue en
+   pausa esperando que el usuario cree las cuentas de Resend y Cloudflare Turnstile. Ver
+   sección 🔐 más abajo, incluye una nota importante sobre un choque de esquema en
+   `audit_log` que hay que resolver antes de retomarlo.
+4. **Probar un pago real de punta a punta** en Wompi producción (el sandbox ya se probó
+   completo; producción todavía no se ha probado con una transacción real).
 
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
