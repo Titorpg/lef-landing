@@ -468,6 +468,7 @@
     main.innerHTML = "";
     Promise.all([
       q("preinscripciones").select("*, modules(level,title,module_number), schedules(days,start_time,end_time)")
+        .neq("status", "convertido")
         .order("created_at", { ascending: false }),
       activeModules()
     ]).then(function (res) {
@@ -501,8 +502,6 @@
                   .then(function (u) { if (u.error) throw u.error; toast("Solicitud descartada."); route(); });
               });
           }));
-        } else if (p.status === "convertido") {
-          cell.innerHTML = '<span class="muted">estudiante creado</span>';
         } else if (p.status === "descartado") {
           cell.innerHTML = '<span class="muted">—</span>';
         }
