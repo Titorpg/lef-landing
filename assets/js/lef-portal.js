@@ -314,10 +314,10 @@
       '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">' +
       '<img data-avatar-preview src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--niebla)">' +
       '<div><label class="fld" style="margin-bottom:6px"><span>Foto de perfil</span><input type="file" accept="image/*" data-avatar-input></label>' +
-      '<button type="button" class="link" data-avatar-toggle style="font-size:13px">O elegí un dibujo</button>' +
       '<p class="muted" data-avatar-msg style="font-size:12.5px"></p></div>' +
       "</div>" +
-      '<div data-avatar-gallery hidden style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">' +
+      '<p class="muted" style="font-size:12.5px;margin:14px 0 8px">O tocá un dibujo:</p>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
       AVATAR_GALLERY.map(function (src) {
         return '<img data-avatar-pick src="' + src + '" alt="" style="width:52px;height:52px;border-radius:50%;cursor:pointer;border:2px solid transparent">';
       }).join("") +
@@ -337,9 +337,6 @@
       });
     }
 
-    avatarBox.querySelector("[data-avatar-toggle]").addEventListener("click", function () {
-      avatarBox.querySelector("[data-avatar-gallery]").hidden = !avatarBox.querySelector("[data-avatar-gallery]").hidden;
-    });
     avatarBox.querySelectorAll("[data-avatar-pick]").forEach(function (img) {
       img.addEventListener("click", function () {
         var msg = avatarBox.querySelector("[data-avatar-msg]");
