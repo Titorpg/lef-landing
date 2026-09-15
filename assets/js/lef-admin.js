@@ -29,7 +29,6 @@
   function days(arr) { return (arr || []).map(function (d) { return DAY_ES[d] || d; }).join(" "); }
   function time(t) { if (!t) return ""; var p = t.split(":"); var hh = +p[0]; return (hh % 12 || 12) + ":" + p[1] + (hh >= 12 ? "pm" : "am"); }
   var MONTHS_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  function lastDay(y, m0) { return new Date(y, m0 + 1, 0).getDate(); }
   function ymd(y, m0, d) { return y + "-" + String(m0 + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0"); }
 
   // Un color fijo por módulo (module_number 1..12). A1.1 = azul de marca.
@@ -1210,43 +1209,40 @@
   }
 
   /* ---- Ciclos ---- */
-  function periodOptions() {
-    var out = [], now = new Date();
-    for (var i = 0; i < 24; i++) {
-      var a = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      var b = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
-      var label = a.getFullYear() === b.getFullYear()
-        ? MONTHS_ABBR[a.getMonth()] + "-" + MONTHS_ABBR[b.getMonth()] + " " + b.getFullYear()
-        : MONTHS_ABBR[a.getMonth()] + " " + a.getFullYear() + " - " + MONTHS_ABBR[b.getMonth()] + " " + b.getFullYear();
-      out.push({
-        label: label,
-        value: a.getFullYear() + "-" + String(a.getMonth() + 1).padStart(2, "0") + "|" +
-               b.getFullYear() + "-" + String(b.getMonth() + 1).padStart(2, "0")
-      });
-    }
-    return out;
+  function periodLabel(sVal, eVal) {
+    if (!sVal || !eVal) return "";
+    var s = sVal.split("-"), e = eVal.split("-");
+    var sy = +s[0], sm = +s[1] - 1, ey = +e[0], em = +e[1] - 1;
+    return sy === ey
+      ? MONTHS_ABBR[sm] + "-" + MONTHS_ABBR[em] + " " + ey
+      : MONTHS_ABBR[sm] + " " + sy + " - " + MONTHS_ABBR[em] + " " + ey;
   }
   function cycleForm(c) {
-    var opts = periodOptions();
+    var now = new Date(), todayStr = ymd(now.getFullYear(), now.getMonth(), now.getDate());
     var b = h("<div>" +
-      field("Periodo", '<select name="p">' + opts.map(function (o) {
-        return '<option value="' + o.value + '"' + (c && c.name === o.label ? " selected" : "") + ">" + esc(o.label) + "</option>";
-      }).join("") + "</select>") +
-      field("Fecha de inicio (mes 1 del periodo)", '<input name="s" type="date">') +
-      field("Fecha de fin (mes 2 del periodo)", '<input name="e" type="date">') +
+      field("Periodo", '<input name="p" type="text" readonly>') +
+      field("Fecha de inicio", '<input name="s" type="date" min="' + todayStr + '">') +
+      field("Fecha de fin", '<input name="e" type="date" min="' + todayStr + '">') +
       (c ? field("Estado", '<select name="st"><option value="Open">Abierto</option><option value="Closed">Cerrado</option></select>') : "") +
       "</div>");
-    var sel = b.querySelector("[name=p]"), si = b.querySelector("[name=s]"), ei = b.querySelector("[name=e]");
-    function applyPeriod() {
-      var parts = sel.value.split("|"), a = parts[0].split("-"), z = parts[1].split("-");
-      var ay = +a[0], am = +a[1] - 1, zy = +z[0], zm = +z[1] - 1;
-      si.min = ymd(ay, am, 1); si.max = ymd(ay, am, lastDay(ay, am));
-      ei.min = ymd(zy, zm, 1); ei.max = ymd(zy, zm, lastDay(zy, zm));
-      si.value = (c && c.start_date && c.start_date >= si.min && c.start_date <= si.max) ? c.start_date : si.min;
-      ei.value = (c && c.end_date && c.end_date >= ei.min && c.end_date <= ei.max) ? c.end_date : ei.max;
+    var pInput = b.querySelector("[name=p]"), si = b.querySelector("[name=s]"), ei = b.querySelector("[name=e]");
+    function updatePeriod() { pInput.value = periodLabel(si.value, ei.value); }
+    function onStartChange() {
+      if (si.value < todayStr) si.value = todayStr;
+      ei.min = si.value > todayStr ? si.value : todayStr;
+      if (ei.value && ei.value < ei.min) ei.value = ei.min;
+      updatePeriod();
     }
-    sel.addEventListener("change", applyPeriod);
-    applyPeriod();
+    si.addEventListener("change", onStartChange);
+    ei.addEventListener("change", function () {
+      if (ei.value < ei.min) ei.value = ei.min;
+      updatePeriod();
+    });
+    si.value = (c && c.start_date) ? c.start_date : todayStr;
+    ei.min = si.value > todayStr ? si.value : todayStr;
+    ei.value = (c && c.end_date) ? c.end_date : todayStr;
+    if (ei.value < ei.min) ei.value = ei.min;
+    updatePeriod();
     if (c && c.status) b.querySelector("[name=st]").value = c.status;
     return b;
   }
@@ -1258,7 +1254,7 @@
       var b = cycleForm(null);
       modal("Nuevo ciclo", b, function () {
         return q("cycles").insert({
-          name: b.querySelector("[name=p]").selectedOptions[0].textContent,
+          name: b.querySelector("[name=p]").value,
           start_date: b.querySelector("[name=s]").value, end_date: b.querySelector("[name=e]").value, status: "Open"
         }).then(function (i) { if (i.error) throw i.error; toast("Ciclo creado."); acCiclos(box); });
       });
@@ -1277,7 +1273,7 @@
           var b = cycleForm(c);
           modal("Editar ciclo", b, function () {
             return q("cycles").update({
-              name: b.querySelector("[name=p]").selectedOptions[0].textContent,
+              name: b.querySelector("[name=p]").value,
               start_date: b.querySelector("[name=s]").value, end_date: b.querySelector("[name=e]").value,
               status: b.querySelector("[name=st]").value
             }).eq("id", c.id).then(function (u) { if (u.error) throw u.error; toast("Ciclo actualizado."); acCiclos(box); });
