@@ -1,5 +1,51 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 15 sep 2026 — ajustes al panel admin (Profesores/Horarios/Usuarios/Dashboard)
+
+**✅ Desplegado (commit `8db9080`, deploy `dpl_5WakBu4P5wrp2RikXEqpedRW2oSW`):**
+1. **Académico > Profesores**: ya no se crean profesores desde aquí (se quitó
+   "+ Profesor" — se dan de alta desde **Usuarios > + Cuenta de staff**); solo se
+   visualizan y se corrigen sus datos (Editar/Activar/Eliminar se mantienen). Columna
+   nueva **"Grupos activos"** con el conteo; al hacer click muestra un detalle por
+   grupo (módulo, ciclo, horario, cupo, lista de estudiantes) — reutiliza la misma
+   información que ya vive en Académico > Grupos.
+2. **Académico > Horarios**: botón **Editar** nuevo (antes solo Activar/Eliminar) —
+   cambia ciclo, módulo, días y horas de un horario ya creado.
+3. **Usuarios**: botones **Editar** (nombre/correo) y **Restablecer contraseña**
+   nuevos por cuenta (antes solo cambiar rol/activar/eliminar). Editar usa una acción
+   nueva `update_profile` en la Edge Function `manage-users`.
+4. **`manage-users` (Edge Function) revertida a la versión realmente desplegada** +
+   `update_profile`: el archivo en el repo tenía desde el 6 sep la versión del
+   endurecimiento de login (`must_change_password`, envío por Resend, `audit_log`)
+   que **nunca se desplegó** (esa migración sigue pausada — ver sección 🔐). Si se
+   hubiera desplegado tal cual con mi cambio encima, se habría roto la creación/reset
+   de cualquier cuenta (columna `must_change_password` inexistente en producción).
+   Se restauró la versión vieja (contraseña generada en el navegador, sin Resend/
+   audit_log — la que de verdad corre hoy) y se le agregó solo `update_profile`.
+   **La versión nueva con endurecimiento sigue intacta en git** (commit `3d737a4`,
+   recuperable cuando se retome ese frente con Resend/Turnstile configurados).
+5. **Bug encontrado y corregido: recibo vacío en pagos de Wompi.** `record_payment`
+   (pago manual) sí asigna `next_receipt_number()` desde el libro contable; a
+   `record_wompi_payment` (el que usa `wompi-webhook` para pagos en línea) se le
+   olvidó esa línea desde que se creó — por eso "Recibo" siempre salía "—" para
+   pagos hechos con Wompi, incluido el primer pago real de producción.
+   **⏳ Pendiente que el usuario aplique a mano** (SQL Editor de Supabase, igual que
+   siempre — Claude no puede aplicar migraciones):
+   `supabase/migrations/20260915120000_recibo_wompi.sql` — corrige la función +
+   backfill del recibo del pago real que ya existe (queda `REC-2026-00006`, el
+   contador ya iba en 6 por los pagos de prueba borrados).
+
+**Diagnóstico (no es bug de código) — "una transacción sin fecha de último pago":**
+revisando la BD en vivo encontré que el estudiante del primer pago real tiene
+**dos suscripciones activas**: una de
+$20.000 (creada 8 sep 02:29, con el único pago real registrado, `REC-...00006` tras
+el backfill) y otra de $200.000 (creada 8 sep 03:23, **sin ningún pago**). La fila sin
+pago es la que sale "—" en "Último pago" en Pagos — es correcto que salga vacía
+(nunca se le ha registrado un pago), el problema es que **hay dos suscripciones para
+la misma persona** y no debería. Probablemente quedó de las pruebas de pago real del
+7-8 sep. **Falta decidir con el usuario** cuál de las dos es la correcta y eliminar
+la otra desde Pagos > Eliminar (pide motivo, queda en el Registro de eventos).
+
 ## Estado al cerrar esta sesión larga (6 sep 2026) — Wompi en producción + varias mejoras
 
 **✅ Wompi en PRODUCCIÓN — los pagos ya son reales.** Llaves `pub_prod_...` configuradas,
