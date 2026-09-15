@@ -796,7 +796,9 @@
           var estado = p.status === "refunded" ? '<span class="badge neutral">reverso</span>'
             : isReversed ? '<span class="badge warn">reversado</span>'
             : '<span class="badge ok">' + esc(PAYST_ES[p.status] || p.status) + "</span>";
-          var tr = h("<tr><td>" + esc(p.receipt_number || "—") + "</td><td>" + esc((p.period_month || "").slice(0, 7)) +
+          var tr = h("<tr><td>" + esc(p.receipt_number || "—") +
+            (p.gateway_txn_id ? '<br><span class="muted" style="font-size:11px">Wompi: ' + esc(p.gateway_txn_id) + "</span>" : "") +
+            "</td><td>" + esc((p.period_month || "").slice(0, 7)) +
             "</td><td>" + money(p.amount, p.currency) + "</td><td>" + esc(METHOD_ES[p.method] || p.method) +
             '</td><td class="wrap">' + esc((p.payer_name || "—") + (p.payer_doc_number ? " · " + (p.payer_doc_type || "") + " " + p.payer_doc_number : "")) +
             "</td><td>" + estado + '</td><td class="acts"></td></tr>');
