@@ -36,6 +36,12 @@
    (`payments_immutable`) y falló con `LEF_PAYMENT_INMUTABLE` — corregido en el
    commit `448fc10` (agrega `set_config('lef.allow_admin_payment_edit','on',true)` +
    inserta en `audit_log`, igual que hacen `admin_update_payment`/`admin_delete_payment`).
+6. **"Ver pagos" muestra el ID real de la transacción de Wompi** (`payments.gateway_txn_id`)
+   en letra chica debajo del recibo interno, solo cuando el pago fue por Wompi — el
+   usuario preguntó si el recibo `REC-AAAA-NNNNN` era el número que genera Wompi; no lo
+   es, es un consecutivo propio de LEF (mismo esquema que los pagos manuales, para el
+   libro contable). El ID real de Wompi ya se guardaba en la base, solo no se mostraba
+   en el panel. Commit `a916312`, desplegado (`dpl_...2054i2d8e`).
 
 **Diagnóstico corregido — "una transacción sin fecha de último pago" NO es bug:**
 primer diagnóstico (equivocado) decía que eran dos suscripciones duplicadas del mismo
@@ -43,6 +49,12 @@ estudiante. El usuario corrigió: son **dos módulos distintos** — A1.1 · Hel
 ($20.000, con el único pago real registrado, `REC-...00006` tras el backfill) y A1.2 ·
 Everyday Life ($200.000, **sin ningún pago todavía**). Es correcto que la fila de A1.2
 salga "—" en "Último pago": nunca se le ha registrado un pago. No hace falta tocar nada.
+
+**Cierre de la sesión (15 sep 2026):** todo lo de arriba desplegado y confirmado en
+vivo (código + Edge Function + migración SQL aplicada por el usuario). Sin pendientes
+nuevos de esta sesión. Los pendientes de fondo siguen siendo los mismos de antes:
+progresión automática de módulos, endurecimiento del login (pausado por Resend/
+Turnstile — ver 🔐) y Wompi solo tarjeta + transferencia/QR (ver más abajo).
 
 ## Estado al cerrar esta sesión larga (6 sep 2026) — Wompi en producción + varias mejoras
 
