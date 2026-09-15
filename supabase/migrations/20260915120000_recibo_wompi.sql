@@ -50,14 +50,23 @@ $$;
 -- Backfill: pagos aprobados que ya existen y se quedaron sin recibo. Usa el mismo
 -- contador (next_receipt_number/receipt_counters) que usan los pagos nuevos, para no
 -- chocar con recibos ya emitidos (a la fecha de esta migración va en REC-2026-00006).
+-- Los pagos son inmutables (trigger payments_immutable, ver 20260906180000): hay que
+-- abrir la misma compuerta que usan admin_update_payment/admin_delete_payment y dejar
+-- rastro en audit_log antes de tocar el dato.
 do $$
-declare r record;
+declare r record; v_new_receipt text;
 begin
+  perform set_config('lef.allow_admin_payment_edit', 'on', true);
   for r in
     select id from public.payments
     where receipt_number is null and status = 'approved'
     order by paid_at, id
   loop
-    update public.payments set receipt_number = public.next_receipt_number() where id = r.id;
+    v_new_receipt := public.next_receipt_number();
+    insert into public.audit_log (actor_email, action, target_table, target_id, reason, details)
+    values ('sistema (migración 20260915120000)', 'payment.receipt_backfill', 'payments', r.id,
+            'Recibo faltante por bug en record_wompi_payment (nunca llamaba a next_receipt_number)',
+            jsonb_build_object('receipt_number_asignado', v_new_receipt));
+    update public.payments set receipt_number = v_new_receipt where id = r.id;
   end loop;
 end $$;
