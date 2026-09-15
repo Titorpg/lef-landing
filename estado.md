@@ -29,11 +29,13 @@
    `record_wompi_payment` (el que usa `wompi-webhook` para pagos en línea) se le
    olvidó esa línea desde que se creó — por eso "Recibo" siempre salía "—" para
    pagos hechos con Wompi, incluido el primer pago real de producción.
-   **⏳ Pendiente que el usuario aplique a mano** (SQL Editor de Supabase, igual que
-   siempre — Claude no puede aplicar migraciones):
-   `supabase/migrations/20260915120000_recibo_wompi.sql` — corrige la función +
-   backfill del recibo del pago real que ya existe (queda `REC-2026-00006`, el
-   contador ya iba en 6 por los pagos de prueba borrados).
+   **✅ Aplicada por el usuario el 15 sep 2026** (SQL Editor de Supabase, vía Artifact
+   con botón "Copiar" — mismo patrón que otras veces). El pago real ya tiene
+   `REC-2026-00006` y quedó su registro en `audit_log`. En el primer intento la
+   corrí sin pasar por la compuerta del trigger de inmutabilidad de pagos
+   (`payments_immutable`) y falló con `LEF_PAYMENT_INMUTABLE` — corregido en el
+   commit `448fc10` (agrega `set_config('lef.allow_admin_payment_edit','on',true)` +
+   inserta en `audit_log`, igual que hacen `admin_update_payment`/`admin_delete_payment`).
 
 **Diagnóstico corregido — "una transacción sin fecha de último pago" NO es bug:**
 primer diagnóstico (equivocado) decía que eran dos suscripciones duplicadas del mismo
