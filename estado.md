@@ -49,6 +49,27 @@ llaves. Datos de prueba (Ana Gómez, Jorge Rada) borrados de pagos/suscripciones
    `audit_log` que hay que resolver antes de retomarlo.
 4. **Probar un pago real de punta a punta** en Wompi producción (el sandbox ya se probó
    completo; producción todavía no se ha probado con una transacción real).
+   → **HECHO (7 sep 2026):** el usuario hizo un pago real y funcionó.
+5. **Wompi solo tarjeta + pago por transferencia/QR** (hablado el 7 sep 2026, se hace
+   mañana). Wompi cobra comisión alta; el usuario solo quiere usar Wompi para pagos con
+   tarjeta y recibir el resto por transferencia directa a su QR bancario (sin comisión).
+   Plan en dos partes:
+   a. **Pedir a Wompi que deje el comercio SOLO con "Tarjeta"** (apagar PSE, Nequi,
+      Bancolombia, Daviplata, Puntos, etc.) — el Widget/Web Checkout NO tiene parámetro
+      para filtrar medios de pago; se hace a nivel de cuenta por soporte de Wompi.
+      Canales: WhatsApp comercios **+57 322 280 4391** o formulario
+      https://soporte.wompi.co/hc/es-419/requests/new (L–V 8am–5pm). Mensaje ya redactado
+      en el chat de esta sesión; datos que pide: razón social, NIT, correo de la cuenta,
+      llave `pub_prod_...`.
+   b. **Agregar en el portal (pestaña Facturación) un bloque "Pagar por transferencia /
+      QR"**: imagen del QR + datos bancarios + botón "Ya hice la transferencia". El pago
+      por transferencia lo confirma el admin a mano con `record_payment` (no hay webhook
+      del banco) — encaja con el modelo contable (pagos inmutables, registra el admin).
+      Falta que el usuario dé: imagen del QR y datos (banco, tipo de cuenta, número,
+      titular) y decida si el aviso del estudiante es solo por WhatsApp o un botón en el
+      portal que deje el pago "por verificar".
+   c. Cuando (a) esté confirmado: corregir textos "PSE o tarjeta" → "tarjeta" en
+      `assets/js/lef-portal.js:174`, `estado.md`, política de privacidad, términos y FAQ.
 
 Última actualización: 6 de septiembre de 2026. **Formulario público → pre-inscripciones
 YA EN VIVO** (sección 📋): migración `20260906140000` aplicada por el usuario en el SQL
