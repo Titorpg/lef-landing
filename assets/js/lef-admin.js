@@ -1168,17 +1168,30 @@
   }
 
   function acProfesores(box) {
-    box.innerHTML = "";
-    var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Profesor</button></div>');
-    box.appendChild(add);
-    add.querySelector("button").onclick = function () { editTeacher(box, null); };
-    q("teachers").select("*").order("full_name").then(function (r) {
-      var t = tableWrap(["Nombre", "Correo", "WhatsApp", "Estado", "Acciones"]);
-      (r.data || []).forEach(function (p) {
+    box.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([
+      q("teachers").select("*").order("full_name"),
+      q("groups").select("id,teacher_id").eq("active", true)
+    ]).then(function (res) {
+      box.innerHTML = "";
+      box.appendChild(h('<p class="pnl-sub" style="margin-bottom:12px">Los profesores nuevos se dan de alta desde Usuarios ' +
+        '(+ Cuenta de staff). Aquí solo se visualizan y se corrigen sus datos.</p>'));
+      var counts = {};
+      (res[1].data || []).forEach(function (g) { counts[g.teacher_id] = (counts[g.teacher_id] || 0) + 1; });
+      var t = tableWrap(["Nombre", "Correo", "WhatsApp", "Grupos activos", "Estado", "Acciones"]);
+      (res[0].data || []).forEach(function (p) {
+        var n = counts[p.id] || 0;
         var tr = h("<tr><td>" + esc(p.full_name) + "</td><td>" + esc(p.email) + "</td><td>" + esc(p.whatsapp || "—") +
-          "</td><td>" + (p.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
+          '</td><td></td><td>' + (p.active ? '<span class="badge ok">activo</span>' : '<span class="badge neutral">inactivo</span>') +
           '</td><td class="acts"></td></tr>');
-        var cell = tr.children[4];
+        var gcell = tr.children[3];
+        if (n) {
+          var gbtn = btn(n + (n === 1 ? " grupo" : " grupos"), "btn-ghost", function () { teacherGroupsModal(p); });
+          gcell.appendChild(gbtn);
+        } else {
+          gcell.textContent = "—";
+        }
+        var cell = tr.children[5];
         cell.appendChild(btn(p.active ? "Desactivar" : "Activar", "btn-ghost", function () {
           q("teachers").update({ active: !p.active }).eq("id", p.id).then(function () { acProfesores(box); });
         }));
@@ -1194,18 +1207,53 @@
     });
   }
   function editTeacher(box, p) {
-    var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(p ? p.full_name : "") + '">') +
-      field("Correo", '<input name="e" type="email" value="' + esc(p ? p.email : "") + '">') +
-      field("WhatsApp", '<input name="w" value="' + esc(p ? (p.whatsapp || "") : "") + '">') + "</div>");
-    modal(p ? "Editar profesor" : "Nuevo profesor", b, function () {
+    var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(p.full_name) + '">') +
+      field("Correo", '<input name="e" type="email" value="' + esc(p.email) + '">') +
+      field("WhatsApp", '<input name="w" value="' + esc(p.whatsapp || "") + '">') + "</div>");
+    modal("Editar profesor", b, function () {
       var payload = {
         full_name: b.querySelector("[name=n]").value.trim(),
         email: b.querySelector("[name=e]").value.trim(),
         whatsapp: b.querySelector("[name=w]").value.trim() || null
       };
-      var pr = p ? q("teachers").update(payload).eq("id", p.id) : q("teachers").insert(payload);
-      return pr.then(function (r) { if (r.error) throw r.error; toast(p ? "Profesor actualizado." : "Profesor agregado."); acProfesores(box); });
-    }, p ? "Guardar" : "Agregar");
+      return q("teachers").update(payload).eq("id", p.id)
+        .then(function (r) { if (r.error) throw r.error; toast("Profesor actualizado."); acProfesores(box); });
+    }, "Guardar");
+  }
+
+  // Detalle de los grupos activos de un profesor: ciclo, horario, cupo y estudiantes,
+  // con la misma información que ya vive en cada grupo (Académico > Grupos).
+  function teacherGroupsModal(t) {
+    var box = h('<div><p class="muted">Cargando…</p></div>');
+    modal("Grupos activos — " + t.full_name, box, null, "Cerrar", false, true);
+    Promise.all([
+      q("groups").select("*,modules(level,title),schedules(days,start_time,end_time,cycles(name,status))")
+        .eq("teacher_id", t.id).eq("active", true).order("created_at", { ascending: false }),
+      q("enrollments").select("group_id,students(full_name)").neq("status", "Cancelled")
+    ]).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      var groups = res[0].data || [];
+      var byGroup = {};
+      (res[1].data || []).forEach(function (e) {
+        if (!e.group_id || !e.students) return;
+        (byGroup[e.group_id] = byGroup[e.group_id] || []).push(e.students.full_name);
+      });
+      box.innerHTML = "";
+      if (!groups.length) { box.appendChild(h('<p class="muted">Sin grupos activos.</p>')); return; }
+      groups.forEach(function (g) {
+        var sc = g.schedules;
+        var est = byGroup[g.id] || [];
+        box.appendChild(h(
+          '<div class="pnl-table-wrap" style="padding:14px 16px;margin-bottom:12px">' +
+          '<p style="font-weight:600;margin-bottom:6px">' + esc(g.modules ? g.modules.level + " · " + g.modules.title : "—") + '</p>' +
+          '<p class="pnl-sub" style="margin-bottom:4px">Ciclo: ' + esc(sc && sc.cycles ? sc.cycles.name : "—") + '</p>' +
+          '<p class="pnl-sub" style="margin-bottom:4px">Horario: ' + esc(sc ? days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time) : "—") + '</p>' +
+          '<p class="pnl-sub" style="margin-bottom:4px">Cupo: ' + est.length + "/" + g.capacity + '</p>' +
+          '<p class="pnl-sub">Estudiantes: ' + (est.length ? esc(est.join(", ")) : "—") + "</p>" +
+          "</div>"
+        ));
+      });
+    }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
   /* ---- Ciclos ---- */
@@ -1329,6 +1377,21 @@
         cell.appendChild(btn(s.active ? "Desactivar" : "Activar", "btn-ghost", function () {
           q("schedules").update({ active: !s.active, deactivated_by_module: false }).eq("id", s.id)
             .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acHorarios(box); });
+        }));
+        cell.appendChild(btn("Editar", "btn-ghost", function () {
+          var b = h("<div>" +
+            field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '"' + (c.id === s.cycle_id ? " selected" : "") + ">" + esc(c.name) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
+            field("Módulo", moduleSelect("m", modules, s.module_id)) +
+            field("Días", '<div>' + DOW.map(function (d) { return '<label style="display:inline-flex;gap:4px;margin:0 8px 6px 0;font-size:13px"><input type="checkbox" style="width:auto" value="' + d + '"' + ((s.days || []).indexOf(d) !== -1 ? " checked" : "") + ">" + DAY_ES[d] + "</label>"; }).join("") + "</div>") +
+            field("Hora inicio", '<input name="s" type="time" value="' + esc((s.start_time || "").slice(0, 5)) + '">') + field("Hora fin", '<input name="e" type="time" value="' + esc((s.end_time || "").slice(0, 5)) + '">') + "</div>");
+          modal("Editar horario", b, function () {
+            var dsel = Array.prototype.slice.call(b.querySelectorAll("input[type=checkbox]:checked")).map(function (x) { return x.value; });
+            if (!dsel.length) throw new Error("Elige al menos un día.");
+            return q("schedules").update({
+              cycle_id: b.querySelector("[name=c]").value, module_id: b.querySelector("[name=m]").value,
+              days: dsel, start_time: b.querySelector("[name=s]").value, end_time: b.querySelector("[name=e]").value
+            }).eq("id", s.id).then(function (u) { if (u.error) throw u.error; toast("Horario actualizado."); acHorarios(box); });
+          });
         }));
         cell.appendChild(btn("Eliminar", "btn-danger", function () {
           confirmDelete("Eliminar horario", "No se puede si tiene grupos asociados.", function () {
@@ -1696,6 +1759,27 @@
             t.body.appendChild(tr); return;
           }
           if (r.user_id === ME.user_id) { cell.innerHTML = '<span class="muted">tú</span>'; t.body.appendChild(tr); return; }
+          cell.appendChild(btn("Editar", "btn-ghost", function () {
+            var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name === "—" ? "" : r.name) + '">') +
+              field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') + "</div>");
+            modal("Editar usuario", b, function () {
+              var full_name = b.querySelector("[name=n]").value.trim();
+              var email = b.querySelector("[name=e]").value.trim();
+              if (!full_name) throw new Error("Escribe el nombre.");
+              if (!email) throw new Error("Escribe el correo.");
+              return callFn({ action: "update_profile", user_id: r.user_id, full_name: full_name, email: email })
+                .then(function () { toast("Usuario actualizado."); load(); });
+            }, "Guardar");
+          }));
+          cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () {
+            var np = "lef" + Math.random().toString(36).slice(2, 10);
+            var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
+              '<p class="pnl-sub">Compártela con ' + esc(r.name) + '. Podrá cambiarla luego.</p></div>');
+            modal("Restablecer contraseña — " + r.name, bb, function () {
+              return callFn({ action: "reset_password", user_id: r.user_id, password: bb.querySelector("[name=p]").value })
+                .then(function () { toast("Contraseña actualizada."); });
+            }, "Guardar");
+          }));
           cell.appendChild(btn(r.active ? "Desactivar" : "Activar", "btn-ghost", function () {
             callFn({ action: "set_active", user_id: r.user_id, active: !r.active })
               .then(function () { toast("Actualizado."); load(); }).catch(function (e) { toast(friendly(e), "err"); });
