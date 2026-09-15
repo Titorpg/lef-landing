@@ -35,16 +35,12 @@
    backfill del recibo del pago real que ya existe (queda `REC-2026-00006`, el
    contador ya iba en 6 por los pagos de prueba borrados).
 
-**Diagnóstico (no es bug de código) — "una transacción sin fecha de último pago":**
-revisando la BD en vivo encontré que el estudiante del primer pago real tiene
-**dos suscripciones activas**: una de
-$20.000 (creada 8 sep 02:29, con el único pago real registrado, `REC-...00006` tras
-el backfill) y otra de $200.000 (creada 8 sep 03:23, **sin ningún pago**). La fila sin
-pago es la que sale "—" en "Último pago" en Pagos — es correcto que salga vacía
-(nunca se le ha registrado un pago), el problema es que **hay dos suscripciones para
-la misma persona** y no debería. Probablemente quedó de las pruebas de pago real del
-7-8 sep. **Falta decidir con el usuario** cuál de las dos es la correcta y eliminar
-la otra desde Pagos > Eliminar (pide motivo, queda en el Registro de eventos).
+**Diagnóstico corregido — "una transacción sin fecha de último pago" NO es bug:**
+primer diagnóstico (equivocado) decía que eran dos suscripciones duplicadas del mismo
+estudiante. El usuario corrigió: son **dos módulos distintos** — A1.1 · Hello, World
+($20.000, con el único pago real registrado, `REC-...00006` tras el backfill) y A1.2 ·
+Everyday Life ($200.000, **sin ningún pago todavía**). Es correcto que la fila de A1.2
+salga "—" en "Último pago": nunca se le ha registrado un pago. No hace falta tocar nada.
 
 ## Estado al cerrar esta sesión larga (6 sep 2026) — Wompi en producción + varias mejoras
 
