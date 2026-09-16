@@ -303,15 +303,16 @@
       "<h3>¿Cómo quieres pagar?</h3>" +
       '<div class="pay-modal__cols">' +
       '<div class="pay-modal__col">' +
-      '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img" data-qr-zoom>' +
-      '<p class="muted" style="font-size:11.5px;text-align:center;margin-top:-4px">Toca el QR para verlo en grande y escanearlo mejor</p>' +
-      '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave @lefcenter</button>' +
+      '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-visual pay-qr__img" data-qr-zoom>' +
+      '<p class="pay-modal__cta-label">Llave Bre-B: @lefcenter</p>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave</button>' +
+      '<p class="muted" style="font-size:11.5px;text-align:center">Toca el QR para verlo en grande y escanearlo mejor.</p>' +
       '<p class="muted" style="font-size:12px;text-align:center">' +
       'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
       "</div>" +
       '<div class="pay-modal__divider">o</div>' +
       '<div class="pay-modal__col">' +
-      '<img src="assets/wompi-pagos.png" alt="Wompi — paga con tarjeta débito o crédito" class="wompi-banner">' +
+      '<img src="assets/wompi-pagos-vertical.png" alt="Wompi — paga con tarjeta débito o crédito" class="pay-visual">' +
       '<p class="pay-modal__cta-label">Paga ahora</p>' +
       '<button type="button" class="btn-wompi" data-pay>Pague aquí</button>' +
       "</div>" +
