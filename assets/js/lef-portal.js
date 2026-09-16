@@ -246,9 +246,8 @@
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
-            '<p style="font-weight:600;margin-bottom:6px">Pago</p>' +
-            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Por transferencia directa (QR) o con tarjeta débito/crédito.</p>' +
-            '<button class="btn btn-blue" data-open-pay>Pagar</button> ' +
+            '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +
+            '<button class="btn btn-blue" data-open-pay>Pagar ahora</button> ' +
             '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
             "</div>") +
           "</div>"
@@ -278,10 +277,24 @@
     });
   }
 
-  // Recuadro flotante "¿Cómo quieres pagar?" (se abre al pulsar "Pagar"): a la
-  // izquierda el QR de transferencia directa, a la derecha una tarjeta visual
-  // que dispara el widget de Wompi — igual de vistosa que el QR, en vez de un
-  // botón azul plano perdido al lado de una imagen.
+  // Amplía una imagen a pantalla casi completa (el QR se ve bien en el modal,
+  // pero a ese tamaño el celular no siempre lo enfoca para escanear).
+  function openImageLightbox(src, alt) {
+    var lb = h(
+      '<div class="qr-lightbox">' +
+      '<button type="button" class="qr-lightbox__close" data-close aria-label="Cerrar">×</button>' +
+      '<img src="' + src + '" alt="' + esc(alt) + '">' +
+      "</div>"
+    );
+    document.body.appendChild(lb);
+    function close() { lb.remove(); }
+    lb.addEventListener("click", function (e) { if (e.target === lb) close(); });
+    lb.querySelector("[data-close]").addEventListener("click", close);
+  }
+
+  // Recuadro flotante "¿Cómo quieres pagar?" (se abre al pulsar "Pagar ahora"):
+  // a la izquierda el QR de transferencia directa, a la derecha Wompi con su
+  // propio banner y un botón verde que dispara el widget.
   function openPayModal(s, main) {
     var bg = h('<div class="pnl-modal-bg"></div>');
     var box = h(
@@ -290,20 +303,17 @@
       "<h3>¿Cómo quieres pagar?</h3>" +
       '<div class="pay-modal__cols">' +
       '<div class="pay-modal__col">' +
-      '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img">' +
+      '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img" data-qr-zoom>' +
+      '<p class="muted" style="font-size:11.5px;text-align:center;margin-top:-4px">Toca el QR para verlo en grande y escanearlo mejor</p>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave @lefcenter</button>' +
       '<p class="muted" style="font-size:12px;text-align:center">' +
       'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
       "</div>" +
       '<div class="pay-modal__divider">o</div>' +
       '<div class="pay-modal__col">' +
-      '<button type="button" class="wompi-card" data-pay>' +
-      '<span class="wompi-card__chip"></span>' +
-      '<span class="wompi-card__dots">•••• •••• •••• ••••</span>' +
-      '<span class="wompi-card__brand">Wompi</span>' +
-      '<span class="wompi-card__sub">Tarjeta débito / crédito</span>' +
-      "</button>" +
-      '<p class="muted" style="font-size:12px;text-align:center">Pago seguro procesado por Wompi.</p>' +
+      '<img src="assets/wompi-pagos.png" alt="Wompi — paga con tarjeta débito o crédito" class="wompi-banner">' +
+      '<p class="pay-modal__cta-label">Paga ahora</p>' +
+      '<button type="button" class="btn-wompi" data-pay>Pague aquí</button>' +
       "</div>" +
       "</div>" +
       '<p class="muted" data-pay-msg style="text-align:center;font-size:12.5px;margin-top:6px"></p>' +
@@ -316,12 +326,15 @@
     bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
     box.querySelector("[data-close]").addEventListener("click", close);
 
+    box.querySelector("[data-qr-zoom]").addEventListener("click", function () {
+      openImageLightbox("assets/qr-bancolombia.jpg", "QR de pago Bre-B — Lef Center");
+    });
     box.querySelector("[data-copy-key]").addEventListener("click", function (e) { copyKey(e.currentTarget); });
 
-    var wompiCard = box.querySelector("[data-pay]");
+    var wompiBtn = box.querySelector("[data-pay]");
     var msgEl = box.querySelector("[data-pay-msg]");
-    wompiCard.addEventListener("click", function () {
-      openWompiCheckout(s.id, msgEl, main, function (loading) { wompiCard.classList.toggle("is-loading", loading); }, close);
+    wompiBtn.addEventListener("click", function () {
+      openWompiCheckout(s.id, msgEl, main, function (loading) { wompiBtn.classList.toggle("is-loading", loading); }, close);
     });
   }
 
