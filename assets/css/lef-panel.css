@@ -185,6 +185,17 @@ td.acts .btn{margin:2px 4px 2px 0;}
   color:var(--azul);font-weight:600;}
 .course-compact__sum{font-size:13.5px;color:var(--grafito);margin-top:2px;}
 .course-compact__detail{border-top:1px solid var(--niebla);margin-top:14px;padding-top:14px;}
+.course-compact__left{display:flex;align-items:center;gap:12px;min-width:0;}
+
+/* módulo culminado y aprobado (Mi curso): chulo grande + banner al abrir el detalle */
+.course-compact--done{border-color:#b7ddc5;}
+.course-compact__check{flex:0 0 auto;width:34px;height:34px;border-radius:50%;
+  background:var(--ok);color:#fff;font-size:18px;font-weight:700;line-height:1;
+  display:flex;align-items:center;justify-content:center;}
+.course-compact__approved{display:flex;align-items:center;gap:8px;
+  background:var(--ok-bg);color:var(--ok);border:1px solid #b7ddc5;border-radius:9px;
+  padding:10px 14px;font-weight:700;font-size:14.5px;margin-bottom:14px;}
+.course-compact__approved span{font-size:17px;}
 
 @media(max-width:780px){
   .pnl-wrap{flex-direction:column;}

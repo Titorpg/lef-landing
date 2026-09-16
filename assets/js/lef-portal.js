@@ -332,27 +332,27 @@
   }
 
   function renderCourseHero(main, c) {
+    // Contenido del módulo y horario/aviso van DENTRO del mismo recuadro (antes
+    // quedaban sueltos como párrafos aparte, y con varios cursos apilados no se
+    // entendía a cuál pertenecía cada uno).
+    var scheduleHtml = (c.schedule_days && c.schedule_days.length)
+      ? '<div class="stat-row">' +
+        '<div class="stat"><div class="k">Días</div><div class="v" style="font-size:16px">' + esc(fmtDays(c.schedule_days)) + "</div></div>" +
+        '<div class="stat"><div class="k">Horario</div><div class="v" style="font-size:16px">' + fmtTime(c.schedule_start_time) + " – " + fmtTime(c.schedule_end_time) + "</div></div>" +
+        (c.teacher_full_name ? '<div class="stat"><div class="k">Profesor(a)</div><div class="v" style="font-size:16px">' + esc(c.teacher_full_name) + "</div></div>" : "") +
+        "</div>"
+      : '<div class="pnl-alert ok" style="margin:0">Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.</div>';
+
     main.appendChild(h(
       '<div class="course-hero">' +
       '<div class="lvl-tag">Nivel · matrícula ' + esc(c.registration_number) + "</div>" +
       "<h2>" + esc(levelOf(c.module_level)) + "</h2>" +
       '<div class="mod-name">Módulo actual: ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
       progressBar(c.cycle_start_date, c.cycle_end_date) +
+      (c.module_description ? '<p class="pnl-sub" style="margin:14px 0 16px"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>" : "") +
+      scheduleHtml +
       "</div>"
     ));
-    if (c.module_description) main.appendChild(h('<p class="pnl-sub"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>"));
-
-    if (c.schedule_days && c.schedule_days.length) {
-      main.appendChild(h(
-        '<div class="stat-row">' +
-        '<div class="stat"><div class="k">Días</div><div class="v" style="font-size:16px">' + esc(fmtDays(c.schedule_days)) + "</div></div>" +
-        '<div class="stat"><div class="k">Horario</div><div class="v" style="font-size:16px">' + fmtTime(c.schedule_start_time) + " – " + fmtTime(c.schedule_end_time) + "</div></div>" +
-        (c.teacher_full_name ? '<div class="stat"><div class="k">Profesor(a)</div><div class="v" style="font-size:16px">' + esc(c.teacher_full_name) + "</div></div>" : "") +
-        "</div>"
-      ));
-    } else {
-      main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.</div>'));
-    }
   }
 
   // Módulo ya culminado: recuadro delgado (igual que en Facturación), con "Ver
@@ -360,11 +360,14 @@
   // con el módulo actual, que es el que debe verse en primer plano.
   function renderCourseCompact(main, c) {
     var card = h(
-      '<div class="course-compact">' +
+      '<div class="course-compact course-compact--done">' +
       '<div class="course-compact__row">' +
-      '<div>' +
+      '<div class="course-compact__left">' +
+      '<div class="course-compact__check" aria-hidden="true">✓</div>' +
+      "<div>" +
       '<div class="lvl-tag">Nivel · ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
-      '<div class="course-compact__sum">Matrícula ' + esc(c.registration_number) + ' · <span class="badge ok">completado</span></div>' +
+      '<div class="course-compact__sum">Matrícula ' + esc(c.registration_number) + "</div>" +
+      "</div>" +
       "</div>" +
       '<button class="btn btn-ghost btn-sm" data-detail-toggle>Ver detalle</button>' +
       "</div>" +
@@ -390,10 +393,10 @@
             "</div>"
           : "";
         detailPanel.innerHTML =
+          '<div class="course-compact__approved"><span aria-hidden="true">✓</span> Curso aprobado</div>' +
           (c.cycle_start_date && c.cycle_end_date ? '<p class="muted" style="font-size:12.5px;margin-bottom:10px">Ciclo: ' + date(c.cycle_start_date) + " – " + date(c.cycle_end_date) + "</p>" : "") +
           scheduleHtml +
-          (c.module_description ? '<p class="pnl-sub" style="margin-top:4px"><strong>Contenido visto:</strong> ' + esc(c.module_description) + "</p>" : "") +
-          '<p class="pnl-sub" style="margin-top:10px;font-weight:600">Módulo completado y aprobado.</p>';
+          (c.module_description ? '<p class="pnl-sub" style="margin-top:4px"><strong>Contenido visto:</strong> ' + esc(c.module_description) + "</p>" : "");
       }
     });
   }
