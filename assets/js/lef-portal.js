@@ -138,49 +138,95 @@
       subs.forEach(function (s) {
         var overdue = s.status === "active" && s.next_due_date &&
           (new Date() > new Date(new Date(s.next_due_date).getTime() + (s.grace_days || 0) * 864e5));
+        var subPays = pays.filter(function (p) { return p.subscription_id === s.id; });
         // "Pendiente" = todavía no hay ningún pago confirmado de esta suscripción.
-        var hasPaid = pays.some(function (p) { return p.subscription_id === s.id && p.status === "approved"; });
+        var hasPaid = subPays.some(function (p) { return p.status === "approved"; });
+        // Al día = ya pagó el período actual y no está vencido. En este caso NO debe
+        // poder volver a pagar el mismo curso por error (ver caso del estudiante que
+        // pasó de A1.1 pagado a A1.2: A1.1 debe quedar "al día", sin botón de pago).
+        var upToDate = s.status === "active" && hasPaid && !overdue;
         var badge = s.status === "frozen" ? '<span class="badge bad">cuenta congelada</span>'
           : s.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
           : (s.status === "active" && !hasPaid) ? '<span class="badge neutral">pendiente</span>'
           : overdue ? '<span class="badge warn">pago pendiente</span>'
           : '<span class="badge ok">al día</span>';
+        var titleTag = s.module_level
+          ? '<div class="lvl-tag">Nivel · ' + esc(s.module_level) + " — " + esc(s.module_title) + "</div>"
+          : '<div class="lvl-tag">Tu mensualidad</div>';
 
         if (s.status === "frozen") {
           main.appendChild(h('<div class="pnl-alert err">Tu cuenta está <strong>congelada</strong> por falta de pago. Realiza el pago o contacta a LEF por WhatsApp para reactivarla.</div>'));
         }
 
-        if (s.module_level) {
-          main.appendChild(h(
-            '<div class="course-hero">' +
-            '<div class="lvl-tag">Nivel · ' + esc(s.module_level) + " — " + esc(s.module_title) + "</div>" +
-            "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
-            '<div class="mod-name">' + badge + " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+        if (upToDate) {
+          // Ya pagado y al día: recuadro delgado — el detalle del pago queda un
+          // clic más allá en vez de mezclarse con la mensualidad pendiente (si hay otra).
+          var lastPay = subPays.filter(function (p) { return p.status === "approved"; })
+            .sort(function (a, b) { return new Date(b.paid_at) - new Date(a.paid_at); })[0];
+          var card = h(
+            '<div class="course-compact">' +
+            '<div class="course-compact__row">' +
+            '<div>' + titleTag +
+            '<div class="course-compact__sum">' + money(s.monthly_amount, s.currency) + " / mes · " + badge +
+            " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+            "</div>" +
+            '<button class="btn btn-ghost btn-sm" data-detail-toggle>Ver detalle</button>' +
+            "</div>" +
+            '<div class="course-compact__detail" hidden></div>' +
             "</div>"
-          ));
-        } else {
-          main.appendChild(h(
-            '<div class="stat-row">' +
-            '<div class="stat"><div class="k">Mensualidad</div><div class="v">' + money(s.monthly_amount, s.currency) + "</div></div>" +
-            '<div class="stat"><div class="k">Estado</div><div class="v" style="font-size:16px">' + badge + "</div></div>" +
-            '<div class="stat"><div class="k">Próximo pago</div><div class="v" style="font-size:16px">' + date(s.next_due_date) + "</div></div>" +
-            "</div>"
-          ));
+          );
+          main.appendChild(card);
+
+          var toggleBtn = card.querySelector("[data-detail-toggle]");
+          var detailPanel = card.querySelector(".course-compact__detail");
+          var open = false;
+          toggleBtn.addEventListener("click", function () {
+            open = !open;
+            detailPanel.hidden = !open;
+            toggleBtn.textContent = open ? "Ocultar detalle" : "Ver detalle";
+            if (open && !detailPanel.dataset.filled) {
+              detailPanel.dataset.filled = "1";
+              detailPanel.innerHTML = lastPay ? (
+                '<div class="stat-row" style="margin-bottom:10px">' +
+                '<div class="stat"><div class="k">Recibo</div><div class="v" style="font-size:16px">' + esc(lastPay.receipt_number || "—") + "</div></div>" +
+                '<div class="stat"><div class="k">Monto pagado</div><div class="v" style="font-size:16px">' + money(lastPay.amount, lastPay.currency) + "</div></div>" +
+                '<div class="stat"><div class="k">Fecha de pago</div><div class="v" style="font-size:16px">' + date(lastPay.paid_at) + "</div></div>" +
+                '<div class="stat"><div class="k">Método</div><div class="v" style="font-size:16px">' + esc(METHOD_ES[lastPay.method] || lastPay.method) + "</div></div>" +
+                "</div>" +
+                '<p class="muted" style="font-size:12.5px">Mes cubierto: ' + monthLabel(lastPay.period_month) +
+                (lastPay.reference ? " · Referencia: " + esc(lastPay.reference) : "") + "</p>" +
+                (s.description ? '<p class="pnl-sub" style="margin-top:10px">' + esc(s.description) + "</p>" : "")
+              ) : '<p class="muted" style="font-size:13px">No encontramos el detalle de este pago.</p>';
+            }
+          });
+          return;
         }
-        if (s.description) main.appendChild(h('<p class="pnl-sub">' + esc(s.description) + "</p>"));
 
-        var box = h('<div class="pnl-table-wrap" style="padding:20px;margin-bottom:24px">' +
-          '<p style="font-weight:600;margin-bottom:6px">Pago en línea</p>' +
-          '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Paga tu mensualidad con PSE o tarjeta, de forma segura, a través de Wompi.</p>' +
-          '<button class="btn btn-blue" data-pay="' + s.id + '"' + (s.status === "cancelled" ? " disabled" : "") + '>Pagar en línea</button> ' +
-          '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
-          '<p class="muted" data-pay-msg style="font-size:12.5px;margin-top:10px"></p>' +
-          "</div>");
-        main.appendChild(box);
+        // Pendiente de pago o vencido: recuadro grande y detallado, con el pago en
+        // línea integrado en el mismo recuadro (así queda claro a qué curso corresponde).
+        var hero = h(
+          '<div class="course-hero">' +
+          titleTag +
+          "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
+          '<div class="mod-name">' + badge + " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+          (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
+          (s.status === "cancelled" ? "" :
+            '<div class="course-hero__pay">' +
+            '<p style="font-weight:600;margin-bottom:6px">Pago en línea</p>' +
+            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Paga tu mensualidad con PSE o tarjeta, de forma segura, a través de Wompi.</p>' +
+            '<button class="btn btn-blue" data-pay="' + s.id + '">Pagar en línea</button> ' +
+            '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
+            '<p class="muted" data-pay-msg style="font-size:12.5px;margin-top:10px"></p>' +
+            "</div>") +
+          "</div>"
+        );
+        main.appendChild(hero);
 
-        var payBtn = box.querySelector("[data-pay]");
-        var payMsg = box.querySelector("[data-pay-msg]");
-        payBtn.addEventListener("click", function () { openWompiCheckout(s.id, payBtn, payMsg, main); });
+        var payBtn = hero.querySelector("[data-pay]");
+        if (payBtn) {
+          var payMsg = hero.querySelector("[data-pay-msg]");
+          payBtn.addEventListener("click", function () { openWompiCheckout(s.id, payBtn, payMsg, main); });
+        }
       });
 
       main.appendChild(h('<h2 class="pnl-h" style="font-size:16px;margin-top:8px">Historial de pagos</h2>'));
