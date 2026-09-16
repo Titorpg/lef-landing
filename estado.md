@@ -50,11 +50,83 @@ estudiante. El usuario corrigió: son **dos módulos distintos** — A1.1 · Hel
 Everyday Life ($200.000, **sin ningún pago todavía**). Es correcto que la fila de A1.2
 salga "—" en "Último pago": nunca se le ha registrado un pago. No hace falta tocar nada.
 
-**Cierre de la sesión (15 sep 2026):** todo lo de arriba desplegado y confirmado en
-vivo (código + Edge Function + migración SQL aplicada por el usuario). Sin pendientes
-nuevos de esta sesión. Los pendientes de fondo siguen siendo los mismos de antes:
-progresión automática de módulos, endurecimiento del login (pausado por Resend/
-Turnstile — ver 🔐) y Wompi solo tarjeta + transferencia/QR (ver más abajo).
+**Cierre de la primera parte de la sesión (15 sep 2026):** todo lo de arriba desplegado
+y confirmado en vivo. La sesión siguió más tarde el mismo día — ver la continuación
+justo abajo, que sí resuelve dos de los tres pendientes de fondo (progresión de
+módulos y Wompi solo tarjeta/QR).
+
+## Sesión 15 sep 2026 (continuación) — Registro de eventos legible, progresión de módulos, pago por QR/Wompi
+
+**✅ Desplegado, todo en vivo:**
+1. **Registro de eventos en español simple para un admin no programador**: la fila
+   `payment.receipt_backfill` (el backfill del recibo de Wompi de la sesión anterior)
+   se mostraba con el texto técnico crudo (nombres de funciones SQL) en Acción y
+   Motivo. Se agregó traducción de la acción, un motivo en lenguaje simple para la
+   tabla, y una explicación completa en párrafos al abrir "Ver detalle" (qué pasó, qué
+   se corrigió, que no hay nada que hacer) — el detalle técnico se conserva debajo,
+   por si algún día hace falta para soporte. Commit `4ac6c6a`.
+2. **Bug real encontrado por el usuario: se podía volver a pagar un curso ya pagado.**
+   Caso real con el estudiante de prueba Liam Caballero: pagó A1.1 · Hello, World, lo
+   pasaron a A1.2 · Everyday Life, y en el portal (Facturación) A1.1 **seguía
+   mostrando el botón "Pagar en línea"** aunque ya estuviera al día — riesgo de que el
+   estudiante pagara dos veces el mismo módulo por error. Causa: `get_my_billing`
+   devuelve TODAS las suscripciones del estudiante (una por cada módulo que ha
+   tenido), y el botón se mostraba siempre sin mirar si esa suscripción ya estaba al
+   día. Corregido: el botón de pago solo aparece si la suscripción no está al día
+   (pendiente, vencida o congelada); si ya está al día, el recuadro se colapsa a una
+   versión delgada con "Ver detalle" (recibo, monto, fecha, método, referencia).
+   Commit `9a85240`.
+3. **Reordenado visual de Facturación** (varios ajustes pedidos tras probar el punto
+   anterior): se quitó "próximo pago día X" de los recuadros (no hay fecha fija de
+   pago, el estudiante solo sabe que debe pagar o el sistema no le activa el curso);
+   en móvil el detalle de "Ver detalle" apila los datos hacia abajo en vez de deslizar
+   a un lado; la(s) mensualidad(es) pendiente(s) salen primero (recuadro grande) y las
+   ya pagadas quedan debajo (recuadro delgado), la más reciente arriba — queda como
+   una lista que se va apilando cada vez que llega un curso nuevo a cobrarse.
+   Commits `13665fd`, `1ada015`.
+4. **Progresión automática de módulos — HECHO** (el pendiente grande que llevaba
+   semanas sin empezar, ver detalle técnico en la sección `🎓` más abajo). Ahora al
+   asignarle a un estudiante activo un módulo nuevo, el módulo anterior se archiva
+   como `Completed` en vez de perderse, y "Mi curso" muestra el módulo actual grande
+   y cada módulo completado como un recuadro delgado con chulo verde + "Ver detalle"
+   (contenido del módulo + "✓ Curso aprobado" destacado arriba de todo). El contenido
+   del módulo y el horario (o el aviso de "sin horario") quedaron dentro del mismo
+   recuadro grande, no sueltos aparte. Probado en vivo con Liam Caballero (reasignado
+   de A1.1 a A1.2 desde Estudiantes → editar). Commits `212aead`, `8748b8d`.
+   **Migración aplicada por el usuario** (`20260915130000_progresion_modulos.sql`) —
+   verificada por Claude con consultas de solo lectura a la REST API (columna
+   `completed_at` existe, `module_enrollment_counts()` responde bien).
+5. **Wompi solo tarjeta — resuelto por interfaz, no por cuenta.** El usuario no logró
+   comunicarse con soporte de Wompi para restringir el comercio a solo "Tarjeta"
+   (plan (a) de la sección 💳 más abajo, ahora abandonado). En su lugar: el botón
+   "Pagar ahora" del recuadro de la mensualidad abre un recuadro flotante ("¿Cómo
+   quieres pagar?", misma mecánica que el widget de Wompi) con el **QR oficial de
+   Bancolombia/Bre-B de LEF** (llave `@lefcenter`) a la izquierda — clic para verlo en
+   grande y poder escanearlo (a tamaño de modal el celular no lo enfocaba bien) — y a
+   la derecha el **banner oficial de Wompi** con un botón verde "Pague aquí" que
+   dispara el widget de siempre. El widget sigue mostrando todos los medios de pago
+   (PSE, Nequi, etc. — eso no se pudo quitar sin soporte de Wompi), pero quien llega
+   hasta ese botón ya sabe que va a pagar con tarjeta. Varias iteraciones de ajuste
+   fino pedidas por el usuario (texto más claro, título centrado, tamaño de imágenes
+   igualado por altura sin recortar ninguna, todo centrado en móvil). Commits
+   `d0207c6`, `fdbdf26`, `5606c59`, `df9f97e`, `765f430`, `f4f1217`, `2c1c457`.
+   **Pendiente igual que antes:** corregir los textos "PSE o tarjeta" → "tarjeta" en
+   el sitio (política de privacidad, términos, FAQ) — sigue sin hacerse porque nunca
+   se confirmó la restricción por cuenta con Wompi; con este cambio de interfaz ya no
+   es bloqueante, pero los textos siguen mencionando PSE.
+
+**Archivos nuevos en `assets/` (imágenes, sin migración ni Edge Function de por
+medio):** `qr-bancolombia.jpg` (QR real, lo subió el usuario, renombrado sin espacios
+desde "Pago bancolombia.jpeg"), `wompi-pagos-vertical.png` (banner oficial de Wompi
+en uso hoy, renombrado desde "wompi pagos2"), `wompi-pagos.png` (versión horizontal
+del mismo banner, renombrada desde "wompi pagos" — **quedó sin usar**, se probó
+primero y se reemplazó por la vertical; se deja en el repo por si sirve en otra
+página más adelante).
+
+**Sin pendientes nuevos de aplicar a mano** de esta continuación — la única migración
+de la sesión ya la aplicó el usuario y quedó verificada. Los pendientes de fondo que
+quedan son los mismos de siempre: endurecimiento del login (pausado por Resend/
+Turnstile) y los textos "PSE o tarjeta" mencionados arriba.
 
 ## Estado al cerrar esta sesión larga (6 sep 2026) — Wompi en producción + varias mejoras
 
@@ -534,14 +606,51 @@ solo permite SELECT a admin; se llena únicamente desde funciones `SECURITY DEFI
   `admin_delete_payment` para no dejar huella de "actividad de prueba" en el Registro de
   eventos que se entrega al cliente. Ver detalle en "Datos de prueba en Supabase" más abajo.
 
-**Pendiente (más grande, sin empezar):** que el sistema avance solo al siguiente módulo
-cuando el Ciclo actual vence (marcando el anterior "completado" con chulo verde en "Mis
-cursos"). El usuario confirmó que el reloj es el Ciclo de 2 meses que ya existe en
-Académico. Falta diseñar el historial de módulos completados sin romper las funciones que
-hoy asumen una sola inscripción "actual" por estudiante (dashboard, conteos de cupos,
-`get_my_course`, etc.) — probablemente una fila de `enrollments` nueva por módulo en vez
-de mutar la actual, lo cual toca bastantes queries. Retomar con cuidado, no fue parte de
-esta sesión.
+**✅ HECHO (15 sep 2026, sesión posterior)** — ver sección `🎓 Progresión automática de
+módulos` más abajo para el detalle técnico completo. Se implementó con el enfoque que
+aquí se anticipaba: una fila nueva de `enrollments` por módulo (la anterior se archiva
+como `Completed`) en vez de mutar la actual.
+
+## 🎓 Progresión automática de módulos (15 sep 2026) — EN VIVO ✅
+
+Migración `20260915130000_progresion_modulos.sql`, aplicada por el usuario en el SQL
+Editor de Supabase y verificada por Claude con dos consultas de solo lectura a la REST
+API (columna `completed_at` existe en `enrollments`, `module_enrollment_counts()`
+responde bien). Commits de código: `212aead` (backend + Mi curso), `8748b8d` (chulo
+verde + mensaje "Curso aprobado" más visible).
+
+**Qué cambia:** antes, `admin_assign_module` siempre reescribía la misma fila de
+`enrollments` al cambiar el módulo de un estudiante — "Mi curso" nunca podía mostrar
+qué módulos ya cursó, porque se perdía el rastro en el momento de avanzarlo. Ahora:
+- Nuevo estado `'Completed'` en `enrollments.status` (antes solo
+  `PendingPayment`/`Active`/`Cancelled`) + columna `completed_at`.
+- `admin_assign_module`: si el módulo **realmente cambia** y la inscripción actual ya
+  estaba `Active` (se había activado con un pago), esa fila se archiva como
+  `Completed` y se crea una fila nueva `PendingPayment` para el módulo siguiente. Si
+  el módulo no cambió, la función ya no toca nada — antes limpiaba `group_id`/
+  `cycle_id` en **cada** guardado del modal de "Editar estudiante" del panel, aunque
+  el admin no hubiera tocado el selector de módulo (bug lateral corregido de paso).
+- `get_my_course()` ya no se corta a 1 fila: devuelve el módulo actual + el historial
+  `Completed`. El portal (`renderCourse`, `lef-portal.js`) muestra el módulo actual en
+  grande y cada módulo completado (por estado real, o porque el ciclo ya terminó
+  aunque el admin no haya asignado el siguiente) como recuadro delgado con chulo
+  verde grande + "Ver detalle" (contenido del módulo, reutilizando la descripción que
+  ya tiene cada módulo en Académico, + "✓ Curso aprobado" destacado arriba de todo).
+- Todo lo que contaba inscripciones/cupo con `status <> 'Cancelled'` se amplió a
+  excluir también `'Completed'`, para que un módulo ya cursado no siga contando como
+  cupo ocupado ni inscripción activa: `enforce_group_capacity` (trigger de cupo),
+  `module_enrollment_counts`, `group_enrollment_counts`, `admin_assign_group`/
+  `admin_unassign_group`, el Dashboard (KPI "Inscripciones activas" + donut por
+  módulo), el roster de grupo del profesor y el modal "Estudiantes del grupo".
+- **Probado en vivo** con el estudiante de prueba Liam Caballero: reasignado de A1.1
+  (ya pagado) a A1.2 desde Estudiantes → editar → cambiar módulo → Guardar. Facturación
+  y "Mi curso" quedaron apilados correctamente (A1.1 chico con chulo verde, A1.2
+  grande).
+
+**Sin pendientes de este frente.** El siguiente nivel (que el sistema avance el
+módulo *solo*, sin que el admin lo asigne a mano, con un cron o similar) no se pidió
+ni se construyó — hoy sigue siendo una acción manual del admin, tal como ya funcionaba
+antes de esta sesión.
 
 ## Qué es esto
 
