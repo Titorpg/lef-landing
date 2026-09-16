@@ -135,7 +135,11 @@
         main.appendChild(h('<div class="pnl-alert ok">Aún no tienes una mensualidad asignada. LEF la configurará al confirmar tu inscripción.</div>'));
       }
 
-      subs.forEach(function (s) {
+      // Se precalcula cada suscripción y se reordena: la(s) que todavía hay que pagar
+      // (recuadro grande) primero, y las ya pagadas y al día (recuadro delgado) debajo,
+      // con la más reciente arriba — así queda como una lista que se va apilando cada
+      // vez que llega un curso nuevo a cobrarse.
+      var entries = subs.map(function (s) {
         var overdue = s.status === "active" && s.next_due_date &&
           (new Date() > new Date(new Date(s.next_due_date).getTime() + (s.grace_days || 0) * 864e5));
         var subPays = pays.filter(function (p) { return p.subscription_id === s.id; });
@@ -145,6 +149,20 @@
         // poder volver a pagar el mismo curso por error (ver caso del estudiante que
         // pasó de A1.1 pagado a A1.2: A1.1 debe quedar "al día", sin botón de pago).
         var upToDate = s.status === "active" && hasPaid && !overdue;
+        var lastPay = subPays.filter(function (p) { return p.status === "approved"; })
+          .sort(function (a, b) { return new Date(b.paid_at) - new Date(a.paid_at); })[0];
+        return { s: s, overdue: overdue, hasPaid: hasPaid, upToDate: upToDate, lastPay: lastPay };
+      });
+      entries.sort(function (a, b) {
+        if (a.upToDate !== b.upToDate) return a.upToDate ? 1 : -1;
+        if (a.upToDate) {
+          return new Date((b.lastPay && b.lastPay.paid_at) || 0) - new Date((a.lastPay && a.lastPay.paid_at) || 0);
+        }
+        return new Date(a.s.started_at || 0) - new Date(b.s.started_at || 0);
+      });
+
+      entries.forEach(function (e) {
+        var s = e.s, overdue = e.overdue, hasPaid = e.hasPaid, upToDate = e.upToDate, lastPay = e.lastPay;
         var badge = s.status === "frozen" ? '<span class="badge bad">cuenta congelada</span>'
           : s.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
           : (s.status === "active" && !hasPaid) ? '<span class="badge neutral">pendiente</span>'
@@ -161,8 +179,6 @@
         if (upToDate) {
           // Ya pagado y al día: recuadro delgado — el detalle del pago queda un
           // clic más allá en vez de mezclarse con la mensualidad pendiente (si hay otra).
-          var lastPay = subPays.filter(function (p) { return p.status === "approved"; })
-            .sort(function (a, b) { return new Date(b.paid_at) - new Date(a.paid_at); })[0];
           var card = h(
             '<div class="course-compact">' +
             '<div class="course-compact__row">' +
