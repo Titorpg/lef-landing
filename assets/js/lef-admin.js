@@ -47,7 +47,10 @@
   }
   var ROLE_ES = { admin: "Administrador", teacher: "Profesor", student: "Estudiante" };
   var ENROLL_STATUS = ["PendingPayment", "Active", "Cancelled"];
-  var ENROLL_ES = { PendingPayment: "Pendiente de pago", Active: "Activo", Cancelled: "Cancelada" };
+  // "Completed" no está en ENROLL_STATUS a propósito: un módulo se archiva como
+  // completado al asignar el siguiente (admin_assign_module), no desde este select
+  // genérico — de ahí no se puede "corregir" a mano sin crear el módulo siguiente.
+  var ENROLL_ES = { PendingPayment: "Pendiente de pago", Active: "Activo", Completed: "Completado", Cancelled: "Cancelada" };
 
   function toast(msg, kind) {
     var t = h('<div class="pnl-alert ' + (kind || "ok") + '" style="position:fixed;right:20px;bottom:20px;z-index:80;max-width:360px;box-shadow:0 8px 24px rgba(0,0,0,.15)">' + esc(msg) + "</div>");
@@ -306,7 +309,7 @@
       var recentPays = isAdmin ? (res[5].data || []) : [];
       var preCount = isAdmin ? (res[6] && res[6].count) || 0 : 0;
 
-      var activos = enr.filter(function (e) { return e.status !== "Cancelled"; });
+      var activos = enr.filter(function (e) { return e.status !== "Cancelled" && e.status !== "Completed"; });
       var nuevas = enr.filter(function (e) { return e.status === "PendingPayment"; }).length;
       // "Pendiente" (suscripción) = suscripción activa que todavía no tiene ningún pago confirmado.
       var pendientes = billing.filter(function (b) { return b.status === "active" && !b.last_payment_at; }).length;
@@ -359,7 +362,7 @@
           "<td>" + esc(e.groups && e.groups.teachers ? e.groups.teachers.full_name : "—") + "</td>" +
           "<td></td><td>" + date(e.created_at) + "</td></tr>");
         var cell = tr.children[6];
-        if (isAdmin) {
+        if (isAdmin && e.status !== "Completed") {
           var sel = h('<select style="width:auto">' + ENROLL_STATUS.map(function (s) {
             return '<option value="' + s + '"' + (s === e.status ? " selected" : "") + ">" + ENROLL_ES[s] + "</option>";
           }).join("") + "</select>");
@@ -1261,7 +1264,7 @@
     Promise.all([
       q("groups").select("*,modules(level,title),schedules(days,start_time,end_time,cycles(name,status))")
         .eq("teacher_id", t.id).eq("active", true).order("created_at", { ascending: false }),
-      q("enrollments").select("group_id,students(full_name)").neq("status", "Cancelled")
+      q("enrollments").select("group_id,students(full_name)").not("status", "in", "(Cancelled,Completed)")
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       var groups = res[0].data || [];
@@ -1528,9 +1531,9 @@
       Promise.all([
         q("groups").select("*,modules(level,title),schedules(days,start_time,end_time)").eq("id", g.id).single(),
         q("enrollments").select("id,student_id,students(full_name,whatsapp,doc_type,doc_number)")
-          .eq("group_id", g.id).neq("status", "Cancelled"),
+          .eq("group_id", g.id).not("status", "in", "(Cancelled,Completed)"),
         q("enrollments").select("id,student_id,students(full_name,whatsapp,doc_type,doc_number)")
-          .eq("module_id", g.module_id).is("group_id", null).neq("status", "Cancelled")
+          .eq("module_id", g.module_id).is("group_id", null).not("status", "in", "(Cancelled,Completed)")
       ]).then(function (res) {
         if (res[0].error) throw res[0].error;
         var grp = res[0].data, dentro = res[1].data || [], libres = res[2].data || [];

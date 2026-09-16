@@ -323,39 +323,100 @@
       '<p class="bar-note">' + esc(doneMsg) + "</p></div>";
   }
 
+  // Completado = el admin ya archivó ese módulo (asignó el siguiente), o el ciclo
+  // ya terminó aunque todavía no le hayan asignado el módulo que sigue.
+  function isCourseDone(c) {
+    if (c.enrollment_status === "Completed") return true;
+    if (!c.cycle_end_date) return false;
+    return new Date() >= new Date(c.cycle_end_date + "T00:00:00");
+  }
+
+  function renderCourseHero(main, c) {
+    main.appendChild(h(
+      '<div class="course-hero">' +
+      '<div class="lvl-tag">Nivel · matrícula ' + esc(c.registration_number) + "</div>" +
+      "<h2>" + esc(levelOf(c.module_level)) + "</h2>" +
+      '<div class="mod-name">Módulo actual: ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
+      progressBar(c.cycle_start_date, c.cycle_end_date) +
+      "</div>"
+    ));
+    if (c.module_description) main.appendChild(h('<p class="pnl-sub"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>"));
+
+    if (c.schedule_days && c.schedule_days.length) {
+      main.appendChild(h(
+        '<div class="stat-row">' +
+        '<div class="stat"><div class="k">Días</div><div class="v" style="font-size:16px">' + esc(fmtDays(c.schedule_days)) + "</div></div>" +
+        '<div class="stat"><div class="k">Horario</div><div class="v" style="font-size:16px">' + fmtTime(c.schedule_start_time) + " – " + fmtTime(c.schedule_end_time) + "</div></div>" +
+        (c.teacher_full_name ? '<div class="stat"><div class="k">Profesor(a)</div><div class="v" style="font-size:16px">' + esc(c.teacher_full_name) + "</div></div>" : "") +
+        "</div>"
+      ));
+    } else {
+      main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.</div>'));
+    }
+  }
+
+  // Módulo ya culminado: recuadro delgado (igual que en Facturación), con "Ver
+  // detalle" para el resumen de qué se vio y que quedó aprobado — sin mezclarse
+  // con el módulo actual, que es el que debe verse en primer plano.
+  function renderCourseCompact(main, c) {
+    var card = h(
+      '<div class="course-compact">' +
+      '<div class="course-compact__row">' +
+      '<div>' +
+      '<div class="lvl-tag">Nivel · ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
+      '<div class="course-compact__sum">Matrícula ' + esc(c.registration_number) + ' · <span class="badge ok">completado</span></div>' +
+      "</div>" +
+      '<button class="btn btn-ghost btn-sm" data-detail-toggle>Ver detalle</button>' +
+      "</div>" +
+      '<div class="course-compact__detail" hidden></div>' +
+      "</div>"
+    );
+    main.appendChild(card);
+
+    var toggleBtn = card.querySelector("[data-detail-toggle]");
+    var detailPanel = card.querySelector(".course-compact__detail");
+    var open = false;
+    toggleBtn.addEventListener("click", function () {
+      open = !open;
+      detailPanel.hidden = !open;
+      toggleBtn.textContent = open ? "Ocultar detalle" : "Ver detalle";
+      if (open && !detailPanel.dataset.filled) {
+        detailPanel.dataset.filled = "1";
+        var scheduleHtml = (c.schedule_days && c.schedule_days.length)
+          ? '<div class="stat-row stat-row--stack" style="margin-bottom:10px">' +
+            '<div class="stat"><div class="k">Días</div><div class="v" style="font-size:16px">' + esc(fmtDays(c.schedule_days)) + "</div></div>" +
+            '<div class="stat"><div class="k">Horario</div><div class="v" style="font-size:16px">' + fmtTime(c.schedule_start_time) + " – " + fmtTime(c.schedule_end_time) + "</div></div>" +
+            (c.teacher_full_name ? '<div class="stat"><div class="k">Profesor(a)</div><div class="v" style="font-size:16px">' + esc(c.teacher_full_name) + "</div></div>" : "") +
+            "</div>"
+          : "";
+        detailPanel.innerHTML =
+          (c.cycle_start_date && c.cycle_end_date ? '<p class="muted" style="font-size:12.5px;margin-bottom:10px">Ciclo: ' + date(c.cycle_start_date) + " – " + date(c.cycle_end_date) + "</p>" : "") +
+          scheduleHtml +
+          (c.module_description ? '<p class="pnl-sub" style="margin-top:4px"><strong>Contenido visto:</strong> ' + esc(c.module_description) + "</p>" : "") +
+          '<p class="pnl-sub" style="margin-top:10px;font-weight:600">Módulo completado y aprobado.</p>';
+      }
+    });
+  }
+
   function renderCourse(main) {
     sb.rpc("get_my_course").then(function (r) {
       if (r.error) throw r.error;
       var rows = r.data || [];
-      var c = rows[0];
       main.innerHTML = '<h1 class="pnl-h">Mi curso</h1><p class="pnl-sub">El nivel y el módulo en el que estás inscrito actualmente.</p>';
 
-      if (!c) {
+      if (!rows.length) {
         main.appendChild(h('<div class="pnl-alert ok">Aún no tienes un módulo asignado. Escríbenos por WhatsApp si crees que esto es un error.</div>'));
         return;
       }
 
-      main.appendChild(h(
-        '<div class="course-hero">' +
-        '<div class="lvl-tag">Nivel · matrícula ' + esc(c.registration_number) + "</div>" +
-        "<h2>" + esc(levelOf(c.module_level)) + "</h2>" +
-        '<div class="mod-name">Módulo actual: ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
-        progressBar(c.cycle_start_date, c.cycle_end_date) +
-        "</div>"
-      ));
-      if (c.module_description) main.appendChild(h('<p class="pnl-sub"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>"));
+      var current = rows.filter(function (c) { return !isCourseDone(c); });
+      var done = rows.filter(isCourseDone);
 
-      if (c.schedule_days && c.schedule_days.length) {
-        main.appendChild(h(
-          '<div class="stat-row">' +
-          '<div class="stat"><div class="k">Días</div><div class="v" style="font-size:16px">' + esc(fmtDays(c.schedule_days)) + "</div></div>" +
-          '<div class="stat"><div class="k">Horario</div><div class="v" style="font-size:16px">' + fmtTime(c.schedule_start_time) + " – " + fmtTime(c.schedule_end_time) + "</div></div>" +
-          (c.teacher_full_name ? '<div class="stat"><div class="k">Profesor(a)</div><div class="v" style="font-size:16px">' + esc(c.teacher_full_name) + "</div></div>" : "") +
-          "</div>"
-        ));
-      } else {
-        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.</div>'));
+      current.forEach(function (c) { renderCourseHero(main, c); });
+      if (!current.length) {
+        main.appendChild(h('<div class="pnl-alert ok">Ya completaste tu módulo actual — LEF te asignará el siguiente en breve.</div>'));
       }
+      done.forEach(function (c) { renderCourseCompact(main, c); });
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu curso: ' + esc(e.message) + "</div>";
     });
