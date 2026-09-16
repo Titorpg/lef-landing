@@ -64,6 +64,25 @@
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
   var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reverso" };
 
+  var WHATSAPP_NUMBER = "573013240652";
+  function waLink(s) {
+    var msg = "Hola LEF, ya hice la transferencia de mi mensualidad" +
+      (s.module_level ? " del módulo " + s.module_level : "") + " (" + money(s.monthly_amount, s.currency) + "). Adjunto el comprobante.";
+    return "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(msg);
+  }
+  function copyKey(btn) {
+    var original = btn.textContent;
+    function done(ok) {
+      btn.textContent = ok ? "¡Llave copiada!" : "No se pudo copiar";
+      setTimeout(function () { btn.textContent = original; }, 2000);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText("@lefcenter").then(function () { done(true); }).catch(function () { done(false); });
+    } else {
+      done(false);
+    }
+  }
+
   function boot() {
     sb.auth.getSession().then(function (r) {
       if (!r.data.session) return window.location.replace("login.html");
@@ -227,9 +246,16 @@
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
-            '<p style="font-weight:600;margin-bottom:6px">Pago en línea</p>' +
-            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Paga tu mensualidad con PSE o tarjeta, de forma segura, a través de Wompi.</p>' +
-            '<button class="btn btn-blue" data-pay="' + s.id + '">Pagar en línea</button> ' +
+            '<p style="font-weight:600;margin-bottom:6px">Cómo pagar</p>' +
+            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Transfiere directo a la cuenta de LEF escaneando este QR desde tu app bancaria (Bre-B), o con tarjeta débito/crédito.</p>' +
+            '<div class="pay-qr">' +
+            '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img">' +
+            '<button class="btn btn-ghost btn-sm" data-copy-key="' + s.id + '">Copiar llave @lefcenter</button>' +
+            '<p class="muted" style="font-size:12px;text-align:center;max-width:320px">' +
+            'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
+            "</div>" +
+            '<div class="pay-divider"><span>o paga con tarjeta</span></div>' +
+            '<button class="btn btn-blue" data-pay="' + s.id + '">Pagar con tarjeta débito/crédito</button> ' +
             '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
             '<p class="muted" data-pay-msg style="font-size:12.5px;margin-top:10px"></p>' +
             "</div>") +
@@ -241,6 +267,10 @@
         if (payBtn) {
           var payMsg = hero.querySelector("[data-pay-msg]");
           payBtn.addEventListener("click", function () { openWompiCheckout(s.id, payBtn, payMsg, main); });
+        }
+        var copyBtn = hero.querySelector("[data-copy-key]");
+        if (copyBtn) {
+          copyBtn.addEventListener("click", function () { copyKey(copyBtn); });
         }
       });
 
