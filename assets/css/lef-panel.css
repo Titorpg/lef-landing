@@ -177,12 +177,36 @@ td.acts .btn{margin:2px 4px 2px 0;}
 /* pago en línea integrado dentro del mismo recuadro del curso (Facturación) */
 .course-hero__pay{border-top:1px solid var(--niebla);margin-top:4px;padding-top:18px;}
 
-/* QR de transferencia directa (Bre-B/Bancolombia) antes del botón de tarjeta */
-.pay-qr{display:flex;flex-direction:column;align-items:center;gap:10px;margin:2px 0 20px;}
+/* ---- modal "¿Cómo quieres pagar?" (Facturación): QR a la izquierda, tarjeta
+   visual de Wompi a la derecha — imita la mecánica del widget de Wompi ---- */
+.pay-modal{position:relative;}
+.pay-modal h3{padding-right:36px;}
+.pay-modal__close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;
+  border:none;background:var(--niebla);color:var(--grafito);font-size:19px;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.pay-modal__close:hover{background:#d8d8d4;}
+.pay-modal__cols{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;margin-top:4px;}
+.pay-modal__col{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1 1 220px;max-width:250px;}
+.pay-modal__divider{flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:var(--niebla);
+  color:var(--plata);font-size:11.5px;font-weight:700;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:center;}
 .pay-qr__img{width:100%;max-width:220px;border-radius:14px;border:1px solid var(--niebla);}
-.pay-divider{display:flex;align-items:center;gap:10px;margin:0 0 14px;
-  color:var(--plata);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;}
-.pay-divider::before,.pay-divider::after{content:"";flex:1;height:1px;background:var(--niebla);}
+
+/* tarjeta visual que dispara el widget de Wompi — contrasta con el QR en vez
+   de un botón plano perdido al lado de una imagen */
+.wompi-card{all:unset;cursor:pointer;width:100%;max-width:220px;aspect-ratio:1.586/1;
+  border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;
+  background:linear-gradient(135deg,#3d5cb8 0%,#1c3170 100%);color:#fff;
+  box-shadow:0 10px 22px -10px rgba(28,49,112,.55);
+  transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease;}
+.wompi-card:hover,.wompi-card:focus-visible{transform:translateY(-2px) scale(1.02);
+  box-shadow:0 14px 28px -10px rgba(28,49,112,.6);}
+.wompi-card.is-loading{opacity:.6;pointer-events:none;}
+.wompi-card__chip{width:32px;height:23px;border-radius:5px;background:linear-gradient(135deg,#ecd696,#c8a24f);}
+.wompi-card__dots{font-family:'SFMono-Regular',ui-monospace,Consolas,monospace;
+  font-size:13px;letter-spacing:2px;opacity:.85;}
+.wompi-card__brand{font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1;}
+.wompi-card__sub{font-size:11px;opacity:.85;margin-top:-8px;}
 
 /* ---- curso ya pagado y al día (Facturación): recuadro delgado con detalle a un clic ---- */
 .course-compact{border:1px solid var(--niebla);border-radius:12px;background:#fff;

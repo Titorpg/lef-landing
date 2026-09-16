@@ -246,31 +246,18 @@
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
-            '<p style="font-weight:600;margin-bottom:6px">Cómo pagar</p>' +
-            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Transfiere directo a la cuenta de LEF escaneando este QR desde tu app bancaria (Bre-B), o con tarjeta débito/crédito.</p>' +
-            '<div class="pay-qr">' +
-            '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img">' +
-            '<button class="btn btn-ghost btn-sm" data-copy-key="' + s.id + '">Copiar llave @lefcenter</button>' +
-            '<p class="muted" style="font-size:12px;text-align:center;max-width:320px">' +
-            'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
-            "</div>" +
-            '<div class="pay-divider"><span>o paga con tarjeta</span></div>' +
-            '<button class="btn btn-blue" data-pay="' + s.id + '">Pagar con tarjeta débito/crédito</button> ' +
+            '<p style="font-weight:600;margin-bottom:6px">Pago</p>' +
+            '<p class="muted" style="font-size:13.5px;margin-bottom:14px">Por transferencia directa (QR) o con tarjeta débito/crédito.</p>' +
+            '<button class="btn btn-blue" data-open-pay>Pagar</button> ' +
             '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
-            '<p class="muted" data-pay-msg style="font-size:12.5px;margin-top:10px"></p>' +
             "</div>") +
           "</div>"
         );
         main.appendChild(hero);
 
-        var payBtn = hero.querySelector("[data-pay]");
-        if (payBtn) {
-          var payMsg = hero.querySelector("[data-pay-msg]");
-          payBtn.addEventListener("click", function () { openWompiCheckout(s.id, payBtn, payMsg, main); });
-        }
-        var copyBtn = hero.querySelector("[data-copy-key]");
-        if (copyBtn) {
-          copyBtn.addEventListener("click", function () { copyKey(copyBtn); });
+        var openPayBtn = hero.querySelector("[data-open-pay]");
+        if (openPayBtn) {
+          openPayBtn.addEventListener("click", function () { openPayModal(s, main); });
         }
       });
 
@@ -291,14 +278,59 @@
     });
   }
 
-  function openWompiCheckout(subscriptionId, btn, msgEl, main) {
+  // Recuadro flotante "¿Cómo quieres pagar?" (se abre al pulsar "Pagar"): a la
+  // izquierda el QR de transferencia directa, a la derecha una tarjeta visual
+  // que dispara el widget de Wompi — igual de vistosa que el QR, en vez de un
+  // botón azul plano perdido al lado de una imagen.
+  function openPayModal(s, main) {
+    var bg = h('<div class="pnl-modal-bg"></div>');
+    var box = h(
+      '<div class="pnl-modal wide pay-modal">' +
+      '<button type="button" class="pay-modal__close" data-close aria-label="Cerrar">×</button>' +
+      "<h3>¿Cómo quieres pagar?</h3>" +
+      '<div class="pay-modal__cols">' +
+      '<div class="pay-modal__col">' +
+      '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-qr__img">' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave @lefcenter</button>' +
+      '<p class="muted" style="font-size:12px;text-align:center">' +
+      'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
+      "</div>" +
+      '<div class="pay-modal__divider">o</div>' +
+      '<div class="pay-modal__col">' +
+      '<button type="button" class="wompi-card" data-pay>' +
+      '<span class="wompi-card__chip"></span>' +
+      '<span class="wompi-card__dots">•••• •••• •••• ••••</span>' +
+      '<span class="wompi-card__brand">Wompi</span>' +
+      '<span class="wompi-card__sub">Tarjeta débito / crédito</span>' +
+      "</button>" +
+      '<p class="muted" style="font-size:12px;text-align:center">Pago seguro procesado por Wompi.</p>' +
+      "</div>" +
+      "</div>" +
+      '<p class="muted" data-pay-msg style="text-align:center;font-size:12.5px;margin-top:6px"></p>' +
+      "</div>"
+    );
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+
+    function close() { bg.remove(); }
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    box.querySelector("[data-close]").addEventListener("click", close);
+
+    box.querySelector("[data-copy-key]").addEventListener("click", function (e) { copyKey(e.currentTarget); });
+
+    var wompiCard = box.querySelector("[data-pay]");
+    var msgEl = box.querySelector("[data-pay-msg]");
+    wompiCard.addEventListener("click", function () {
+      openWompiCheckout(s.id, msgEl, main, function (loading) { wompiCard.classList.toggle("is-loading", loading); }, close);
+    });
+  }
+
+  function openWompiCheckout(subscriptionId, msgEl, main, setLoading, closeModal) {
     if (!window.WidgetCheckout) {
       msgEl.textContent = "La pasarela de pagos no cargó. Recarga la página e intenta de nuevo.";
       return;
     }
-    btn.disabled = true;
-    var original = btn.textContent;
-    btn.textContent = "Cargando…";
+    setLoading(true);
     msgEl.textContent = "";
 
     callFn("wompi-checkout", { subscription_id: subscriptionId }).then(function (d) {
@@ -311,14 +343,14 @@
         publicKey: d.publicKey,
         signature: { integrity: d.signature }
       });
-      btn.disabled = false;
-      btn.textContent = original;
+      setLoading(false);
       checkout.open(function (result) {
         var tx = result && result.transaction;
-        if (tx && tx.status === "APPROVED") {
-          msgEl.textContent = "¡Pago recibido! Actualizando tu historial…";
-        } else if (tx && tx.status === "PENDING") {
-          msgEl.textContent = "Tu pago está pendiente de confirmación. Actualizaremos tu historial apenas se confirme.";
+        if (tx && (tx.status === "APPROVED" || tx.status === "PENDING")) {
+          msgEl.textContent = tx.status === "APPROVED"
+            ? "¡Pago recibido! Actualizando tu historial…"
+            : "Tu pago está pendiente de confirmación. Actualizaremos tu historial apenas se confirme.";
+          setTimeout(closeModal, 1500);
         } else {
           msgEl.textContent = "El pago no se completó. Puedes intentarlo de nuevo.";
         }
@@ -328,8 +360,7 @@
         setTimeout(function () { renderBilling(main); }, 5000);
       });
     }).catch(function (e) {
-      btn.disabled = false;
-      btn.textContent = original;
+      setLoading(false);
       msgEl.textContent = "No pudimos iniciar el pago: " + ((e && e.message) || e);
     });
   }
