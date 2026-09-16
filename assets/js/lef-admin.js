@@ -973,7 +973,28 @@
   /* ============ REGISTRO DE EVENTOS ============ */
   var AUDIT_ACTION_ES = {
     "payment.delete": "Pago eliminado", "payment.update": "Pago editado",
-    "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada"
+    "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada",
+    "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)"
+  };
+  // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
+  // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
+  var AUDIT_REASON_ES = {
+    "payment.receipt_backfill": "Un error de programación dejaba el número de recibo vacío en los pagos hechos con Wompi. Ya se corrigió."
+  };
+  // Explicación completa para el botón "Ver" de acciones del sistema — se agrega ANTES del detalle
+  // técnico (que se conserva igual, por si alguien de soporte técnico lo necesita).
+  var AUDIT_ACTION_EXPLAIN_ES = {
+    "payment.receipt_backfill":
+      "¿Qué pasó? Cuando un estudiante pagaba en línea con Wompi, el sistema debía asignarle automáticamente " +
+      "un número de recibo interno (por ejemplo REC-2026-00006), igual que se hace con los pagos manuales. " +
+      "Por un error de programación que existía desde que se creó esa función, esa asignación nunca se hacía " +
+      "— por eso el recibo aparecía vacío (\"—\") en \"Ver pagos\", aunque el pago sí se había cobrado y " +
+      "quedado registrado correctamente.\n\n" +
+      "¿Qué se corrigió? Se completó el número de recibo que faltaba en los pagos afectados. No se cambió " +
+      "ningún monto, fecha, estudiante ni otro dato del pago — solo se llenó el campo del recibo. También se " +
+      "corrigió el sistema para que esto no vuelva a pasar con los próximos pagos de Wompi.\n\n" +
+      "¿Hay algo que hacer? No. Este registro queda aquí solo como comprobante permanente de que se hizo " +
+      "esa corrección — nadie, ni el admin, puede borrar este historial."
   };
   function secRegistro(main) {
     head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
@@ -983,14 +1004,23 @@
       rows.forEach(function (r) {
         var detailBtn = h('<button class="btn btn-sm btn-ghost">Ver</button>');
         var td = h("<td></td>"); td.appendChild(detailBtn);
+        var reasonDisplay = AUDIT_REASON_ES[r.action] || r.reason;
         var tr = h("<tr><td>" + date(r.created_at) + " " + new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) +
           "</td><td>" + esc(r.actor_email || "—") + "</td><td>" + esc(AUDIT_ACTION_ES[r.action] || r.action) +
-          '</td><td class="wrap">' + esc(r.reason) + "</td></tr>");
+          '</td><td class="wrap">' + esc(reasonDisplay) + "</td></tr>");
         tr.appendChild(td);
         detailBtn.onclick = function () {
+          var box = h("<div></div>");
+          var explain = AUDIT_ACTION_EXPLAIN_ES[r.action];
+          if (explain) {
+            box.appendChild(h('<p style="margin:0 0 16px;line-height:1.55;white-space:pre-wrap">' + esc(explain) + "</p>"));
+            box.appendChild(h('<p class="muted" style="font-size:12px;margin:0 0 6px">Motivo técnico original (para soporte):</p>'));
+            box.appendChild(h('<p class="muted" style="font-size:12.5px;margin:0 0 14px">' + esc(r.reason) + "</p>"));
+          }
           var pre = h('<pre style="white-space:pre-wrap;font-size:12px;max-height:60vh;overflow:auto;background:var(--niebla);padding:12px;border-radius:8px">' +
             esc(JSON.stringify(r.details, null, 2)) + "</pre>");
-          modal("Detalle — " + (AUDIT_ACTION_ES[r.action] || r.action), pre, function () { return Promise.resolve(); }, "Cerrar");
+          box.appendChild(pre);
+          modal("Detalle — " + (AUDIT_ACTION_ES[r.action] || r.action), box, function () { return Promise.resolve(); }, "Cerrar");
         };
         t.body.appendChild(tr);
       });
