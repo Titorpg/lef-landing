@@ -246,7 +246,7 @@
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
-            '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +
+            '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria o usando la llave Bre-B @lefcenter, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +
             '<button class="btn btn-blue" data-open-pay>Pagar ahora</button> ' +
             '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
             "</div>") +
@@ -304,9 +304,8 @@
       '<div class="pay-modal__cols">' +
       '<div class="pay-modal__col">' +
       '<img src="assets/qr-bancolombia.jpg" alt="QR de pago Bre-B — Lef Center" class="pay-visual pay-qr__img" data-qr-zoom>' +
-      '<p class="pay-modal__cta-label">Llave Bre-B: @lefcenter</p>' +
-      '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave</button>' +
-      '<p class="muted" style="font-size:11.5px;text-align:center">Toca el QR para verlo en grande y escanearlo mejor.</p>' +
+      '<p class="muted" style="font-size:11.5px;text-align:center;margin-top:-4px">Toca el QR para verlo en grande y escanearlo mejor.</p>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-copy-key>Copiar llave @lefcenter</button>' +
       '<p class="muted" style="font-size:12px;text-align:center">' +
       'Después de transferir, <a href="' + waLink(s) + '" target="_blank" rel="noopener">escríbenos por WhatsApp con el comprobante</a> para registrar tu pago.</p>' +
       "</div>" +

@@ -192,9 +192,13 @@ td.acts .btn{margin:2px 4px 2px 0;}
   color:var(--plata);font-size:11.5px;font-weight:700;text-transform:uppercase;
   display:flex;align-items:center;justify-content:center;}
 
-/* misma medida para el QR y el banner de Wompi: el recuadro queda simétrico
-   aunque cada imagen traiga su propia proporción (ambas son verticales) */
-.pay-visual{width:100%;max-width:210px;border-radius:14px;border:1px solid var(--niebla);display:block;}
+/* misma caja para el QR y el banner de Wompi: cada imagen trae su propia
+   proporción (el QR es más alargado que el banner), así que se fuerza la
+   misma medida (ancho + alto, proporción del QR) y "contain" ajusta la
+   imagen del banner adentro sin recortarla — como ambas tienen fondo
+   blanco, el espacio que sobra no se nota. */
+.pay-visual{width:100%;max-width:210px;aspect-ratio:718/1280;object-fit:contain;
+  background:#fff;border-radius:14px;border:1px solid var(--niebla);display:block;}
 .pay-qr__img{cursor:zoom-in;}
 
 /* lupa: el QR a tamaño de modal es muy chico para que el celular lo enfoque bien */
