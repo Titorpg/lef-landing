@@ -194,10 +194,10 @@ td.acts .btn{margin:2px 4px 2px 0;}
 
 /* misma caja para el QR y el banner de Wompi: cada imagen trae su propia
    proporción (el QR es más alargado que el banner), así que se fuerza la
-   misma medida (ancho + alto, proporción del QR) y "contain" ajusta la
-   imagen del banner adentro sin recortarla — como ambas tienen fondo
-   blanco, el espacio que sobra no se nota. */
-.pay-visual{width:100%;max-width:210px;aspect-ratio:718/1280;object-fit:contain;
+   misma medida (ancho + alto, proporción del QR) y "cover" AMPLÍA la imagen
+   del banner hasta llenar esa caja (recorta un poco los bordes en vez de
+   dejar espacio en blanco alrededor). */
+.pay-visual{width:100%;max-width:210px;aspect-ratio:718/1280;object-fit:cover;
   background:#fff;border-radius:14px;border:1px solid var(--niebla);display:block;}
 .pay-qr__img{cursor:zoom-in;}
 
@@ -209,11 +209,7 @@ td.acts .btn{margin:2px 4px 2px 0;}
   border:none;background:#fff;color:var(--ink);font-size:22px;line-height:1;cursor:pointer;
   display:flex;align-items:center;justify-content:center;padding:0;}
 
-/* etiqueta destacada bajo cada imagen ("Llave Bre-B: ..." / "Paga ahora") y el
-   botón verde que dispara el widget de Wompi — todo centrado a propósito:
-   en móvil las dos columnas quedan una debajo de otra y se nota si algo
-   no está centrado. */
-.pay-modal__cta-label{font-weight:700;font-size:14.5px;color:var(--ink);margin:0;text-align:center;}
+/* botón verde que dispara el widget de Wompi, justo debajo de su imagen */
 .btn-wompi{all:unset;cursor:pointer;width:100%;max-width:210px;text-align:center;
   background:#17B48A;color:#fff;font-weight:700;font-size:14.5px;
   padding:12px 20px;border-radius:10px;box-shadow:0 8px 18px -8px rgba(23,180,138,.55);

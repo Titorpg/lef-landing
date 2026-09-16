@@ -312,7 +312,6 @@
       '<div class="pay-modal__divider">o</div>' +
       '<div class="pay-modal__col">' +
       '<img src="assets/wompi-pagos-vertical.png" alt="Wompi — paga con tarjeta débito o crédito" class="pay-visual">' +
-      '<p class="pay-modal__cta-label">Paga ahora</p>' +
       '<button type="button" class="btn-wompi" data-pay>Pague aquí</button>' +
       "</div>" +
       "</div>" +
