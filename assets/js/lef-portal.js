@@ -167,8 +167,7 @@
             '<div class="course-compact">' +
             '<div class="course-compact__row">' +
             '<div>' + titleTag +
-            '<div class="course-compact__sum">' + money(s.monthly_amount, s.currency) + " / mes · " + badge +
-            " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+            '<div class="course-compact__sum">' + money(s.monthly_amount, s.currency) + " / mes · " + badge + "</div>" +
             "</div>" +
             '<button class="btn btn-ghost btn-sm" data-detail-toggle>Ver detalle</button>' +
             "</div>" +
@@ -187,7 +186,7 @@
             if (open && !detailPanel.dataset.filled) {
               detailPanel.dataset.filled = "1";
               detailPanel.innerHTML = lastPay ? (
-                '<div class="stat-row" style="margin-bottom:10px">' +
+                '<div class="stat-row stat-row--stack" style="margin-bottom:10px">' +
                 '<div class="stat"><div class="k">Recibo</div><div class="v" style="font-size:16px">' + esc(lastPay.receipt_number || "—") + "</div></div>" +
                 '<div class="stat"><div class="k">Monto pagado</div><div class="v" style="font-size:16px">' + money(lastPay.amount, lastPay.currency) + "</div></div>" +
                 '<div class="stat"><div class="k">Fecha de pago</div><div class="v" style="font-size:16px">' + date(lastPay.paid_at) + "</div></div>" +
@@ -208,7 +207,7 @@
           '<div class="course-hero">' +
           titleTag +
           "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
-          '<div class="mod-name">' + badge + " · próximo pago " + esc(date(s.next_due_date)) + "</div>" +
+          '<div class="mod-name">' + badge + "</div>" +
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +

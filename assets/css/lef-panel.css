@@ -154,6 +154,9 @@ td.acts .btn{margin:2px 4px 2px 0;}
   .stat-row{grid-auto-columns:minmax(140px,1fr);overflow-x:auto;padding-bottom:4px;
     scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
   .stat{scroll-snap-align:start;}
+  /* variante que apila hacia abajo en vez de deslizar a la derecha (detalle de pago) */
+  .stat-row--stack{grid-auto-flow:row;grid-auto-columns:unset;overflow-x:visible;}
+  .stat-row--stack .stat{scroll-snap-align:unset;}
 }
 
 /* ---- bloque grande de nivel/módulo (portal, Mi curso) ---- */
