@@ -159,18 +159,19 @@
       // con la más reciente arriba — así queda como una lista que se va apilando cada
       // vez que llega un curso nuevo a cobrarse.
       var entries = subs.map(function (s) {
-        var overdue = s.status === "active" && s.next_due_date &&
-          (new Date() > new Date(new Date(s.next_due_date).getTime() + (s.grace_days || 0) * 864e5));
+        var paid = s.paid_amount || 0;
         var subPays = pays.filter(function (p) { return p.subscription_id === s.id; });
-        // "Pendiente" = todavía no hay ningún pago confirmado de esta suscripción.
-        var hasPaid = subPays.some(function (p) { return p.status === "approved"; });
-        // Al día = ya pagó el período actual y no está vencido. En este caso NO debe
-        // poder volver a pagar el mismo curso por error (ver caso del estudiante que
-        // pasó de A1.1 pagado a A1.2: A1.1 debe quedar "al día", sin botón de pago).
-        var upToDate = s.status === "active" && hasPaid && !overdue;
+        // "Pendiente" = todavía no hay ningún abono. "Pago parcial" = hay algo
+        // abonado pero no completa la mensualidad — el curso no se activa
+        // todavía. "Al día" = la mensualidad ya está completa (en uno o
+        // varios abonos). En este caso NO debe poder volver a pagar el mismo
+        // curso por error (ver caso del estudiante que pasó de A1.1 pagado a
+        // A1.2: A1.1 debe quedar "al día", sin botón de pago).
+        var partial = s.status === "active" && paid > 0 && paid < s.monthly_amount;
+        var upToDate = s.status === "active" && paid >= s.monthly_amount;
         var lastPay = subPays.filter(function (p) { return p.status === "approved"; })
           .sort(function (a, b) { return new Date(b.paid_at) - new Date(a.paid_at); })[0];
-        return { s: s, overdue: overdue, hasPaid: hasPaid, upToDate: upToDate, lastPay: lastPay };
+        return { s: s, paid: paid, partial: partial, upToDate: upToDate, lastPay: lastPay };
       });
       entries.sort(function (a, b) {
         if (a.upToDate !== b.upToDate) return a.upToDate ? 1 : -1;
@@ -181,11 +182,11 @@
       });
 
       entries.forEach(function (e) {
-        var s = e.s, overdue = e.overdue, hasPaid = e.hasPaid, upToDate = e.upToDate, lastPay = e.lastPay;
+        var s = e.s, paid = e.paid, partial = e.partial, upToDate = e.upToDate, lastPay = e.lastPay;
         var badge = s.status === "frozen" ? '<span class="badge bad">cuenta congelada</span>'
           : s.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
-          : (s.status === "active" && !hasPaid) ? '<span class="badge neutral">pendiente</span>'
-          : overdue ? '<span class="badge warn">pago pendiente</span>'
+          : (s.status === "active" && paid <= 0) ? '<span class="badge neutral">pendiente</span>'
+          : partial ? '<span class="badge warn">pago parcial</span>'
           : '<span class="badge ok">al día</span>';
         var titleTag = s.module_level
           ? '<div class="lvl-tag">Nivel · ' + esc(s.module_level) + " — " + esc(s.module_title) + "</div>"
@@ -244,6 +245,8 @@
           "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
           '<div class="mod-name">' + badge + "</div>" +
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
+          (partial ? '<p class="pnl-sub" style="margin:-8px 0 18px">Ya abonaste <strong>' + money(paid, s.currency) + "</strong> — falta <strong>" +
+            money(s.monthly_amount - paid, s.currency) + "</strong> para completar tu mensualidad y activar el curso.</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
             '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria o usando la llave Bre-B @lefcenter, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +

@@ -1,5 +1,64 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 17 sep 2026 — Pagos: se quitan las fechas fijas, se agregan abonos
+
+**Pedido del usuario:** en Pagos, cambiar "Crear suscripción" por "Generar
+pago"; quitar "día de cobro" y "días de gracia" del formulario (ya no hay
+fechas fijas de pago); agregar debajo de la mensualidad una opción para
+registrar abonos — mientras el abono no complete el valor de la mensualidad,
+la cuenta queda "pago parcial" y el estudiante **no** obtiene acceso al curso.
+
+**Decisiones tomadas con el usuario:** al no haber más fechas fijas, se
+retiran también el botón "Congelar cuentas vencidas" y la etiqueta "en mora"
+(dependían de día de cobro + días de gracia) — congelar una cuenta sigue
+existiendo, pero como acción manual del admin (Editar → Estado: Congelada).
+La columna "Próximo pago" de la tabla de Pagos se quita (no se reemplaza por
+otra fecha).
+
+**Cambios:**
+1. **Botón "+ Generar pago"** (antes "+ Nueva suscripción"). El formulario ya
+   no pide día de cobro ni días de gracia; debajo de "Mensualidad (COP)" hay
+   un campo opcional **"Abono inicial"** + método — si el estudiante ya
+   entregó algo de dinero al momento de generar el cobro, se registra ahí
+   mismo (llama a `record_payment` tras crear la suscripción).
+2. **Tabla de Pagos**: columna "Próximo pago" → **"Pagado"** (muestra el
+   monto abonado hasta ahora). Estado: `pendiente` (sin abonos) / **`pago
+   parcial`** (abonos que no completan la mensualidad) / `al día` (completa)
+   / `congelada` / `cancelada` — ya sin fechas de por medio.
+3. **"Registrar pago"** (para abonos posteriores a la creación): muestra
+   cuánto se ha abonado y cuánto falta, y precarga el monto restante.
+4. **Dashboard**: el KPI "En mora" se reemplaza por **"Pago parcial"**.
+5. **Portal del estudiante (Facturación)**: mismo criterio — "pago parcial"
+   en vez de "vencido"; el recuadro de pago muestra cuánto ya se abonó y
+   cuánto falta.
+6. **Hallazgo real, corregido de paso:** desde el 6 sep, `record_payment`
+   (el que usa "Registrar pago" en el panel) tenía **dos versiones
+   sobrecargadas** en la base — la de 11 parámetros (con datos del pagador y
+   recibo, la que en verdad invoca el panel) y una de 6 parámetros agregada
+   después que sí activaba la inscripción pero, al tener una firma distinta,
+   **nunca llegó a invocarse**. En la práctica, un pago manual registrado
+   desde el panel **nunca activaba el curso del estudiante** (solo lo hacía
+   un pago en línea por Wompi, que usa una función aparte). Esta migración
+   limpia la duplicidad y deja una sola versión, con la activación basada en
+   el total pagado (no en "cualquier pago").
+
+**⚠️ Migración pendiente de aplicar a mano** (Claude no puede correr SQL en
+producción): `supabase/migrations/20260918000000_pagos_parciales_sin_fechas.sql`
+— pégala en el SQL Editor de Supabase. Elimina `billing_day`, `grace_days` y
+`next_due_date` de `subscriptions`; redefine `record_payment`,
+`record_wompi_payment`, `admin_billing_overview` y `get_my_billing`. El
+código del panel/portal ya está desplegado y **asume que esta migración ya
+corrió** — hasta que se aplique, el panel de Pagos fallará al cargar (las
+columnas `is_overdue`/`next_due_date` que esperaba ya no las devuelve el
+código nuevo, y viceversa la función vieja no tiene `paid_amount`).
+
+**Pendiente / limitación conocida:** el widget de Wompi (`wompi-checkout`)
+siempre cobra el valor **completo** de la mensualidad — no sabe restar un
+abono ya registrado a mano. Si un estudiante con un abono parcial paga por
+Wompi, se le cobrará el total de nuevo, no el saldo restante. No se tocó
+porque no se pidió; si hace falta, hay que sumarle a `wompi-checkout` el
+cálculo de saldo pendiente (`monthly_amount - paid_amount`).
+
 ## Sesión 15 sep 2026 — ajustes al panel admin (Profesores/Horarios/Usuarios/Dashboard)
 
 **✅ Desplegado (commit `8db9080`, deploy `dpl_5WakBu4P5wrp2RikXEqpedRW2oSW`):**

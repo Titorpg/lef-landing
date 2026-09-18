@@ -108,7 +108,7 @@
   };
   var CODE_ES = {
     LEF_PAYMENT_INMUTABLE: "Un pago registrado no se edita ni se borra. Usa “Reversar” para corregirlo.",
-    LEF_PERIOD_ALREADY_PAID: "Ya hay un pago aprobado para ese mes en esta suscripción. Si fue un error, revérsalo primero.",
+    LEF_SUBSCRIPTION_ALREADY_PAID: "Esta mensualidad ya está completa. Si necesitas corregir algo, edita o reversa un pago existente desde “Ver pagos”.",
     LEF_ALREADY_REVERSED: "Ese pago ya tiene un reverso registrado.",
     LEF_PAYMENT_NOT_FOUND: "No se encontró el pago.",
     LEF_STUDENT_NOT_FOUND: "No se encontró el estudiante.",
@@ -311,18 +311,19 @@
 
       var activos = enr.filter(function (e) { return e.status !== "Cancelled" && e.status !== "Completed"; });
       var nuevas = enr.filter(function (e) { return e.status === "PendingPayment"; }).length;
-      // "Pendiente" (suscripción) = suscripción activa que todavía no tiene ningún pago confirmado.
-      var pendientes = billing.filter(function (b) { return b.status === "active" && !b.last_payment_at; }).length;
-      var alDia = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && !b.is_overdue; }).length;
-      var mora = billing.filter(function (b) { return b.status === "active" && b.last_payment_at && b.is_overdue; }).length;
+      // "Pendiente" = suscripción activa sin ningún abono todavía; "pago parcial" = tiene
+      // algo abonado pero no completa la mensualidad; "al día" = mensualidad completa.
+      var pendientes = billing.filter(function (b) { return b.status === "active" && !(b.paid_amount > 0); }).length;
+      var parciales = billing.filter(function (b) { return b.status === "active" && b.paid_amount > 0 && b.paid_amount < b.monthly_amount; }).length;
+      var alDia = billing.filter(function (b) { return b.status === "active" && b.paid_amount >= b.monthly_amount; }).length;
       var congeladas = billing.filter(function (b) { return b.status === "frozen"; }).length;
 
       var tiles = [["Estudiantes", studentCount], ["Profesores", teacherCount],
         ["Inscripciones activas", activos.length], ["Inscripciones sin pago", nuevas]];
       if (isAdmin) {
         tiles.push(["Pre-inscritos", preCount]);
-        tiles.push(["Pendientes", pendientes]); tiles.push(["Al día", alDia]);
-        tiles.push(["En mora", mora]); tiles.push(["Congeladas", congeladas]);
+        tiles.push(["Pendientes", pendientes]); tiles.push(["Pago parcial", parciales]);
+        tiles.push(["Al día", alDia]); tiles.push(["Congeladas", congeladas]);
       }
       main.appendChild(statRow(tiles));
 
@@ -594,11 +595,9 @@
         p_city: p.city || null
       }).then(function (out) {
         var row = Array.isArray(out) ? out[0] : out;
-        var today = new Date();
         return q("subscriptions").insert({
           student_id: row.student_id, enrollment_id: row.enrollment_id, module_id: moduleId,
           monthly_amount: monthly, currency: "COP",
-          billing_day: Math.min(today.getDate(), 28), next_due_date: ymd(today.getFullYear(), today.getMonth(), today.getDate()),
           payer_name: p.full_name, payer_doc_type: docType, payer_doc_number: dn,
           payer_email: p.email, payer_phone: p.whatsapp
         }).then(function (subRes) {
@@ -614,7 +613,7 @@
               '</strong> creada — inscripción en <strong>pendiente de pago</strong>, mensualidad ' + esc(money(monthly, "COP")) + ' ya generada.</p>' +
               '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(p.email) + "</strong><br>" +
               'Contraseña temporal: <code style="font-size:14px">' + esc(accountPwd) + "</code></p>" +
-              '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se registre su primer pago.</p></div>');
+              '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se complete el valor de la mensualidad (en uno o varios abonos).</p></div>');
             modal("Estudiante creado", info, function () { return Promise.resolve(); }, "Entendido");
           }).catch(function (accErr) {
             route();
@@ -725,30 +724,25 @@
 
   /* ============ PAGOS ============ */
   function secPagos(main) {
-    head(main, "Pagos", "Suscripciones mensuales y estado de pago. El estudiante paga en línea con Wompi desde su portal, o registrás el pago aquí a mano.");
-    var bar = h('<div class="pnl-toolbar">' +
-      '<button class="btn btn-ghost btn-sm" data-freeze>Congelar cuentas vencidas</button>' +
-      '<span class="muted" style="font-size:13px">La congelación automática se agenda en la Fase 2.</span></div>');
+    head(main, "Pagos", "El cobro de cada módulo y su estado de pago. El estudiante paga en línea con Wompi desde su portal, o registrás el pago (o un abono) aquí a mano.");
+    var bar = h('<div class="pnl-toolbar"></div>');
     main.appendChild(bar);
-    bar.querySelector("[data-freeze]").onclick = function () {
-      rpc("freeze_overdue_subscriptions").then(function (n) { toast(n + " cuenta(s) congelada(s)."); route(); })
-        .catch(function (e) { toast(friendly(e), "err"); });
-    };
     Promise.all([
       rpc("admin_billing_overview"),
       q("students").select("id,full_name,doc_type,doc_number,email,whatsapp").order("full_name"),
       activeModules()
     ]).then(function (res) {
         var rows = res[0] || [], students = res[1].data || [], mods = res[2];
-        var newBtn = h('<button class="btn btn-dark btn-sm" data-new>+ Nueva suscripción</button>');
+        var newBtn = h('<button class="btn btn-dark btn-sm" data-new>+ Generar pago</button>');
         bar.appendChild(newBtn);
         newBtn.onclick = function () { editarSuscripcion(null, students, mods); };
-        var t = tableWrap(["Estudiante / pagador", "Módulo", "Mensualidad", "Próximo pago", "Último pago", "Estado", "Acciones"]);
+        var t = tableWrap(["Estudiante / pagador", "Módulo", "Mensualidad", "Pagado", "Último pago", "Estado", "Acciones"]);
         rows.forEach(function (r) {
+          var paid = r.paid_amount || 0;
           var st = r.status === "frozen" ? '<span class="badge bad">congelada</span>'
             : r.status === "cancelled" ? '<span class="badge neutral">cancelada</span>'
-            : (r.status === "active" && !r.last_payment_at) ? '<span class="badge neutral">pendiente</span>'
-            : r.is_overdue ? '<span class="badge warn">en mora</span>'
+            : paid <= 0 ? '<span class="badge neutral">pendiente</span>'
+            : paid < r.monthly_amount ? '<span class="badge warn">pago parcial</span>'
             : '<span class="badge ok">al día</span>';
           var who = esc(r.student_name) +
             (r.student_deleted ? ' <span class="badge neutral">estudiante eliminado</span>' : "") +
@@ -757,7 +751,7 @@
                 (r.payer_doc_number ? " (" + esc((r.payer_doc_type || "") + " " + r.payer_doc_number) + ")" : "") + "</span>"
               : "");
           var tr = h("<tr><td>" + who + '</td><td class="wrap">' + esc(r.module_label || "—") +
-            "</td><td>" + money(r.monthly_amount, r.currency) + "</td><td>" + date(r.next_due_date) + "</td><td>" +
+            "</td><td>" + money(r.monthly_amount, r.currency) + "</td><td>" + money(paid, r.currency) + "</td><td>" +
             (r.last_payment_at ? date(r.last_payment_at) + " · " + money(r.last_payment_amount, r.currency) : "—") +
             '</td><td>' + st + '</td><td class="acts"></td></tr>');
           var cell = tr.children[6];
@@ -776,7 +770,7 @@
           }
           t.body.appendChild(tr);
         });
-        if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin suscripciones. Crea una con “Nueva suscripción”.</td></tr>'));
+        if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin pagos generados. Crea uno con “Generar pago”.</td></tr>'));
         main.appendChild(t.wrap);
       }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
@@ -897,8 +891,12 @@
       }).join("") + "</select>")) +
       field("Módulo", moduleSelect("mod", mods, r ? r.module_id : (mods[0] && mods[0].id))) +
       field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : "") + '">') +
-      field("Día de cobro (1–28)", '<input name="day" type="number" min="1" max="28" value="' + (r ? "" : 1) + '" placeholder="1">') +
-      field("Días de gracia", '<input name="grace" type="number" min="0" max="60" value="5">') +
+      (r ? "" :
+        field("Abono inicial (COP, opcional)", '<input name="abono" type="number" min="0" value="0">') +
+        field("Método del abono", '<select name="abonoM">' + Object.keys(METHOD_ES).map(function (k) {
+          return '<option value="' + k + '">' + esc(METHOD_ES[k]) + "</option>";
+        }).join("") + "</select>") +
+        '<p class="pnl-sub" style="margin:-4px 0 10px">Si el estudiante ya entregó algo de dinero, regístralo aquí. Si no alcanza a cubrir la mensualidad completa, queda como <strong>pago parcial</strong> y el curso no se activa hasta completarla — puedes seguir sumando abonos después con “Registrar pago”.</p>') +
       (r ? field("Estado", '<select name="status"><option value="active">Activa</option><option value="frozen">Congelada</option><option value="cancelled">Cancelada</option></select>') : "") +
       payerFields(initPayer) +
       (r ? "" : '<p class="pnl-sub">Si el estudiante es mayor y paga él mismo, deja sus datos. Si paga un familiar, cámbialos.</p>') +
@@ -916,18 +914,15 @@
       body.querySelector("[name=pe]").value = p.email || "";
       body.querySelector("[name=pp]").value = p.phone || "";
     };
-    modal(r ? "Editar suscripción" : "Nueva suscripción", body, function () {
+    modal(r ? "Editar suscripción" : "Generar pago", body, function () {
       var payer = readPayer(body);
       var payload = {
         module_id: body.querySelector("[name=mod]").value,
         monthly_amount: +body.querySelector("[name=amt]").value || 0,
-        grace_days: +body.querySelector("[name=grace]").value || 5,
         payer_name: payer.p_payer_name, payer_doc_type: payer.p_payer_doc_type,
         payer_doc_number: payer.p_payer_doc_number, payer_email: payer.p_payer_email,
         payer_phone: payer.p_payer_phone
       };
-      var day = +body.querySelector("[name=day]").value;
-      if (day >= 1 && day <= 28) payload.billing_day = day;
       if (r) {
         payload.status = body.querySelector("[name=status]").value;
         payload.updated_at = new Date().toISOString();
@@ -936,20 +931,30 @@
         });
       }
       payload.student_id = body.querySelector("[name=sid]").value;
-      if (payload.billing_day) {
-        var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1);
-        payload.next_due_date = ymd(d.getFullYear(), d.getMonth(), payload.billing_day);
-      }
-      return q("subscriptions").insert(payload).then(function (i) {
-        if (i.error) throw i.error; toast("Suscripción creada."); route();
+      var abono = +body.querySelector("[name=abono]").value || 0;
+      return q("subscriptions").insert(payload).select("id").single().then(function (i) {
+        if (i.error) throw i.error;
+        if (abono > 0) {
+          return rpc("record_payment", Object.assign({
+            p_subscription_id: i.data.id, p_amount: abono,
+            p_method: body.querySelector("[name=abonoM]").value
+          }, payer)).then(function () { toast("Pago generado."); route(); });
+        }
+        toast("Pago generado."); route();
       });
-    }, r ? "Guardar" : "Crear");
+    }, r ? "Guardar" : "Generar");
   }
 
   function registrarPago(r) {
     var now = new Date();
-    var body = h("<div>" +
-      field("Monto (COP)", '<input name="amt" type="number" min="0" value="' + (r.monthly_amount || "") + '">') +
+    var paid = r.paid_amount || 0;
+    var remaining = Math.max(r.monthly_amount - paid, 0);
+    var progress = paid <= 0
+      ? '<p class="pnl-sub" style="margin-bottom:10px">Todavía no hay ningún abono registrado para esta mensualidad de ' + money(r.monthly_amount, r.currency) + ".</p>"
+      : '<p class="pnl-sub" style="margin-bottom:10px">Ya se han abonado <strong>' + money(paid, r.currency) + "</strong> de " + money(r.monthly_amount, r.currency) +
+        (remaining > 0 ? " — falta " + money(remaining, r.currency) + " para completarla y activar el curso." : " — ya está completa.") + "</p>";
+    var body = h("<div>" + progress +
+      field("Monto del abono (COP)", '<input name="amt" type="number" min="0" value="' + (remaining || "") + '">') +
       field("Método", '<select name="m"><option value="cash">Efectivo</option><option value="transfer">Transferencia</option><option value="pse">PSE</option><option value="card">Tarjeta</option><option value="other">Otro</option></select>') +
       field("Mes que cubre", '<input name="pm" type="month" value="' + now.toISOString().slice(0, 7) + '">') +
       field("Referencia / nº de soporte (opcional)", '<input name="ref" placeholder="Nº de consignación, transferencia…">') +
@@ -958,7 +963,7 @@
         name: r.payer_name, docType: r.payer_doc_type, docNumber: r.payer_doc_number,
         email: r.payer_email, phone: r.payer_phone
       }) +
-      '<p class="pnl-sub">Registra el documento que figura en el soporte del pago (puede ser distinto al del estudiante).</p>' +
+      '<p class="pnl-sub">Registra el documento que figura en el soporte del pago (puede ser distinto al del estudiante). Si el monto no completa la mensualidad, queda como pago parcial y el curso no se activa todavía.</p>' +
       "</div>");
     modal("Registrar pago — " + r.student_name, body, function () {
       var payer = readPayer(body);
