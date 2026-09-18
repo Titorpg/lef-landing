@@ -1,6 +1,6 @@
 # Estado del proyecto — Landing LEF
 
-## Sesión 17 sep 2026 — Pagos: se quitan las fechas fijas, se agregan abonos
+## Sesión 17–18 sep 2026 — Pagos: se quitan las fechas fijas, se agregan abonos
 
 **Pedido del usuario:** en Pagos, cambiar "Crear suscripción" por "Generar
 pago"; quitar "día de cobro" y "días de gracia" del formulario (ya no hay
@@ -42,15 +42,16 @@ otra fecha).
    limpia la duplicidad y deja una sola versión, con la activación basada en
    el total pagado (no en "cualquier pago").
 
-**⚠️ Migración pendiente de aplicar a mano** (Claude no puede correr SQL en
-producción): `supabase/migrations/20260918000000_pagos_parciales_sin_fechas.sql`
-— pégala en el SQL Editor de Supabase. Elimina `billing_day`, `grace_days` y
-`next_due_date` de `subscriptions`; redefine `record_payment`,
-`record_wompi_payment`, `admin_billing_overview` y `get_my_billing`. El
-código del panel/portal ya está desplegado y **asume que esta migración ya
-corrió** — hasta que se aplique, el panel de Pagos fallará al cargar (las
-columnas `is_overdue`/`next_due_date` que esperaba ya no las devuelve el
-código nuevo, y viceversa la función vieja no tiene `paid_amount`).
+**✅ Migración aplicada por el usuario el 18 sep 2026** (SQL Editor de
+Supabase, pegada desde el Artifact con botón "Copiar") —
+`supabase/migrations/20260918000000_pagos_parciales_sin_fechas.sql`. Elimina
+`billing_day`, `grace_days` y `next_due_date` de `subscriptions`; redefine
+`record_payment`, `record_wompi_payment`, `admin_billing_overview` y
+`get_my_billing`. **Verificado por Claude** con una consulta de solo lectura
+a la REST API de Supabase: las tres columnas ya no existen en `subscriptions`
+y `freeze_overdue_subscriptions` ya no aparece entre las funciones expuestas
+— la migración corrió completa. Panel, portal y base de datos quedan
+alineados; sin pendientes de aplicar de esta sesión.
 
 **Pendiente / limitación conocida:** el widget de Wompi (`wompi-checkout`)
 siempre cobra el valor **completo** de la mensualidad — no sabe restar un
@@ -58,6 +59,13 @@ abono ya registrado a mano. Si un estudiante con un abono parcial paga por
 Wompi, se le cobrará el total de nuevo, no el saldo restante. No se tocó
 porque no se pidió; si hace falta, hay que sumarle a `wompi-checkout` el
 cálculo de saldo pendiente (`monthly_amount - paid_amount`).
+
+**Cierre de sesión (18 sep 2026):** todo lo de arriba desplegado, migrado y
+verificado. Único pendiente de fondo que queda abierto en el proyecto:
+endurecimiento del login (sigue en pausa por Resend/Turnstile — el usuario
+va a crear esas cuentas). Los textos de pago del sitio (política, términos,
+FAQ) ya reflejan Wompi completo (tarjeta, PSE, Nequi, Botón Bancolombia) +
+transferencia/QR Bre-B, actualizados el 17 sep.
 
 ## Sesión 15 sep 2026 — ajustes al panel admin (Profesores/Horarios/Usuarios/Dashboard)
 
