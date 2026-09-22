@@ -65,12 +65,28 @@ Deno.serve(async (req) => {
   if (sub.student_id !== profile.student_id) return json(req, { error: "no_autorizado" }, 403);
   if (sub.status === "cancelled") return json(req, { error: "suscripcion_cancelada" }, 400);
 
+  // Cobrar solo el saldo pendiente, no la mensualidad completa — si el estudiante
+  // ya tiene un abono registrado a mano, Wompi no debe volver a cobrarle el total.
+  // Mismo cálculo que admin_billing_overview/get_my_billing: suma de pagos
+  // aprobados que nadie haya reversado.
+  const { data: subPayments } = await admin
+    .from("payments")
+    .select("id, amount, status, reverses_payment")
+    .eq("subscription_id", sub.id);
+  const rows = subPayments || [];
+  const reversedIds = new Set(rows.map((p) => p.reverses_payment).filter(Boolean));
+  const paidBefore = rows
+    .filter((p) => p.status === "approved" && !reversedIds.has(p.id))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const balance = Number(sub.monthly_amount) - paidBefore;
+  if (balance <= 0) return json(req, { error: "suscripcion_ya_pagada" }, 400);
+
   const publicKey = Deno.env.get("WOMPI_PUBLIC_KEY");
   const integritySecret = Deno.env.get("WOMPI_INTEGRITY_SECRET");
   if (!publicKey || !integritySecret) return json(req, { error: "wompi_sin_configurar" }, 500);
 
   const currency = (sub.currency || "COP").toUpperCase();
-  const amountInCents = Math.round(Number(sub.monthly_amount) * 100);
+  const amountInCents = Math.round(balance * 100);
   const reference = `LEF-${sub.id}-${Date.now()}`;
   const signature = await sha256Hex(reference + amountInCents + currency + integritySecret);
 

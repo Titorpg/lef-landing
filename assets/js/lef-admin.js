@@ -896,7 +896,7 @@
         field("Método del abono", '<select name="abonoM">' + Object.keys(METHOD_ES).map(function (k) {
           return '<option value="' + k + '">' + esc(METHOD_ES[k]) + "</option>";
         }).join("") + "</select>") +
-        '<p class="pnl-sub" style="margin:-4px 0 10px">Si el estudiante ya entregó algo de dinero, regístralo aquí. Si no alcanza a cubrir la mensualidad completa, queda como <strong>pago parcial</strong> y el curso no se activa hasta completarla — puedes seguir sumando abonos después con “Registrar pago”.</p>') +
+        '<p class="pnl-sub" style="margin:-4px 0 10px">Si el estudiante ya entregó algo de dinero, regístralo aquí — con eso ya queda <strong>activo</strong> en el sistema. Si no alcanza a cubrir la mensualidad completa, queda marcado como <strong>pago parcial</strong> hasta completarla — puedes seguir sumando abonos después con “Registrar pago”.</p>') +
       (r ? field("Estado", '<select name="status"><option value="active">Activa</option><option value="frozen">Congelada</option><option value="cancelled">Cancelada</option></select>') : "") +
       payerFields(initPayer) +
       (r ? "" : '<p class="pnl-sub">Si el estudiante es mayor y paga él mismo, deja sus datos. Si paga un familiar, cámbialos.</p>') +
@@ -952,7 +952,7 @@
     var progress = paid <= 0
       ? '<p class="pnl-sub" style="margin-bottom:10px">Todavía no hay ningún abono registrado para esta mensualidad de ' + money(r.monthly_amount, r.currency) + ".</p>"
       : '<p class="pnl-sub" style="margin-bottom:10px">Ya se han abonado <strong>' + money(paid, r.currency) + "</strong> de " + money(r.monthly_amount, r.currency) +
-        (remaining > 0 ? " — falta " + money(remaining, r.currency) + " para completarla y activar el curso." : " — ya está completa.") + "</p>";
+        (remaining > 0 ? " — falta " + money(remaining, r.currency) + " para completarla." : " — ya está completa.") + "</p>";
     var body = h("<div>" + progress +
       field("Monto del abono (COP)", '<input name="amt" type="number" min="0" value="' + (remaining || "") + '">') +
       field("Método", '<select name="m"><option value="cash">Efectivo</option><option value="transfer">Transferencia</option><option value="pse">PSE</option><option value="card">Tarjeta</option><option value="other">Otro</option></select>') +
@@ -963,7 +963,7 @@
         name: r.payer_name, docType: r.payer_doc_type, docNumber: r.payer_doc_number,
         email: r.payer_email, phone: r.payer_phone
       }) +
-      '<p class="pnl-sub">Registra el documento que figura en el soporte del pago (puede ser distinto al del estudiante). Si el monto no completa la mensualidad, queda como pago parcial y el curso no se activa todavía.</p>' +
+      '<p class="pnl-sub">Registra el documento que figura en el soporte del pago (puede ser distinto al del estudiante). El estudiante queda activo con este abono; si el monto no completa la mensualidad, queda marcado como pago parcial hasta completarla.</p>' +
       "</div>");
     modal("Registrar pago — " + r.student_name, body, function () {
       var payer = readPayer(body);

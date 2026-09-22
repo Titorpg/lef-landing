@@ -162,9 +162,10 @@
         var paid = s.paid_amount || 0;
         var subPays = pays.filter(function (p) { return p.subscription_id === s.id; });
         // "Pendiente" = todavía no hay ningún abono. "Pago parcial" = hay algo
-        // abonado pero no completa la mensualidad — el curso no se activa
-        // todavía. "Al día" = la mensualidad ya está completa (en uno o
-        // varios abonos). En este caso NO debe poder volver a pagar el mismo
+        // abonado pero no completa la mensualidad — el estudiante ya está
+        // activo en el sistema, solo queda saldo por cubrir. "Al día" = la
+        // mensualidad ya está completa (en uno o varios abonos). En este
+        // caso NO debe poder volver a pagar el mismo
         // curso por error (ver caso del estudiante que pasó de A1.1 pagado a
         // A1.2: A1.1 debe quedar "al día", sin botón de pago).
         var partial = s.status === "active" && paid > 0 && paid < s.monthly_amount;
