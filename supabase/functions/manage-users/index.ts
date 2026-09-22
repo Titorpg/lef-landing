@@ -79,6 +79,18 @@ Deno.serve(async (req) => {
       return json({ ok: true, user_id: created.user.id });
     }
 
+    if (action === "set_teacher_link") {
+      // Vincula (o desvincula) una cuenta de rol "profesor" a una fila de
+      // teachers. Antes solo se podía elegir al CREAR la cuenta; esta acción
+      // deja corregirlo después (profiles.teacher_id no acepta UPDATE
+      // directo desde el panel, se revocó junto con el resto de columnas
+      // sensibles de profiles en 20260906200000).
+      const teacher_id = payload.teacher_id ? String(payload.teacher_id) : null;
+      const { error } = await admin.from("profiles")
+        .update({ teacher_id }).eq("user_id", String(payload.user_id));
+      return error ? json({ error: error.message }, 400) : json({ ok: true });
+    }
+
     if (action === "set_role") {
       const { error } = await admin.from("profiles")
         .update({ role: String(payload.role) }).eq("user_id", String(payload.user_id));
