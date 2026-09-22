@@ -1,5 +1,30 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 22 sep 2026 (5ª parte) — Estudiantes acotado a "mis grupos" + pestaña nueva
+
+**Corrección pedida por el usuario:** en la pestaña Estudiantes, el profesor
+veía a **todos** los estudiantes del colegio (mismo query que el admin, solo
+con columnas distintas) — debía ver únicamente a los que están inscritos en
+**sus** grupos (los que el admin le configuró). De paso pidió una pestaña
+nueva **"Mis grupos"** con los grupos que le asignen.
+
+**Construido (commit `9f1b0d7`, desplegado):**
+1. **Estudiantes (profesor)**: ahora primero busca los `id` de sus grupos
+   (`groups.teacher_id = ME.teacher_id`) y filtra la lista de estudiantes a
+   solo quienes tengan una inscripción (`enrollments.group_id`) en alguno de
+   esos grupos. Si no tiene grupos asignados, muestra un aviso en vez de una
+   tabla vacía sin explicación.
+2. **Pestaña nueva "Mis grupos"** (solo profesor): una tarjeta por grupo con
+   módulo, horario, cupo (x/y) y un botón "Ver estudiantes" que despliega la
+   lista de nombres inscritos en ese grupo puntual.
+3. `loadMyGroups()` (nueva, compartida): la consulta de grupos + inscripciones
+   del profesor la usan tanto el Dashboard (solo para los números del
+   resumen) como "Mis grupos" (el detalle) — antes esa tabla vivía duplicada
+   dentro del Dashboard; se sacó de ahí para no repetirla en dos pestañas.
+
+Sin pendientes de aplicar a mano en esta parte — todo es código de panel, sin
+tocar la base de datos.
+
 ## Sesión 22 sep 2026 (4ª parte) — Bug real: cuentas de profesor sin vincular rompían el panel
 
 **Encontrado al probar:** el Dashboard del profesor tiró
