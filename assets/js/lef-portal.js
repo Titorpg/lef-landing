@@ -478,6 +478,45 @@
     });
   }
 
+  // Sugerencia de auto-matrícula: solo aparece cuando el módulo actual ya
+  // está terminado (chulo verde) y el admin todavía no asignó el siguiente a
+  // mano — get_next_module_offer() no devuelve fila en ningún otro caso, así
+  // que si el admin ya lo matriculó, esta tarjeta deja de salir sola.
+  function renderNextModuleOffer(main, offer) {
+    var box = h(
+      '<div class="course-hero">' +
+      '<div class="lvl-tag">Siguiente módulo</div>' +
+      "<h2>" + esc(levelOf(offer.next_module_level)) + "</h2>" +
+      '<div class="mod-name">' + esc(offer.next_module_level) + " — " + esc(offer.next_module_title) + "</div>" +
+      '<div class="course-hero__pay">' +
+      '<p class="course-hero__pay-lead">Ya completaste tu módulo actual. Matricúlate en el siguiente para continuar — se genera tu mensualidad de ' +
+      money(offer.suggested_amount, offer.suggested_currency) + ' para que la pagues desde Facturación.</p>' +
+      '<button class="btn btn-blue" data-enroll-next>Matricular el siguiente curso</button>' +
+      "</div>" +
+      '<p class="muted" data-enroll-msg style="font-size:12.5px;margin-top:10px"></p>' +
+      "</div>"
+    );
+    main.appendChild(box);
+
+    var btn = box.querySelector("[data-enroll-next]");
+    var msg = box.querySelector("[data-enroll-msg]");
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      msg.textContent = "Matriculando…";
+      sb.rpc("self_enroll_next_module").then(function (r) {
+        if (r.error) throw r.error;
+        msg.textContent = "¡Listo! Ya puedes ir a Facturación para pagar tu mensualidad y activar el curso.";
+        btn.remove();
+        var goBtn = h('<button class="btn btn-blue btn-sm" style="margin-top:8px">Ir a Facturación</button>');
+        goBtn.addEventListener("click", function () { location.hash = "facturacion"; });
+        msg.insertAdjacentElement("afterend", goBtn);
+      }).catch(function (e) {
+        btn.disabled = false;
+        msg.textContent = "No pudimos matricularte: " + ((e && e.message) || e);
+      });
+    });
+  }
+
   function renderCourse(main) {
     sb.rpc("get_my_course").then(function (r) {
       if (r.error) throw r.error;
@@ -493,10 +532,19 @@
       var done = rows.filter(isCourseDone);
 
       current.forEach(function (c) { renderCourseHero(main, c); });
-      if (!current.length) {
-        main.appendChild(h('<div class="pnl-alert ok">Ya completaste tu módulo actual — LEF te asignará el siguiente en breve.</div>'));
-      }
-      done.forEach(function (c) { renderCourseCompact(main, c); });
+
+      var offerPromise = current.length
+        ? Promise.resolve(null)
+        : sb.rpc("get_next_module_offer").then(function (r2) { return (r2.data && r2.data[0]) || null; })
+          .catch(function () { return null; });
+
+      offerPromise.then(function (offer) {
+        if (!current.length) {
+          if (offer) renderNextModuleOffer(main, offer);
+          else main.appendChild(h('<div class="pnl-alert ok">Ya completaste tu módulo actual — LEF te asignará el siguiente en breve.</div>'));
+        }
+        done.forEach(function (c) { renderCourseCompact(main, c); });
+      });
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu curso: ' + esc(e.message) + "</div>";
     });

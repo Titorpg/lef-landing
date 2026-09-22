@@ -1,5 +1,48 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 21 sep 2026 (continuación) — "Mi curso": sugerencia de auto-matrícula al siguiente módulo
+
+**Pedido del usuario:** hoy solo el admin matricula al estudiante en el
+siguiente módulo (a mano, desde Estudiantes). El usuario quiere que si el
+estudiante ya terminó su módulo actual (chulo verde) y el admin **todavía
+no** le asignó el siguiente, en "Mi curso" le salga una sugerencia
+"Matricular el siguiente curso" — el que sigue en el orden jerárquico
+(A1.1→A1.2→…→B2.3, ya numerado 1-12 en `modules.module_number`). Al darle
+clic, se crea su inscripción + mensualidad, para que la pague en
+Facturación y se active sola. Si el admin lo matricula manualmente primero,
+la sugerencia debe desaparecer sola.
+
+**Cambios (commit pendiente de push, ver más abajo):**
+1. **`supabase/migrations/20260921010000_sugerencia_siguiente_modulo.sql`**:
+   - `get_next_module_offer()` (lectura, estudiante): mira la inscripción más
+     reciente no cancelada. La considera "terminada" si quedó `Completed`, o
+     si sigue `Active` pero el ciclo asignado ya venció (mismo criterio que
+     `isCourseDone` del frontend). Si está terminada, busca el módulo con
+     `module_number + 1` (activo) y devuelve su id/nivel/título + un monto
+     sugerido = la mensualidad de la última suscripción del módulo que
+     termina (o 297.500 COP si no hay ninguna). Si no aplica ninguna
+     condición, no devuelve filas — así la tarjeta desaparece sola apenas el
+     admin asigna el módulo a mano (la inscripción más reciente deja de ser
+     la "terminada").
+   - `self_enroll_next_module()` (mutación, estudiante): repite el mismo
+     chequeo (no confía en lo que mandó el navegador), y si aplica: archiva
+     la inscripción actual como `Completed` (solo ahora que ya se confirmó
+     que existe módulo siguiente), crea la inscripción `PendingPayment` del
+     módulo siguiente y su suscripción (mismo monto/moneda/pagador que la
+     anterior). Devuelve el id de la nueva inscripción.
+2. **`assets/js/lef-portal.js`** — "Mi curso": cuando no queda ningún módulo
+   "en curso" (todos completados o vencidos por ciclo), pide
+   `get_next_module_offer()`; si hay oferta, muestra una tarjeta tipo
+   `course-hero` con el módulo siguiente, el monto y el botón "Matricular el
+   siguiente curso" (llama a `self_enroll_next_module()`, y al terminar
+   ofrece un botón "Ir a Facturación"); si no hay oferta, se mantiene el
+   mensaje genérico de siempre ("LEF te asignará el siguiente en breve").
+
+**⏳ Pendiente de aplicar a mano:** la migración
+`20260921010000_sugerencia_siguiente_modulo.sql` en el SQL Editor de
+Supabase (dos `create or replace function` nuevas, no toca datos ni
+columnas). El frontend se despliega junto con este cambio.
+
 ## Sesión 21 sep 2026 — Wompi cobra el saldo pendiente; un abono ya activa al estudiante
 
 **Pedido del usuario:** dos ajustes al modelo de abonos de la sesión anterior
