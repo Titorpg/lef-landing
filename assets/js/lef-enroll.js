@@ -1,4 +1,4 @@
-/* LEF — Asistente de pre-inscripción (4 pasos)
+﻿/* LEF — Asistente de pre-inscripción (4 pasos)
    Paso 1 Tus datos · Paso 2 Tu nivel (autoevaluación) · Paso 3 Franja horaria
    (preferencia) · Paso 4 Revisar.
    El nivel y la franja horaria son solo INDICADORES para el asesor — no
@@ -17,7 +17,7 @@
   var mount = document.getElementById("enroll-app");
   if (!mount) return;
 
-  var WHATSAPP_NUMBER = (window.LEF_WHATSAPP || "573013240652");
+  var WHATSAPP_NUMBER = (window.LEF_WHATSAPP || "573173962244");
   var sb = window.lefSupabase;
 
   var FALLBACK_ES = {

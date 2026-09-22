@@ -1,6 +1,6 @@
 ﻿// LEF landing — i18n (EN/ES) + reveal-on-scroll + WhatsApp links
-// WhatsApp / contact number provided by the client: +57 301 324 0652.
-const WHATSAPP_NUMBER = "573013240652";
+// WhatsApp / contact number provided by the client: +57 317 396 2244.
+const WHATSAPP_NUMBER = "573173962244";
 
 const I18N = {
   en: {
@@ -157,7 +157,7 @@ const I18N = {
     footer_tagline: "An online structured English program for real communicative competence.",
     footer_col_program: "Program",
     footer_col_contact: "Contact",
-    footer_phone: "Phone: +57 301 324 0652",
+    footer_phone: "Phone: +57 317 396 2244",
     footer_location: "Barranquilla, Colombia",
     footer_right: "Barranquilla, Colombia · 2026",
     nav_inscripcion: "Enroll",
@@ -510,7 +510,7 @@ const I18N = {
     footer_tagline: "Un programa de inglés online estructurado, diseñado para una competencia comunicativa real.",
     footer_col_program: "Programa",
     footer_col_contact: "Contacto",
-    footer_phone: "Teléfono: +57 301 324 0652",
+    footer_phone: "Teléfono: +57 317 396 2244",
     footer_location: "Barranquilla, Colombia",
     footer_right: "Barranquilla, Colombia · 2026",
     nav_inscripcion: "Inscripción",

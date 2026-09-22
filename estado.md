@@ -1,4 +1,4 @@
-# Estado del proyecto — Landing LEF
+﻿# Estado del proyecto — Landing LEF
 
 ## Cierre de sesión — 22 sep 2026
 
@@ -1182,7 +1182,7 @@ vive únicamente local y NO está en Git.
 
 ## Datos reales usados
 
-- **WhatsApp:** +57 301 324 0652 (dato dado directamente por el cliente)
+- **WhatsApp:** +57 317 396 2244 (dato dado directamente por el cliente)
 - **Correo:** informacion@lefcenter.com
 - **Facebook:** https://www.facebook.com/profile.php?id=100067494009346 (perfil real)
 - **Instagram:** @Lefcenter (usuario dado por el cliente, no verificado)

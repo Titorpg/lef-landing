@@ -1,4 +1,4 @@
-/* LEF — Portal del estudiante. 3 pestañas: Facturación, Mi curso, Mi cuenta.
+﻿/* LEF — Portal del estudiante. 3 pestañas: Facturación, Mi curso, Mi cuenta.
    El cobro en línea usa el Widget oficial de Wompi (checkout.wompi.co/widget.js);
    la firma de integridad se calcula en el Edge Function wompi-checkout (nunca en el
    navegador) y el pago se confirma por el webhook wompi-webhook, no por el resultado
@@ -64,7 +64,7 @@
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
   var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reverso" };
 
-  var WHATSAPP_NUMBER = "573013240652";
+  var WHATSAPP_NUMBER = "573173962244";
   function waLink(s) {
     var msg = "Hola LEF, ya hice la transferencia de mi mensualidad" +
       (s.module_level ? " del módulo " + s.module_level : "") + " (" + money(s.monthly_amount, s.currency) + "). Adjunto el comprobante.";
