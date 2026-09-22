@@ -2183,25 +2183,21 @@
     var host = h("<div></div>"); main.appendChild(host);
 
     bar.querySelector("[data-new]").onclick = function () {
-      q("teachers").select("id,full_name").eq("active", true).then(function (tr) {
-        var teachers = tr.data || [];
-        var pwd = "lef" + Math.random().toString(36).slice(2, 10);
-        var b = h("<div>" +
-          field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
-          field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
-          field("Contraseña temporal", '<input name="p" value="' + pwd + '">') +
-          field("Vincular a profesor (opcional)", '<select name="t"><option value="">—</option>' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
-          "</div>");
-        modal("Nueva cuenta de staff", b, function () {
-          return callFn({
-            action: "create_account", role: b.querySelector("[name=r]").value,
-            full_name: b.querySelector("[name=n]").value.trim(),
-            email: b.querySelector("[name=e]").value.trim(),
-            password: b.querySelector("[name=p]").value,
-            teacher_id: b.querySelector("[name=t]").value || null
-          }).then(function () { toast("Cuenta creada."); load(); });
-        }, "Crear");
-      });
+      var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+      var b = h("<div>" +
+        field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
+        field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
+        field("Contraseña temporal", '<input name="p" value="' + pwd + '">') +
+        '<p class="pnl-sub">Si el rol es Profesor, queda enlazado automáticamente a un registro nuevo en Académico → Profesores (mismo nombre y correo) — no hace falta vincular nada aparte.</p>' +
+        "</div>");
+      modal("Nueva cuenta de staff", b, function () {
+        return callFn({
+          action: "create_account", role: b.querySelector("[name=r]").value,
+          full_name: b.querySelector("[name=n]").value.trim(),
+          email: b.querySelector("[name=e]").value.trim(),
+          password: b.querySelector("[name=p]").value
+        }).then(function () { toast("Cuenta creada."); load(); });
+      }, "Crear");
     };
 
     function load() {
@@ -2213,7 +2209,7 @@
         profiles.forEach(function (p) { if (p.teacher_id) linkedTeacher[p.teacher_id] = true; });
         var rows = profiles.map(function (p) {
           return { name: p.full_name || "—", email: p.email, role: p.role, active: p.active,
-            created_at: p.created_at, kind: "cuenta", user_id: p.user_id, teacher_id: p.teacher_id };
+            created_at: p.created_at, kind: "cuenta", user_id: p.user_id };
         });
         teachers.filter(function (t) { return !linkedTeacher[t.id]; }).forEach(function (t) {
           rows.push({ name: t.full_name, email: t.email, role: "teacher", active: t.active,
@@ -2261,24 +2257,14 @@
           if (r.user_id === ME.user_id) { cell.innerHTML = '<span class="muted">tú</span>'; t.body.appendChild(tr); return; }
           cell.appendChild(btn("Editar", "btn-ghost", function () {
             var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name === "—" ? "" : r.name) + '">') +
-              field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
-              (r.role === "teacher" ? field("Vincular a profesor", '<select name="t"><option value="">— sin vincular —</option>' +
-                teachers.map(function (t) { return '<option value="' + t.id + '"' + (t.id === r.teacher_id ? " selected" : "") + ">" + esc(t.full_name) + "</option>"; }).join("") + "</select>") : "") +
-              (r.role === "teacher" ? '<p class="pnl-sub">Sin vincular, esta cuenta no puede ver sus grupos ni el Dashboard de profesor.</p>' : "") +
-              "</div>");
+              field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') + "</div>");
             modal("Editar usuario", b, function () {
               var full_name = b.querySelector("[name=n]").value.trim();
               var email = b.querySelector("[name=e]").value.trim();
               if (!full_name) throw new Error("Escribe el nombre.");
               if (!email) throw new Error("Escribe el correo.");
-              var pr = callFn({ action: "update_profile", user_id: r.user_id, full_name: full_name, email: email });
-              var tSel = b.querySelector("[name=t]");
-              if (tSel) {
-                pr = pr.then(function () {
-                  return callFn({ action: "set_teacher_link", user_id: r.user_id, teacher_id: tSel.value || null });
-                });
-              }
-              return pr.then(function () { toast("Usuario actualizado."); load(); });
+              return callFn({ action: "update_profile", user_id: r.user_id, full_name: full_name, email: email })
+                .then(function () { toast("Usuario actualizado."); load(); });
             }, "Guardar");
           }));
           cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () {

@@ -60,7 +60,12 @@ Deno.serve(async (req) => {
       const full_name = String(payload.full_name ?? "").trim();
       const password = String(payload.password ?? "");
       const student_id = payload.student_id ? String(payload.student_id) : null;
-      const teacher_id = payload.teacher_id ? String(payload.teacher_id) : null;
+      // teacher_id solo llega ya elegido cuando se le da acceso a un profesor
+      // que YA existía en Académico (fila "profesor sin cuenta" en Usuarios).
+      // En cualquier otro caso, un profesor nuevo se enlaza solo: más abajo
+      // se crea su fila en teachers con estos mismos datos, sin que el admin
+      // tenga que elegir ni vincular nada aparte.
+      let teacher_id = payload.teacher_id ? String(payload.teacher_id) : null;
       if (!email || !password || password.length < 8) return json({ error: "email_o_password_invalido" }, 400);
       if (!["student", "teacher", "admin"].includes(role)) return json({ error: "rol_invalido" }, 400);
 
@@ -69,26 +74,27 @@ Deno.serve(async (req) => {
       });
       if (cErr) return json({ error: cErr.message }, 400);
 
+      let createdTeacherId: string | null = null;
+      if (role === "teacher" && !teacher_id) {
+        const { data: newTeacher, error: tErr } = await admin.from("teachers")
+          .insert({ full_name, email }).select("id").single();
+        if (tErr) {
+          await admin.auth.admin.deleteUser(created.user.id);
+          return json({ error: tErr.message }, 400);
+        }
+        teacher_id = newTeacher.id;
+        createdTeacherId = newTeacher.id;
+      }
+
       const { error: pErr } = await admin.from("profiles").insert({
         user_id: created.user.id, role, full_name, email, student_id, teacher_id,
       });
       if (pErr) {
         await admin.auth.admin.deleteUser(created.user.id);
+        if (createdTeacherId) await admin.from("teachers").delete().eq("id", createdTeacherId);
         return json({ error: pErr.message }, 400);
       }
       return json({ ok: true, user_id: created.user.id });
-    }
-
-    if (action === "set_teacher_link") {
-      // Vincula (o desvincula) una cuenta de rol "profesor" a una fila de
-      // teachers. Antes solo se podía elegir al CREAR la cuenta; esta acción
-      // deja corregirlo después (profiles.teacher_id no acepta UPDATE
-      // directo desde el panel, se revocó junto con el resto de columnas
-      // sensibles de profiles en 20260906200000).
-      const teacher_id = payload.teacher_id ? String(payload.teacher_id) : null;
-      const { error } = await admin.from("profiles")
-        .update({ teacher_id }).eq("user_id", String(payload.user_id));
-      return error ? json({ error: error.message }, 400) : json({ ok: true });
     }
 
     if (action === "set_role") {
