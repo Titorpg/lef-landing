@@ -1,5 +1,42 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 21 sep 2026 — Wompi cobra el saldo pendiente; un abono ya activa al estudiante
+
+**Pedido del usuario:** dos ajustes al modelo de abonos de la sesión anterior
+(17–18 sep). (1) El widget de Wompi siempre cobraba la mensualidad completa,
+sin restar un abono ya registrado a mano — corregir para que cobre el saldo.
+(2) Un abono parcial dejaba al estudiante "pendiente de pago" en el sistema
+(sin acceso) hasta completar el 100% — el usuario quiere que con **cualquier**
+abono el estudiante quede **activo**, pero que se siga viendo la anotación de
+"pago parcial" mientras quede saldo.
+
+**Cambios (commit `3d13263`, desplegado en Vercel + Supabase):**
+1. **`supabase/functions/wompi-checkout/index.ts`**: antes de calcular el
+   monto a cobrar, suma los pagos `approved` no reversados de la suscripción
+   (mismo cálculo que `admin_billing_overview`/`get_my_billing`) y cobra
+   `monthly_amount - paid_amount` en vez del total. Si el saldo ya es 0 o
+   menos, devuelve error `suscripcion_ya_pagada` (defensivo — el botón de
+   pago ya no debería mostrarse en ese caso). **Desplegada** vía
+   `npx supabase functions deploy wompi-checkout`.
+2. **`supabase/migrations/20260921000000_activacion_con_abono_parcial.sql`**:
+   `record_payment` y `record_wompi_payment` ahora activan la inscripción
+   (`PendingPayment` → `Active`) con **cualquier** pago aprobado (`p_amount >
+   0`), no solo al alcanzar `monthly_amount`. El guardarraíl de no poder
+   sobrepagar una suscripción ya completa (`LEF_SUBSCRIPTION_ALREADY_PAID`)
+   se mantiene igual. El estado "pago parcial"/"al día" no cambió — lo sigue
+   derivando el panel/portal comparando `paid_amount` contra `monthly_amount`
+   (sin tocar), así que un estudiante activo con saldo pendiente se sigue
+   viendo claramente marcado.
+3. Textos del panel actualizados para reflejar el nuevo comportamiento
+   (`lef-admin.js`: modal "Generar pago" y "Registrar pago" ya no dicen "el
+   curso no se activa hasta completarla"); comentario equivalente corregido
+   en `lef-portal.js`.
+
+**⏳ Pendiente de aplicar a mano:** la migración
+`20260921000000_activacion_con_abono_parcial.sql` — el usuario debe pegarla
+en el SQL Editor de Supabase (Claude no puede aplicar SQL a producción). El
+resto (Edge Function + frontend) ya está en vivo.
+
 ## Sesión 17–18 sep 2026 — Pagos: se quitan las fechas fijas, se agregan abonos
 
 **Pedido del usuario:** en Pagos, cambiar "Crear suscripción" por "Generar
