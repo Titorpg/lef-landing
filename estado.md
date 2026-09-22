@@ -1,5 +1,80 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 22 sep 2026 — Integración de solo lectura con Google Classroom (por profesor)
+
+**Pedido del usuario:** el usuario ya tiene los cursos y actividades del día
+a día creados en Google Classroom (tiene Workspace de pago) y quiere que los
+profesores los vean también en el panel de LEF — "lo único que quiero migrar
+son los cursos creados con cada uno de los temas [topics], nada más de
+Classroom" (sin tareas calificadas, sin entregas ni calificaciones de
+estudiantes). Pidió explícitamente la opción que **no** necesite revisión de
+Google.
+
+**Decisión de arquitectura:** conexión **por profesor** (cada quien conecta
+su propia cuenta de Google con OAuth estándar) en vez de domain-wide
+delegation (que le daría a LEF acceso a todas las cuentas del Workspace de
+una vez desde el admin — mucho más trámite y más superficie de acceso
+concedido). Como LEF tiene Workspace, la app de Google Cloud se puede
+registrar como **"Interna"** — eso evita por completo el proceso de revisión
+de Google sin importar que los scopes de Classroom sean "sensibles", porque
+las apps internas nunca pasan por esa revisión. Solo se piden scopes de
+lectura de estructura (`classroom.courses.readonly`,
+`classroom.topics.readonly`, `classroom.courseworkmaterials.readonly` +
+`openid`/`email` para mostrar con qué cuenta está conectado). Cada material
+se muestra con un enlace "Abrir en Classroom" (usa el `alternateLink` que la
+propia API de Classroom devuelve) en vez de intentar embeber el archivo —
+así tampoco hace falta pedir acceso a Drive.
+
+**Construido (commit pendiente, ver más abajo):**
+1. **`supabase/migrations/20260922000000_google_classroom.sql`**: tabla
+   `teacher_google_tokens` (sin ninguna política RLS con `using` — nadie
+   entra por PostgREST directo, ni el propio profesor; solo la tocan las
+   Edge Functions con service role). `current_teacher_id()` (análoga a
+   `current_student_id()`), `get_my_classroom_connection()` (el profesor ve
+   si está conectado y con qué correo, sin ver el token) y
+   `disconnect_my_classroom()`.
+2. **Tres Edge Functions nuevas**, desplegadas:
+   - `classroom-oauth-start`: valida que quien llama sea un profesor activo,
+     arma la URL de consentimiento de Google con un `state` firmado (HMAC,
+     secreto `GOOGLE_OAUTH_STATE_SECRET` — ya generado y configurado por
+     Claude) que amarra el `teacher_id` sin necesitar una tabla aparte de
+     estados pendientes.
+   - `classroom-oauth-callback` (desplegada con `--no-verify-jwt`, Google no
+     manda auth de Supabase al redirigir aquí): verifica la firma del
+     `state`, cambia el `code` por tokens con Google, guarda el
+     `refresh_token` y redirige de vuelta a `admin.html?google=ok#classroom`.
+   - `classroom-list`: refresca el `access_token` si hace falta y trae
+     `courses` → `topics` + `courseWorkMaterials` de Classroom, ya
+     organizados por tema, listos para pintar en el panel.
+3. **Panel admin (`lef-admin.js`)**: sección nueva **"Google Classroom"**
+   (solo visible para el rol `teacher`, no para admin) — botón "Conectar con
+   Google Classroom" si no está conectado; una vez conectado, lista cada
+   curso con sus materiales agrupados por tema, cada uno con un enlace para
+   abrirlo en Classroom, y un botón "Desconectar". Helper nuevo
+   `callEdgeFn(nombre, body)` para invocar cualquier Edge Function (antes
+   `callFn` solo servía para `manage-users`).
+
+**⏳ Pendientes de aplicar/configurar a mano, en este orden:**
+1. **Migración** `20260922000000_google_classroom.sql` en el SQL Editor de
+   Supabase (crea tabla + 3 funciones nuevas, no toca nada existente).
+2. **Google Cloud Console** (con una cuenta del Workspace de `lefcenter.com`,
+   idealmente la de administrador):
+   a. Crear un proyecto (p. ej. "LEF Classroom").
+   b. Habilitar la **Google Classroom API** en la biblioteca de APIs.
+   c. Configurar la **pantalla de consentimiento OAuth**: tipo de usuario
+      **Interno** (solo aparece porque el proyecto pertenece a la
+      organización de Workspace — así se evita la revisión de Google).
+      Agregar los scopes de solo lectura mencionados arriba.
+   d. Crear credenciales → **ID de cliente de OAuth** → tipo "Aplicación
+      web" → **URI de redirección autorizada**:
+      `https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/classroom-oauth-callback`
+   e. Copiar el **Client ID** y **Client Secret** generados.
+3. Con esos dos valores, configurar los secrets que faltan (Claude puede
+   correr esto si el usuario pasa los valores, o el usuario mismo):
+   `npx supabase secrets set GOOGLE_CLASSROOM_CLIENT_ID=... GOOGLE_CLASSROOM_CLIENT_SECRET=... --project-ref cemrxcatbxbcipxmsnjf`
+4. Un profesor entra a **admin.html → Google Classroom** y pulsa "Conectar
+   con Google Classroom" para probar de punta a punta.
+
 ## Sesión 21 sep 2026 (3ª parte) — Pestaña nueva "Mis recursos" + libro virtual Heyzine
 
 **Pedido del usuario:** pestaña nueva en el portal del estudiante, "Mis

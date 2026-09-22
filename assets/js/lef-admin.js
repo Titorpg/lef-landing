@@ -168,6 +168,17 @@
       return j;
     });
   }
+  function callEdgeFn(name, body) {
+    return fetch(window.LEF_SUPABASE.url + "/functions/v1/" + name, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then(async function (r) {
+      var j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error");
+      return j;
+    });
+  }
 
   /* ============ auth ============ */
   function boot() {
@@ -190,6 +201,7 @@
   var SECTIONS = [
     { id: "dashboard", label: "Dashboard", roles: ["admin", "teacher"] },
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
+    { id: "classroom", label: "Google Classroom", roles: ["teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
@@ -232,7 +244,7 @@
     if (!main) return;
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
-      dashboard: secDashboard, estudiantes: secEstudiantes,
+      dashboard: secDashboard, estudiantes: secEstudiantes, classroom: secClassroom,
       pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
       registro: secRegistro, micuenta: secMiCuenta
     })[id];
@@ -720,6 +732,128 @@
         student_id: s.id
       }).then(function () { toast("Cuenta creada."); route(); });
     }, "Crear cuenta");
+  }
+
+  /* ============ GOOGLE CLASSROOM (solo profesor) ============ */
+  // Conexión por profesor (OAuth estándar, cada quien autoriza su propia
+  // cuenta) — no domain-wide delegation. Solo lectura: cursos, temas y
+  // materiales, con un enlace para abrir cada uno en Classroom (no se
+  // embebe ni se pide acceso a Drive, no hace falta).
+  function secClassroom(main) {
+    head(main, "Google Classroom", "Tus cursos y materiales, organizados igual que en Classroom.");
+
+    var qs = new URLSearchParams(location.search);
+    var googleStatus = qs.get("google");
+    if (googleStatus) {
+      var statusMsg = {
+        ok: "Cuenta de Google conectada.",
+        denied: "Cancelaste la conexión con Google.",
+        expired: "El enlace expiró — intenta conectarte de nuevo.",
+        error: "No pudimos conectar tu cuenta de Google. Intenta de nuevo."
+      }[googleStatus] || "";
+      if (statusMsg) {
+        main.appendChild(h('<div class="pnl-alert ' + (googleStatus === "ok" ? "ok" : "err") + '" style="margin-bottom:16px">' + esc(statusMsg) + "</div>"));
+      }
+      history.replaceState(null, "", location.pathname + location.hash);
+    }
+
+    var body = h('<div></div>');
+    main.appendChild(body);
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+
+    rpc("get_my_classroom_connection").then(function (r) {
+      var conn = (r && r[0]) || { connected: false };
+      body.innerHTML = "";
+      if (!conn.connected) renderConnectPrompt(body);
+      else renderCourseList(body, conn.google_email);
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+
+    function renderConnectPrompt(box) {
+      var card = h(
+        '<div class="pnl-table-wrap" style="padding:24px;text-align:center">' +
+        '<p class="pnl-sub" style="margin-bottom:16px">Conecta tu cuenta de Google para ver aquí los cursos y materiales que ya tienes en Classroom.</p>' +
+        '<button class="btn btn-blue" data-connect>Conectar con Google Classroom</button>' +
+        "</div>"
+      );
+      box.appendChild(card);
+      var btnEl = card.querySelector("[data-connect]");
+      btnEl.addEventListener("click", function () {
+        btnEl.disabled = true; btnEl.textContent = "Redirigiendo…";
+        callEdgeFn("classroom-oauth-start").then(function (d) {
+          if (!d || !d.url) throw new Error("respuesta_invalida");
+          window.location.href = d.url;
+        }).catch(function (e) {
+          btnEl.disabled = false; btnEl.textContent = "Conectar con Google Classroom";
+          toast("No pudimos iniciar la conexión: " + ((e && e.message) || e), "err");
+        });
+      });
+    }
+
+    function renderCourseList(box, email) {
+      var bar = h(
+        '<div class="pnl-toolbar" style="justify-content:space-between">' +
+        '<span class="muted" style="font-size:13px">Conectado como <strong>' + esc(email || "—") + "</strong></span>" +
+        '<button class="btn btn-ghost btn-sm" data-disconnect>Desconectar</button>' +
+        "</div>"
+      );
+      box.appendChild(bar);
+      bar.querySelector("[data-disconnect]").addEventListener("click", function () {
+        rpc("disconnect_my_classroom").then(function () { secClassroom(main); }).catch(function (e) { toast(friendly(e), "err"); });
+      });
+
+      var loading = h('<p class="muted">Cargando tus cursos de Classroom…</p>');
+      box.appendChild(loading);
+
+      callEdgeFn("classroom-list").then(function (d) {
+        loading.remove();
+        if (!d || d.connected === false) {
+          box.appendChild(h('<div class="pnl-alert err">Tu conexión con Google expiró — desconéctate y vuelve a conectarte.</div>'));
+          return;
+        }
+        var courses = d.courses || [];
+        if (!courses.length) {
+          box.appendChild(h('<div class="pnl-alert ok">No encontramos cursos activos en tu cuenta de Classroom.</div>'));
+          return;
+        }
+        courses.forEach(function (c) { box.appendChild(courseCard(c)); });
+      }).catch(function (e) {
+        loading.remove();
+        box.appendChild(h('<div class="pnl-alert err">No pudimos cargar Classroom: ' + esc((e && e.message) || e) + "</div>"));
+      });
+    }
+
+    function materialLink(m) {
+      return '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" ' +
+        'style="display:block;color:var(--azul);font-weight:600;text-decoration:none;font-size:13.5px;padding:4px 0">↳ ' +
+        esc(m.title) + "</a>";
+    }
+
+    function courseCard(c) {
+      var byTopic = {};
+      var loose = [];
+      (c.materials || []).forEach(function (m) {
+        if (m.topicId) { (byTopic[m.topicId] = byTopic[m.topicId] || []).push(m); }
+        else loose.push(m);
+      });
+      var groupsHtml = (c.topics || []).map(function (t) {
+        var items = byTopic[t.id] || [];
+        if (!items.length) return "";
+        return '<div style="margin-top:14px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">' +
+          esc(t.name) + "</p>" + items.map(materialLink).join("") + "</div>";
+      }).join("");
+      var looseHtml = loose.length
+        ? '<div style="margin-top:14px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">Sin tema</p>' + loose.map(materialLink).join("") + "</div>"
+        : "";
+      var hasContent = groupsHtml || looseHtml;
+
+      return h(
+        '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:16px">' +
+        '<p style="font-weight:700;font-size:15px">' + esc(c.name) + (c.section ? " · " + esc(c.section) : "") + "</p>" +
+        '<a href="' + esc(c.alternateLink) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir curso en Classroom ↗</a>' +
+        (hasContent ? groupsHtml + looseHtml : '<p class="muted" style="margin-top:10px;font-size:13px">Todavía no hay materiales publicados en este curso.</p>') +
+        "</div>"
+      );
+    }
   }
 
   /* ============ PAGOS ============ */
