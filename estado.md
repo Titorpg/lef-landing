@@ -1,5 +1,54 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 21 sep 2026 (3ª parte) — Pestaña nueva "Mis recursos" + libro virtual Heyzine
+
+**Pedido del usuario:** pestaña nueva en el portal del estudiante, "Mis
+recursos", con los módulos que ha cursado o cursa actualmente en modo lista;
+al hacer clic en un módulo se entra a una vista con categorías (**Libro de
+estudio**, **Talleres**, **Recursos interactivos** — "ventana dentro de
+otra"); al hacer clic en una categoría se entra a su contenido. El usuario
+todavía no define cómo se van a montar Talleres/Recursos interactivos (¿archivos
+propios? ¿Drive? ¿Classroom?) así que esas quedan vacías por ahora ("LEF lo
+agregará pronto"). Lo único definido hoy: **Libro de estudio** se integra con
+**Heyzine** (heyzine.com, libros virtuales tipo flipbook) — confirmado que sí
+se puede embeber: Heyzine publica cada libro con una URL propia
+(`https://heyzine.com/flip-book/xxxxx.html`) pensada para ir en un `<iframe>`,
+así que basta con que el admin pegue esa URL por módulo y el portal la
+embebe.
+
+**Cambios (commit pendiente de push, ver más abajo):**
+1. **`supabase/migrations/20260921020000_libro_heyzine.sql`**: columna nueva
+   `modules.heyzine_url` (texto, opcional). `get_my_course()` (ya la usa "Mi
+   curso") ahora también devuelve `module_heyzine_url` — "Mis recursos"
+   reutiliza esta misma función en vez de crear una aparte.
+2. **Panel admin (`lef-admin.js`, Académico → Módulos → Editar)**: campo
+   nuevo "URL del libro en Heyzine (opcional)" junto a título/descripción;
+   guarda `null` si se deja vacío.
+3. **Portal (`lef-portal.js`)**: pestaña nueva **Mis recursos** (entre "Mi
+   curso" y "Mi cuenta"). Navegación en tres niveles dentro de la misma
+   pestaña, sin router — lista de módulos (solo `Active`/`Completed`, no
+   `PendingPayment`) → categorías del módulo elegido → contenido de la
+   categoría, cada nivel con su botón "← Volver". "Libro de estudio" muestra
+   el iframe de Heyzine si el módulo tiene `heyzine_url`; si no, o si es
+   Talleres/Recursos interactivos, muestra "Todavía no hay contenido cargado
+   aquí — LEF lo agregará pronto".
+4. CSS nuevo en `lef-panel.css`: `.resource-row` (fila de lista clicable con
+   flecha), `.resource-back` (botón volver), `.resource-frame-wrap` (marco
+   responsivo 16:10 para el iframe de Heyzine); se generalizó `.lvl-tag` para
+   poder usarse fuera de `.course-hero`/`.course-compact`.
+
+**⏳ Pendiente de aplicar a mano:** la migración
+`20260921020000_libro_heyzine.sql` en el SQL Editor de Supabase (agrega una
+columna nullable + redefine `get_my_course`, no borra nada). Una vez
+aplicada, para probar: Académico → Módulos → Editar un módulo → pegar una URL
+de Heyzine de prueba → verificar en el portal (Mis recursos → ese módulo →
+Libro de estudio) que carga el flipbook.
+
+**Pendiente de fondo, sin definir todavía (fuera de esta sesión):** cómo se
+van a montar Talleres y Recursos interactivos — el usuario dijo explícitamente
+que no lo tiene decidido (¿subir archivos propios a Storage, enlazar Google
+Drive/Classroom, u otra cosa?). No construir nada ahí hasta que lo confirme.
+
 ## Sesión 21 sep 2026 (continuación) — "Mi curso": sugerencia de auto-matrícula al siguiente módulo
 
 **Pedido del usuario:** hoy solo el admin matricula al estudiante en el

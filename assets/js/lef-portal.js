@@ -103,6 +103,7 @@
   var TABS = [
     { id: "facturacion", label: "Facturación", render: renderBilling },
     { id: "curso", label: "Mi curso", render: renderCourse },
+    { id: "recursos", label: "Mis recursos", render: renderResources },
     { id: "cuenta", label: "Mi cuenta", render: renderAccount }
   ];
 
@@ -547,6 +548,87 @@
       });
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu curso: ' + esc(e.message) + "</div>";
+    });
+  }
+
+  /* ---------- Mis recursos ---------- */
+  // Navegación en tres niveles dentro de la misma pestaña (sin router): lista
+  // de módulos -> categorías del módulo -> contenido de la categoría. Cada
+  // nivel se pinta encima del anterior y trae su propio botón para volver.
+  var RESOURCE_CATEGORIES = [
+    { id: "libro", label: "Libro de estudio" },
+    { id: "talleres", label: "Talleres" },
+    { id: "interactivos", label: "Recursos interactivos" }
+  ];
+
+  function renderResourceCategory(main, course, cat) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; ' + esc(course.module_level) + " — " + esc(course.module_title) + "</button>");
+    back.addEventListener("click", function () { renderResourceModule(main, course); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:14px">' + esc(cat.label) + "</h1>"));
+
+    if (cat.id === "libro" && course.module_heyzine_url) {
+      var frame = h(
+        '<div class="resource-frame-wrap">' +
+        '<iframe src="' + esc(course.module_heyzine_url) + '" allowfullscreen loading="lazy" title="Libro de estudio — ' + esc(course.module_level) + '"></iframe>' +
+        "</div>"
+      );
+      main.appendChild(frame);
+    } else {
+      main.appendChild(h('<div class="pnl-alert ok">Todavía no hay contenido cargado aquí — LEF lo agregará pronto.</div>'));
+    }
+  }
+
+  function renderResourceModule(main, course) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Mis recursos</button>');
+    back.addEventListener("click", function () { renderResources(main); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">' + esc(course.module_level) + " — " + esc(course.module_title) + "</h1>"));
+    main.appendChild(h('<p class="pnl-sub">Elige qué quieres ver.</p>'));
+
+    RESOURCE_CATEGORIES.forEach(function (cat) {
+      var row = h(
+        '<div class="resource-row" tabindex="0" role="button">' +
+        "<span>" + esc(cat.label) + "</span>" +
+        '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span>' +
+        "</div>"
+      );
+      row.addEventListener("click", function () { renderResourceCategory(main, course, cat); });
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
+      main.appendChild(row);
+    });
+  }
+
+  function renderResources(main) {
+    sb.rpc("get_my_course").then(function (r) {
+      if (r.error) throw r.error;
+      var rows = (r.data || []).filter(function (c) {
+        return c.enrollment_status === "Active" || c.enrollment_status === "Completed";
+      });
+      main.innerHTML = '<h1 class="pnl-h">Mis recursos</h1><p class="pnl-sub">Material de estudio de los cursos que has tomado o estás tomando.</p>';
+
+      if (!rows.length) {
+        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes un curso activo o culminado. Cuando empieces uno, aquí verás su material.</div>'));
+        return;
+      }
+
+      rows.forEach(function (c) {
+        var tag = c.enrollment_status === "Completed" ? " · culminado" : "";
+        var row = h(
+          '<div class="resource-row" tabindex="0" role="button">' +
+          '<div><div class="lvl-tag" style="margin-bottom:2px">' + esc(c.module_level) + "</div>" +
+          '<span style="font-size:13.5px;color:var(--grafito)">' + esc(c.module_title + tag) + "</span></div>" +
+          '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span>' +
+          "</div>"
+        );
+        row.addEventListener("click", function () { renderResourceModule(main, c); });
+        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
+        main.appendChild(row);
+      });
+    }).catch(function (e) {
+      main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tus recursos: ' + esc(e.message) + "</div>";
     });
   }
 
