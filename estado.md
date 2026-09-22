@@ -1,5 +1,38 @@
 # Estado del proyecto — Landing LEF
 
+## Cierre de sesión — 22 sep 2026
+
+Sesión larga, todo desplegado y subido a `origin/main` (commit `b35aaaf`).
+Resumen de lo que quedó vivo hoy, de más reciente a más viejo (detalle
+completo en las secciones de abajo):
+
+- **Interfaz del profesor construida de punta a punta**: Dashboard propio
+  (solo sus grupos), Estudiantes acotado a sus grupos (con Anotaciones),
+  pestaña nueva **Mis grupos**, **Recursos de la clase** (Libro de trabajo
+  con buscador + Heyzine, Materiales vacío), **Planificador** (Google
+  Classroom) y **Calendario**, y **Mi cuenta**.
+- **Integración con Google Classroom + Calendar**, conexión por profesor
+  (OAuth, app "Interna" — sin revisión de Google), con las credenciales de
+  Google Cloud ya configuradas como secrets de Supabase. Falta que el
+  usuario dé de alta cuentas de Workspace `@lefcenter.com` para los
+  profesores reales y los agregue como colaboradores en sus cursos de
+  Classroom — sin eso, "Planificador"/"Calendario" no tienen nada que
+  mostrar (pero ya no truenan).
+- **Cuentas de profesor quedan enlazadas automáticamente** al crearse
+  (ya no hay paso manual de "vincular a profesor" — se quitó esa opción).
+- **Wompi cobra el saldo pendiente** (no la mensualidad completa) y
+  **cualquier abono activa al estudiante** (con "pago parcial" visible).
+- **"Mis recursos"** en el portal del estudiante, con libro virtual de
+  **Heyzine** embebido por módulo, y sugerencia de auto-matrícula al
+  siguiente módulo cuando el estudiante termina el actual.
+
+**Sin pendientes de aplicar a mano** (SQL o config) al cerrar esta sesión —
+todas las migraciones de hoy ya fueron confirmadas aplicadas por el usuario.
+Los pendientes que quedan son de **datos/configuración del usuario**, no de
+código: cuentas de Workspace de los profesores + agregarlos en Classroom, y
+decidir cómo se van a montar Talleres/Recursos interactivos/Material
+bibliográfico (todavía sin definir, a propósito quedaron vacíos).
+
 ## Sesión 22 sep 2026 (5ª parte) — Estudiantes acotado a "mis grupos" + pestaña nueva
 
 **Corrección pedida por el usuario:** en la pestaña Estudiantes, el profesor
