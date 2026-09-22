@@ -822,10 +822,36 @@
       });
     }
 
-    function materialLink(m) {
-      return '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" ' +
-        'style="display:block;color:var(--azul);font-weight:600;text-decoration:none;font-size:13.5px;padding:4px 0">↳ ' +
-        esc(m.title) + "</a>";
+    // Embebe el archivo/video adjunto directo en la página en vez de mandar a
+    // otra pestaña. Drive y YouTube tienen URLs de vista previa pensadas para
+    // esto (no hace falta pedir acceso a Drive). Un enlace externo o un Form
+    // pueden no dejarse embeber (lo decide el sitio destino, no LEF) — por
+    // eso siempre queda debajo el enlace de respaldo para abrirlo aparte.
+    function attachmentEmbed(att) {
+      if (att.type === "drive") {
+        return '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
+          (att.alternateLink ? '<a href="' + esc(att.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Ábrelo en Google Drive ↗</a>' : "");
+      }
+      if (att.type === "youtube") {
+        return '<div class="cls-embed cls-embed--16-9"><iframe src="https://www.youtube.com/embed/' + esc(att.id) + '" allowfullscreen loading="lazy"></iframe></div>';
+      }
+      if (att.type === "link" && att.url) {
+        return '<div class="cls-embed"><iframe src="' + esc(att.url) + '" loading="lazy"></iframe></div>' +
+          '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir enlace en una pestaña nueva ↗</a>';
+      }
+      if (att.type === "form" && att.url) {
+        return '<div class="cls-embed"><iframe src="' + esc(att.url) + '" loading="lazy"></iframe></div>' +
+          '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir formulario en una pestaña nueva ↗</a>';
+      }
+      return "";
+    }
+
+    function postBlock(m) {
+      var attachments = m.attachments || [];
+      var embedsHtml = attachments.map(attachmentEmbed).join("");
+      return '<div class="cls-post"><p class="cls-post__title">' + esc(m.title) + "</p>" +
+        (embedsHtml || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>') +
+        "</div>";
     }
 
     function courseCard(c) {
@@ -838,11 +864,11 @@
       var groupsHtml = (c.topics || []).map(function (t) {
         var items = byTopic[t.id] || [];
         if (!items.length) return "";
-        return '<div style="margin-top:14px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">' +
-          esc(t.name) + "</p>" + items.map(materialLink).join("") + "</div>";
+        return '<div style="margin-top:18px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">' +
+          esc(t.name) + "</p>" + items.map(postBlock).join("") + "</div>";
       }).join("");
       var looseHtml = loose.length
-        ? '<div style="margin-top:14px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">Sin tema</p>' + loose.map(materialLink).join("") + "</div>"
+        ? '<div style="margin-top:18px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">Sin tema</p>' + loose.map(postBlock).join("") + "</div>"
         : "";
       var hasContent = groupsHtml || looseHtml;
 
