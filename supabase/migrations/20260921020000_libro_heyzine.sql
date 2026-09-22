@@ -14,6 +14,10 @@
 
 alter table public.modules add column if not exists heyzine_url text;
 
+-- create or replace no alcanza: cambia las columnas de retorno (parámetros
+-- OUT), Postgres exige soltar la función primero (error 42P13).
+drop function if exists public.get_my_course();
+
 create or replace function public.get_my_course()
   returns table(
     enrollment_status text, registration_number text,
