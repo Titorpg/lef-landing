@@ -20,10 +20,21 @@ de Google sin importar que los scopes de Classroom sean "sensibles", porque
 las apps internas nunca pasan por esa revisión. Solo se piden scopes de
 lectura de estructura (`classroom.courses.readonly`,
 `classroom.topics.readonly`, `classroom.courseworkmaterials.readonly` +
-`openid`/`email` para mostrar con qué cuenta está conectado). Cada material
-se muestra con un enlace "Abrir en Classroom" (usa el `alternateLink` que la
-propia API de Classroom devuelve) en vez de intentar embeber el archivo —
-así tampoco hace falta pedir acceso a Drive.
+`openid`/`email` para mostrar con qué cuenta está conectado).
+
+**Ajuste pedido el mismo día:** el usuario aclaró que no quiere un simple
+link que mande a Classroom — quiere el contenido embebido directo en la
+página. Se logró **sin pedir ningún permiso nuevo**: la API de Classroom ya
+entrega el id de cada archivo/video adjunto (Drive, YouTube, enlace o Form)
+dentro de `courseWorkMaterials.materials[]`, y tanto Drive
+(`drive.google.com/file/d/ID/preview`) como YouTube
+(`youtube.com/embed/ID`) tienen URLs de vista previa pensadas justo para
+embeberse en un iframe — no hace falta la API de Drive. El profesor ve sus
+propios archivos de Drive embebidos porque su navegador ya tiene sesión de
+Google activa (la misma con la que conectó Classroom) con acceso a sus
+propios archivos. Enlaces sueltos o Forms se intentan embeber igual, pero
+si el sitio de destino bloquea el iframe (política que no depende de LEF)
+queda siempre un enlace de respaldo "ábrelo en otra pestaña" debajo.
 
 **Construido (commit `a994b8a`, Edge Functions desplegadas, frontend en
 Vercel):**
@@ -50,9 +61,10 @@ Vercel):**
 3. **Panel admin (`lef-admin.js`)**: sección nueva **"Google Classroom"**
    (solo visible para el rol `teacher`, no para admin) — botón "Conectar con
    Google Classroom" si no está conectado; una vez conectado, lista cada
-   curso con sus materiales agrupados por tema, cada uno con un enlace para
-   abrirlo en Classroom, y un botón "Desconectar". Helper nuevo
-   `callEdgeFn(nombre, body)` para invocar cualquier Edge Function (antes
+   curso con sus materiales agrupados por tema, **cada archivo/video
+   embebido en un iframe** (Drive/YouTube) con enlace de respaldo debajo, y
+   un botón "Desconectar". Helper nuevo `callEdgeFn(nombre, body)` para
+   invocar cualquier Edge Function (antes
    `callFn` solo servía para `manage-users`).
 
 **⏳ Pendientes de aplicar/configurar a mano, en este orden:**
@@ -70,7 +82,9 @@ Vercel):**
       web" → **URI de redirección autorizada**:
       `https://cemrxcatbxbcipxmsnjf.supabase.co/functions/v1/classroom-oauth-callback`
    e. Copiar el **Client ID** y **Client Secret** generados.
-3. Con esos dos valores, configurar los secrets que faltan (Claude puede
+3. (Sin cambios por el ajuste de embebido — mismos scopes, mismos pasos de
+   Google Cloud de antes.) Con esos dos valores, configurar los secrets que
+   faltan (Claude puede
    correr esto si el usuario pasa los valores, o el usuario mismo):
    `npx supabase secrets set GOOGLE_CLASSROOM_CLIENT_ID=... GOOGLE_CLASSROOM_CLIENT_SECRET=... --project-ref cemrxcatbxbcipxmsnjf`
 4. Un profesor entra a **admin.html → Google Classroom** y pulsa "Conectar
