@@ -12,7 +12,7 @@ clic, se crea su inscripción + mensualidad, para que la pague en
 Facturación y se active sola. Si el admin lo matricula manualmente primero,
 la sugerencia debe desaparecer sola.
 
-**Cambios (commit pendiente de push, ver más abajo):**
+**Cambios (commit `eb57d41`, desplegado en Vercel):**
 1. **`supabase/migrations/20260921010000_sugerencia_siguiente_modulo.sql`**:
    - `get_next_module_offer()` (lectura, estudiante): mira la inscripción más
      reciente no cancelada. La considera "terminada" si quedó `Completed`, o
@@ -38,10 +38,9 @@ la sugerencia debe desaparecer sola.
    ofrece un botón "Ir a Facturación"); si no hay oferta, se mantiene el
    mensaje genérico de siempre ("LEF te asignará el siguiente en breve").
 
-**⏳ Pendiente de aplicar a mano:** la migración
-`20260921010000_sugerencia_siguiente_modulo.sql` en el SQL Editor de
-Supabase (dos `create or replace function` nuevas, no toca datos ni
-columnas). El frontend se despliega junto con este cambio.
+**✅ Migración aplicada por el usuario el 21 sep 2026** (SQL Editor de
+Supabase, "Success" sin errores). Sin pendientes de esta sesión: frontend y
+base de datos quedan alineados.
 
 ## Sesión 21 sep 2026 — Wompi cobra el saldo pendiente; un abono ya activa al estudiante
 
