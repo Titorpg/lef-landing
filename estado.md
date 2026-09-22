@@ -2,10 +2,12 @@
 
 ## Cierre de sesión — 22 sep 2026
 
-Sesión larga, todo desplegado y subido a `origin/main` (commit `b35aaaf`).
+Sesión larga, todo desplegado y subido a `origin/main` (commit `3ce5b68`).
 Resumen de lo que quedó vivo hoy, de más reciente a más viejo (detalle
 completo en las secciones de abajo):
 
+- **Número de WhatsApp/teléfono de LEF actualizado** a `+57 317 396 2244`
+  en toda la plataforma (antes `+57 301 324 0652`).
 - **Interfaz del profesor construida de punta a punta**: Dashboard propio
   (solo sus grupos), Estudiantes acotado a sus grupos (con Anotaciones),
   pestaña nueva **Mis grupos**, **Recursos de la clase** (Libro de trabajo
@@ -32,6 +34,21 @@ Los pendientes que quedan son de **datos/configuración del usuario**, no de
 código: cuentas de Workspace de los profesores + agregarlos en Classroom, y
 decidir cómo se van a montar Talleres/Recursos interactivos/Material
 bibliográfico (todavía sin definir, a propósito quedaron vacíos).
+
+## Sesión 22 sep 2026 (6ª parte) — Número de WhatsApp/teléfono actualizado
+
+**Pedido por el usuario:** cambiar el número de WhatsApp de LEF en toda la
+plataforma al nuevo `317 396 2244`.
+
+**Hecho (commit `3ce5b68`, desplegado):** reemplazado `+57 301 324 0652` /
+`573013240652` por `+57 317 396 2244` / `573173962244` en los 12 archivos
+donde aparecía: `index.html`, `inscripcion.html`, `niveles.html`,
+`ofrecemos.html`, `sistema.html`, `terminos-uso.html`,
+`politica-privacidad.html`, `preguntas-frecuentes.html`, `script.js`,
+`assets/js/lef-enroll.js`, `assets/js/lef-portal.js` (enlaces `tel:`,
+`wa.me`, texto del footer y la constante `WHATSAPP_NUMBER`).
+
+Sin pendientes — cambio de solo texto/constante, sin tocar base de datos.
 
 ## Sesión 22 sep 2026 (5ª parte) — Estudiantes acotado a "mis grupos" + pestaña nueva
 
