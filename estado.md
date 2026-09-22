@@ -85,6 +85,21 @@ antes de este cambio, tiene que **desconectarse y volver a conectarse** para
 que Google le pida también el permiso de Calendar (los scopes no se agregan
 solos a una conexión ya autorizada).
 
+**✅ Google Cloud Console completado por el usuario el 22 sep 2026:** proyecto
+creado, Classroom API + Calendar API habilitadas, pantalla de consentimiento
+Interna con los 4 scopes (courses/topics/courseworkmaterials/calendar, todos
+`.readonly`) + openid/email, credenciales OAuth creadas con la URI de
+redirección correcta. El usuario pasó el **Client ID** y **Client Secret** —
+Claude los configuró como secrets de Supabase (`GOOGLE_CLASSROOM_CLIENT_ID`,
+`GOOGLE_CLASSROOM_CLIENT_SECRET`, verificados con `secrets list`).
+
+**Estado: integración completa del lado técnico, lista para probar.** Solo
+falta lo que ya se sabía: que el profesor de prueba tenga cuenta de Workspace
+`@lefcenter.com` y que esa cuenta quede agregada como profesor/colaborador en
+los cursos de Classroom que se quieran ver (Classroom → curso → Personas →
+Profesores → Invitar). Con eso, "Planificador" y "Calendario" deberían
+funcionar de punta a punta.
+
 ## Sesión 22 sep 2026 — Integración de solo lectura con Google Classroom (por profesor)
 
 **Pedido del usuario:** el usuario ya tiene los cursos y actividades del día
