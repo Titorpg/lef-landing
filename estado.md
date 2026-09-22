@@ -16,24 +16,34 @@ había ninguna forma de vincularlo o corregirlo después si se creaba sin
 elegirlo o si cambiaba. Es un hueco real del panel, no solo un dato mal
 cargado.
 
-**Corregido (commit `3a88892`, desplegado):**
+**Corregido, primer paso (commit `3a88892`):**
 1. `secDashboardTeacher`, la carga de Anotaciones y el botón "Guardar" de
    una anotación ahora comprueban `ME.teacher_id` primero y muestran un
-   aviso claro ("Tu cuenta no está vinculada a un profesor — pide al admin
-   que la revise en Usuarios") en vez de la excepción de Postgres.
-2. **Usuarios → Editar** ahora incluye, cuando el rol es profesor, un
-   selector **"Vincular a profesor"** (con "— sin vincular —" si aplica) —
-   acción nueva `set_teacher_link` en `manage-users` (admin-only). Antes no
-   existía ninguna forma de tocar ese vínculo después de crear la cuenta.
+   aviso claro en vez de la excepción de Postgres.
+2. Se agregó un selector "Vincular a profesor" en Usuarios → Editar, con una
+   acción nueva `set_teacher_link` en `manage-users`.
 
-**⏳ Pendiente de que el usuario haga en el panel (no requiere SQL):** en
-**Usuarios**, buscar la cuenta de prueba y usar "Editar" → "Vincular a
-profesor" para conectarla a un registro de `teachers` (hoy solo existe uno
-en la base, "Luis Caballero" / `director@lefcenter.com` — parece dato de
-semilla, revisar si conviene crear uno nuevo con el nombre real en Académico
-→ Profesores en vez de reusar ese). Sin ese vínculo, el Dashboard y las
-Anotaciones del profesor van a seguir sin poder mostrar nada (avisan en vez
-de romperse, pero igual no hay datos que mostrar).
+**Ajuste pedido por el usuario el mismo día (commit `e867ed7`, ya
+desplegado):** no le gustó tener que vincular a mano — quiere que una cuenta
+de profesor quede enlazada **automáticamente** al crearla, sin ningún paso
+aparte. Se **quitó por completo** el selector "Vincular a profesor" (tanto
+de "+ Cuenta de staff" como de "Editar usuario") y la acción
+`set_teacher_link` que lo soportaba. En su lugar:
+- `create_account` (en `manage-users`) ahora, cuando el rol es **profesor**
+  y no viene ya un `teacher_id` elegido, **crea automáticamente la fila en
+  `teachers`** con el mismo nombre y correo de la cuenta, y la enlaza — todo
+  en un solo paso, sin que el admin tenga que hacer nada más.
+- El otro camino (dar acceso a un profesor que **ya existía** en Académico
+  → Profesores, botón "Crear cuenta" sobre una fila "profesor sin cuenta"
+  en Usuarios) sigue enlazando al registro existente correcto — ahí sí se
+  conoce de antemano cuál es, no hace falta ni tiene sentido crear uno
+  nuevo.
+
+**⏳ Para probar:** la cuenta de prueba rota (`jorgeradash@gmail.com`) sigue
+sin vínculo — como ya no hay botón para arreglarla a mano, lo más simple es
+**eliminarla (Usuarios → Eliminar) y volver a crearla** desde "+ Cuenta de
+staff" con rol Profesor: debería quedar enlazada sola, y de paso confirma
+que el flujo nuevo funciona de punta a punta.
 
 ## Sesión 22 sep 2026 (continuación) — Interfaz completa del profesor
 
