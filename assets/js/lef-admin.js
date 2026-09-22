@@ -201,6 +201,7 @@
   var SECTIONS = [
     { id: "dashboard", label: "Dashboard", roles: ["admin", "teacher"] },
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
+    { id: "misgrupos", label: "Mis grupos", roles: ["teacher"] },
     { id: "recursos_clase", label: "Recursos de la clase", roles: ["teacher"] },
     { id: "classroom", label: "Planificador", roles: ["teacher"] },
     { id: "calendario", label: "Calendario", roles: ["teacher"] },
@@ -246,7 +247,7 @@
     if (!main) return;
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
-      dashboard: secDashboard, estudiantes: secEstudiantes,
+      dashboard: secDashboard, estudiantes: secEstudiantes, misgrupos: secMisGrupos,
       recursos_clase: secRecursosClase, classroom: secClassroom, calendario: secCalendario,
       pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
       registro: secRegistro, micuenta: secMiCuenta
@@ -412,6 +413,25 @@
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
+  // Grupos activos del profesor + sus inscripciones (Active/PendingPayment).
+  // Usado por el Dashboard (resumen) y por "Mis grupos" (detalle).
+  function loadMyGroups() {
+    return q("groups").select("id,capacity,active,modules(id,level,title,module_number),schedules(days,start_time,end_time)")
+      .eq("teacher_id", ME.teacher_id).eq("active", true)
+      .then(function (gr) {
+        if (gr.error) throw gr.error;
+        var groups = gr.data || [];
+        if (!groups.length) return { groups: [], enrollments: [] };
+        var groupIds = groups.map(function (g) { return g.id; });
+        return q("enrollments").select("student_id,group_id,status,students(full_name)").in("group_id", groupIds)
+          .then(function (er) {
+            if (er.error) throw er.error;
+            var enr = (er.data || []).filter(function (e) { return e.status === "Active" || e.status === "PendingPayment"; });
+            return { groups: groups, enrollments: enr };
+          });
+      });
+  }
+
   // Dashboard propio del profesor: solo sus grupos, nada del resto del
   // colegio (pagos, otros módulos, etc. — eso es del admin).
   function secDashboardTeacher(main) {
@@ -420,49 +440,74 @@
       main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
       return;
     }
-    q("groups").select("id,capacity,active,modules(id,level,title,module_number),schedules(days,start_time,end_time)")
-      .eq("teacher_id", ME.teacher_id).eq("active", true)
-      .then(function (gr) {
-        if (gr.error) throw gr.error;
-        var groups = gr.data || [];
-        var groupIds = groups.map(function (g) { return g.id; });
-        if (!groupIds.length) {
-          main.appendChild(statRow([["Cursos asignados", 0], ["Grupos activos", 0], ["Estudiantes asignados", 0], ["Cupos disponibles", 0]]));
-          main.appendChild(h('<div class="pnl-alert ok" style="margin-top:16px">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
-          return;
-        }
-        return q("enrollments").select("id,student_id,group_id,status").in("group_id", groupIds)
-          .then(function (er) {
-            if (er.error) throw er.error;
-            var enr = (er.data || []).filter(function (e) { return e.status === "Active" || e.status === "PendingPayment"; });
-            var countByGroup = {};
-            var students = {};
-            enr.forEach(function (e) {
-              countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
-              students[e.student_id] = true;
-            });
-            var mods = {};
-            groups.forEach(function (g) { if (g.modules) mods[g.modules.id] = true; });
-            var cupos = groups.reduce(function (sum, g) { return sum + Math.max(g.capacity - (countByGroup[g.id] || 0), 0); }, 0);
+    loadMyGroups().then(function (d) {
+      var groups = d.groups;
+      if (!groups.length) {
+        main.appendChild(statRow([["Cursos asignados", 0], ["Grupos activos", 0], ["Estudiantes asignados", 0], ["Cupos disponibles", 0]]));
+        main.appendChild(h('<div class="pnl-alert ok" style="margin-top:16px">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+        return;
+      }
+      var countByGroup = {}, uniqueStudents = {}, mods = {};
+      d.enrollments.forEach(function (e) {
+        countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
+        uniqueStudents[e.student_id] = true;
+      });
+      groups.forEach(function (g) { if (g.modules) mods[g.modules.id] = true; });
+      var cupos = groups.reduce(function (sum, g) { return sum + Math.max(g.capacity - (countByGroup[g.id] || 0), 0); }, 0);
 
-            main.appendChild(statRow([
-              ["Cursos asignados", Object.keys(mods).length],
-              ["Grupos activos", groups.length],
-              ["Estudiantes asignados", Object.keys(students).length],
-              ["Cupos disponibles", cupos]
-            ]));
+      main.appendChild(statRow([
+        ["Cursos asignados", Object.keys(mods).length],
+        ["Grupos activos", groups.length],
+        ["Estudiantes asignados", Object.keys(uniqueStudents).length],
+        ["Cupos disponibles", cupos]
+      ]));
+    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
 
-            main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:26px 0 12px">Mis grupos</h2>'));
-            var t = tableWrap(["Módulo", "Horario", "Estudiantes"]);
-            groups.forEach(function (g) {
-              var sc = g.schedules;
-              t.body.appendChild(h("<tr><td>" + (g.modules ? esc(g.modules.level + " · " + g.modules.title) : "—") + "</td><td>" +
-                (sc ? esc(days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "—") + "</td><td>" +
-                (countByGroup[g.id] || 0) + " / " + g.capacity + "</td></tr>"));
-            });
-            main.appendChild(t.wrap);
-          });
-      }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  // "Mis grupos" (solo profesor): el detalle de cada grupo que el admin le
+  // configuró, con la lista de estudiantes inscritos a un clic.
+  function secMisGrupos(main) {
+    head(main, "Mis grupos", "Los grupos que el admin te asignó.");
+    if (!ME.teacher_id) {
+      main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
+      return;
+    }
+    loadMyGroups().then(function (d) {
+      var groups = d.groups;
+      if (!groups.length) {
+        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+        return;
+      }
+      var countByGroup = {}, namesByGroup = {};
+      d.enrollments.forEach(function (e) {
+        countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
+        (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
+      });
+      groups.forEach(function (g) {
+        var sc = g.schedules;
+        var card = h(
+          '<div class="pnl-table-wrap" style="padding:18px 20px;margin-bottom:14px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">' +
+          "<div><p style=\"font-weight:700;font-size:15px\">" + (g.modules ? esc(g.modules.level + " · " + g.modules.title) : "—") + "</p>" +
+          '<p class="muted" style="font-size:13px">' + (sc ? esc(days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "Sin horario asignado") + "</p></div>" +
+          '<span class="badge neutral">' + (countByGroup[g.id] || 0) + " / " + g.capacity + " estudiantes</span>" +
+          "</div>" +
+          '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:10px" data-toggle>Ver estudiantes</button>' +
+          '<div class="muted" style="font-size:13px;margin-top:8px" data-list hidden></div>' +
+          "</div>"
+        );
+        var names = namesByGroup[g.id] || [];
+        var toggleBtn = card.querySelector("[data-toggle]");
+        var listEl = card.querySelector("[data-list]");
+        toggleBtn.addEventListener("click", function () {
+          var show = listEl.hidden;
+          listEl.hidden = !show;
+          toggleBtn.textContent = show ? "Ocultar estudiantes" : "Ver estudiantes";
+          if (show) listEl.textContent = names.length ? names.join(", ") : "Sin estudiantes inscritos todavía.";
+        });
+        main.appendChild(card);
+      });
+    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
   /* ============ ESTUDIANTES ============ */
@@ -507,30 +552,56 @@
       main.innerHTML = ""; main.appendChild(toolbar);
     } else { main.innerHTML = ""; }
     var isAdminView = ME.role === "admin";
-    Promise.all([
-      q("students").select("*").order("created_at", { ascending: false }),
-      isAdminView ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
-      q("enrollments").select("student_id,module_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
-      activeModules(),
-      (isAdminView || !ME.teacher_id) ? Promise.resolve({ data: [] }) : q("teacher_student_notes").select("student_id,note").eq("teacher_id", ME.teacher_id)
-    ]).then(function (res) {
-      if (res[0].error) throw res[0].error;
-      var profByStudent = {}, modByStudent = {}, noteByStudent = {};
-      (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
-      (res[2].data || []).forEach(function (e) {
-        if (e.status === "Cancelled") return;
-        if (!modByStudent[e.student_id]) modByStudent[e.student_id] = e; // el más reciente
-      });
-      (res[4].data || []).forEach(function (n) { noteByStudent[n.student_id] = n.note; });
-      var mods = res[3];
-      if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
 
-      var cols = isAdminView
-        ? ["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]
-        : ["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Anotaciones"];
-      var t = tableWrap(cols);
-      (res[0].data || []).forEach(function (s) {
-        var prof = profByStudent[s.id];
+    // El profesor solo ve a los estudiantes de SUS grupos (los que el admin
+    // le asignó en Académico → Grupos) — no a todo el colegio.
+    var myGroupIdsPromise = (isAdminView || !ME.teacher_id)
+      ? Promise.resolve(null)
+      : q("groups").select("id").eq("teacher_id", ME.teacher_id).then(function (r) {
+          if (r.error) throw r.error;
+          return (r.data || []).map(function (g) { return g.id; });
+        });
+
+    myGroupIdsPromise.then(function (myGroupIds) {
+      if (!isAdminView && !ME.teacher_id) {
+        main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
+        return;
+      }
+      if (!isAdminView && !myGroupIds.length) {
+        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+        return;
+      }
+      return Promise.all([
+        q("students").select("*").order("created_at", { ascending: false }),
+        isAdminView ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
+        q("enrollments").select("student_id,module_id,group_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
+        activeModules(),
+        isAdminView ? Promise.resolve({ data: [] }) : q("teacher_student_notes").select("student_id,note").eq("teacher_id", ME.teacher_id)
+      ]).then(function (res) {
+        if (res[0].error) throw res[0].error;
+        var profByStudent = {}, modByStudent = {}, noteByStudent = {}, myStudentIds = null;
+        (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
+        (res[2].data || []).forEach(function (e) {
+          if (e.status === "Cancelled") return;
+          if (!modByStudent[e.student_id]) modByStudent[e.student_id] = e; // el más reciente
+        });
+        if (!isAdminView) {
+          myStudentIds = {};
+          (res[2].data || []).forEach(function (e) {
+            if (e.status !== "Cancelled" && e.group_id && myGroupIds.indexOf(e.group_id) !== -1) myStudentIds[e.student_id] = true;
+          });
+        }
+        (res[4].data || []).forEach(function (n) { noteByStudent[n.student_id] = n.note; });
+        var mods = res[3];
+        if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
+
+        var cols = isAdminView
+          ? ["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]
+          : ["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Anotaciones"];
+        var t = tableWrap(cols);
+        var visibleStudents = isAdminView ? (res[0].data || []) : (res[0].data || []).filter(function (s) { return myStudentIds[s.id]; });
+        visibleStudents.forEach(function (s) {
+          var prof = profByStudent[s.id];
         var enr = modByStudent[s.id];
         var modLabel = enr && enr.modules ? enr.modules.level + " · " + enr.modules.title : "—";
         var modColorDot = enr && enr.modules ? '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(enr.modules.module_number) + '"></span>' : "";
@@ -598,8 +669,9 @@
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía' + (isAdminView ? '. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).' : " asignados.") + "</td></tr>"));
-      main.appendChild(t.wrap);
+        if (!visibleStudents.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía' + (isAdminView ? '. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).' : " asignados.") + "</td></tr>"));
+        main.appendChild(t.wrap);
+      });
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
