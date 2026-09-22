@@ -16,7 +16,7 @@ se puede embeber: Heyzine publica cada libro con una URL propia
 así que basta con que el admin pegue esa URL por módulo y el portal la
 embebe.
 
-**Cambios (commit pendiente de push, ver más abajo):**
+**Cambios (commit `212eef4`, desplegado en Vercel):**
 1. **`supabase/migrations/20260921020000_libro_heyzine.sql`**: columna nueva
    `modules.heyzine_url` (texto, opcional). `get_my_course()` (ya la usa "Mi
    curso") ahora también devuelve `module_heyzine_url` — "Mis recursos"
@@ -37,11 +37,14 @@ embebe.
    responsivo 16:10 para el iframe de Heyzine); se generalizó `.lvl-tag` para
    poder usarse fuera de `.course-hero`/`.course-compact`.
 
-**⏳ Pendiente de aplicar a mano:** la migración
-`20260921020000_libro_heyzine.sql` en el SQL Editor de Supabase (agrega una
-columna nullable + redefine `get_my_course`, no borra nada). Una vez
-aplicada, para probar: Académico → Módulos → Editar un módulo → pegar una URL
-de Heyzine de prueba → verificar en el portal (Mis recursos → ese módulo →
+**✅ Migración aplicada por el usuario el 21 sep 2026** (SQL Editor de
+Supabase, "Success" sin errores). Primer intento falló con `42P13: cannot
+change return type of existing function` porque `get_my_course()` cambia sus
+columnas de retorno (parámetros OUT) y `create or replace` no lo permite —
+corregido agregando `drop function if exists public.get_my_course();` antes
+del `create or replace` (commit `a2cdbab`). Sin pendientes de esta sesión.
+Para probar: Académico → Módulos → Editar un módulo → pegar una URL de
+Heyzine de prueba → verificar en el portal (Mis recursos → ese módulo →
 Libro de estudio) que carga el flipbook.
 
 **Pendiente de fondo, sin definir todavía (fuera de esta sesión):** cómo se
