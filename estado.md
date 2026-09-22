@@ -25,7 +25,8 @@ se muestra con un enlace "Abrir en Classroom" (usa el `alternateLink` que la
 propia API de Classroom devuelve) en vez de intentar embeber el archivo —
 así tampoco hace falta pedir acceso a Drive.
 
-**Construido (commit pendiente, ver más abajo):**
+**Construido (commit `a994b8a`, Edge Functions desplegadas, frontend en
+Vercel):**
 1. **`supabase/migrations/20260922000000_google_classroom.sql`**: tabla
    `teacher_google_tokens` (sin ninguna política RLS con `using` — nadie
    entra por PostgREST directo, ni el propio profesor; solo la tocan las
