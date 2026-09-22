@@ -41,11 +41,16 @@ Deno.serve(async (req) => {
   const admin = createClient(url, serviceKey);
   const { data: me } = await admin
     .from("profiles").select("role, active").eq("user_id", auth.user.id).maybeSingle();
-  if (!me || me.role !== "admin" || !me.active) return json({ error: "requiere_admin" }, 403);
+  if (!me || !me.active) return json({ error: "requiere_admin" }, 403);
 
   let payload: Record<string, unknown>;
   try { payload = await req.json(); } catch { return json({ error: "json_invalido" }, 400); }
   const action = String(payload.action ?? "");
+
+  // Autoservicio: cualquier cuenta activa (admin, profesor o estudiante) puede
+  // cambiar SU PROPIO correo desde "Mi cuenta" — todo lo demás sigue admin-only.
+  const isSelfEmailUpdate = action === "update_email" && String(payload.user_id ?? "") === auth.user.id;
+  if (!isSelfEmailUpdate && me.role !== "admin") return json({ error: "requiere_admin" }, 403);
 
   try {
     if (action === "create_account") {

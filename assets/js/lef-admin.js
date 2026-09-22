@@ -201,12 +201,14 @@
   var SECTIONS = [
     { id: "dashboard", label: "Dashboard", roles: ["admin", "teacher"] },
     { id: "estudiantes", label: "Estudiantes", roles: ["admin", "teacher"] },
-    { id: "classroom", label: "Google Classroom", roles: ["teacher"] },
+    { id: "recursos_clase", label: "Recursos de la clase", roles: ["teacher"] },
+    { id: "classroom", label: "Planificador", roles: ["teacher"] },
+    { id: "calendario", label: "Calendario", roles: ["teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
     { id: "registro", label: "Registro de eventos", roles: ["admin"] },
-    { id: "micuenta", label: "Mi cuenta", roles: ["admin"] }
+    { id: "micuenta", label: "Mi cuenta", roles: ["admin", "teacher"] }
   ];
 
   function renderShell() {
@@ -244,7 +246,8 @@
     if (!main) return;
     main.innerHTML = '<p class="muted">Cargando…</p>';
     var fn = ({
-      dashboard: secDashboard, estudiantes: secEstudiantes, classroom: secClassroom,
+      dashboard: secDashboard, estudiantes: secEstudiantes,
+      recursos_clase: secRecursosClase, classroom: secClassroom, calendario: secCalendario,
       pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
       registro: secRegistro, micuenta: secMiCuenta
     })[id];
@@ -296,8 +299,9 @@
 
   /* ============ DASHBOARD ============ */
   function secDashboard(main) {
-    var isAdmin = ME.role === "admin";
-    head(main, "Dashboard", isAdmin ? "Resumen general del sistema." : "Resumen de tus grupos.");
+    if (ME.role !== "admin") return secDashboardTeacher(main);
+    var isAdmin = true;
+    head(main, "Dashboard", "Resumen general del sistema.");
 
     var jobs = [
       q("enrollments").select("id,registration_number,status,created_at,module_id,students(full_name,whatsapp,email),modules(level,title,module_number),groups(schedules(days,start_time,end_time),teachers(full_name))").order("created_at", { ascending: false }),
@@ -408,8 +412,64 @@
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
+  // Dashboard propio del profesor: solo sus grupos, nada del resto del
+  // colegio (pagos, otros módulos, etc. — eso es del admin).
+  function secDashboardTeacher(main) {
+    head(main, "Dashboard", "Resumen de tus grupos.");
+    q("groups").select("id,capacity,active,modules(id,level,title,module_number),schedules(days,start_time,end_time)")
+      .eq("teacher_id", ME.teacher_id).eq("active", true)
+      .then(function (gr) {
+        if (gr.error) throw gr.error;
+        var groups = gr.data || [];
+        var groupIds = groups.map(function (g) { return g.id; });
+        if (!groupIds.length) {
+          main.appendChild(statRow([["Cursos asignados", 0], ["Grupos activos", 0], ["Estudiantes asignados", 0], ["Cupos disponibles", 0]]));
+          main.appendChild(h('<div class="pnl-alert ok" style="margin-top:16px">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+          return;
+        }
+        return q("enrollments").select("id,student_id,group_id,status").in("group_id", groupIds)
+          .then(function (er) {
+            if (er.error) throw er.error;
+            var enr = (er.data || []).filter(function (e) { return e.status === "Active" || e.status === "PendingPayment"; });
+            var countByGroup = {};
+            var students = {};
+            enr.forEach(function (e) {
+              countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
+              students[e.student_id] = true;
+            });
+            var mods = {};
+            groups.forEach(function (g) { if (g.modules) mods[g.modules.id] = true; });
+            var cupos = groups.reduce(function (sum, g) { return sum + Math.max(g.capacity - (countByGroup[g.id] || 0), 0); }, 0);
+
+            main.appendChild(statRow([
+              ["Cursos asignados", Object.keys(mods).length],
+              ["Grupos activos", groups.length],
+              ["Estudiantes asignados", Object.keys(students).length],
+              ["Cupos disponibles", cupos]
+            ]));
+
+            main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:26px 0 12px">Mis grupos</h2>'));
+            var t = tableWrap(["Módulo", "Horario", "Estudiantes"]);
+            groups.forEach(function (g) {
+              var sc = g.schedules;
+              t.body.appendChild(h("<tr><td>" + (g.modules ? esc(g.modules.level + " · " + g.modules.title) : "—") + "</td><td>" +
+                (sc ? esc(days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "—") + "</td><td>" +
+                (countByGroup[g.id] || 0) + " / " + g.capacity + "</td></tr>"));
+            });
+            main.appendChild(t.wrap);
+          });
+      }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
   /* ============ ESTUDIANTES ============ */
   function secEstudiantes(main) {
+    if (ME.role !== "admin") {
+      head(main, "Estudiantes", "Tus estudiantes y tus anotaciones sobre cada uno.");
+      var teacherHost = h("<div></div>");
+      main.appendChild(teacherHost);
+      renderStudentsList(teacherHost);
+      return;
+    }
     head(main, "Estudiantes", "Personas inscritas y solicitudes que llegan por el formulario público.");
     var tabsBar = h('<div class="pnl-toolbar" data-tabs style="margin-bottom:14px"></div>');
     var host = h("<div></div>");
@@ -442,45 +502,52 @@
         '<span class="muted" style="font-size:13px">Al agregar uno se elige su módulo y queda inscrito.</span></div>');
       main.innerHTML = ""; main.appendChild(toolbar);
     } else { main.innerHTML = ""; }
+    var isAdminView = ME.role === "admin";
     Promise.all([
       q("students").select("*").order("created_at", { ascending: false }),
-      ME.role === "admin" ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
+      isAdminView ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
       q("enrollments").select("student_id,module_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
-      activeModules()
+      activeModules(),
+      isAdminView ? Promise.resolve({ data: [] }) : q("teacher_student_notes").select("student_id,note").eq("teacher_id", ME.teacher_id)
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
-      var profByStudent = {}, modByStudent = {};
+      var profByStudent = {}, modByStudent = {}, noteByStudent = {};
       (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
       (res[2].data || []).forEach(function (e) {
         if (e.status === "Cancelled") return;
         if (!modByStudent[e.student_id]) modByStudent[e.student_id] = e; // el más reciente
       });
+      (res[4].data || []).forEach(function (n) { noteByStudent[n.student_id] = n.note; });
       var mods = res[3];
       if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
 
-      var t = tableWrap(["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]);
+      var cols = isAdminView
+        ? ["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]
+        : ["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Anotaciones"];
+      var t = tableWrap(cols);
       (res[0].data || []).forEach(function (s) {
         var prof = profByStudent[s.id];
         var enr = modByStudent[s.id];
         var modLabel = enr && enr.modules ? enr.modules.level + " · " + enr.modules.title : "—";
         var modColorDot = enr && enr.modules ? '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(enr.modules.module_number) + '"></span>' : "";
-        var enrBadge = !enr ? "—" : enr.status === "Active" ? '<span class="badge ok">activo</span>'
-          : enr.status === "PendingPayment" ? '<span class="badge warn">pendiente de pago</span>'
-          : '<span class="badge neutral">' + esc(ENROLL_ES[enr.status] || enr.status) + "</span>";
-        var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
-          : prof.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
-        var tr = h([
-          "<tr><td>", esc(s.full_name), "</td>",
-          "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
-          "<td>", modColorDot, esc(modLabel), "</td>",
-          "<td>", enrBadge, "</td>",
-          "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
-          "<td>", esc(s.city || "—"), "</td>",
-          "<td>", estado, (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : ""), "</td>",
-          '<td class="acts"></td></tr>'
-        ].join(""));
-        var cell = tr.children[8];
-        if (ME.role === "admin") {
+        var tr;
+        if (isAdminView) {
+          var enrBadge = !enr ? "—" : enr.status === "Active" ? '<span class="badge ok">activo</span>'
+            : enr.status === "PendingPayment" ? '<span class="badge warn">pendiente de pago</span>'
+            : '<span class="badge neutral">' + esc(ENROLL_ES[enr.status] || enr.status) + "</span>";
+          var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
+            : prof.active ? '<span class="badge ok">activa</span>' : '<span class="badge bad">inactiva</span>';
+          tr = h([
+            "<tr><td>", esc(s.full_name), "</td>",
+            "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
+            "<td>", modColorDot, esc(modLabel), "</td>",
+            "<td>", enrBadge, "</td>",
+            "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
+            "<td>", esc(s.city || "—"), "</td>",
+            "<td>", estado, (prof ? '<br><span class="muted" style="font-size:12px">' + esc(prof.email) + "</span>" : ""), "</td>",
+            '<td class="acts"></td></tr>'
+          ].join(""));
+          var cell = tr.children[8];
           if (!prof) cell.appendChild(btn("Crear cuenta de portal", "btn-blue", function () { crearCuentaEstudiante(s); }));
           else {
             cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () { resetStudentPwd(s, prof); }));
@@ -491,10 +558,42 @@
           }
           cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s, enr ? enr.module_id : null, mods); }));
           cell.appendChild(btn("Eliminar", "btn-danger", function () { deleteStudent(s, prof); }));
+        } else {
+          tr = h([
+            "<tr><td>", esc(s.full_name), "</td>",
+            "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
+            "<td>", modColorDot, esc(modLabel), "</td>",
+            "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
+            "<td>", esc(s.city || "—"), "</td>",
+            '<td style="min-width:220px"></td></tr>'
+          ].join(""));
+          var noteCell = tr.children[6];
+          var noteBox = h(
+            '<div>' +
+            '<textarea rows="2" style="width:100%;resize:vertical;font:inherit;padding:6px 8px;border:1px solid var(--niebla);border-radius:8px">' +
+            esc(noteByStudent[s.id] || "") + "</textarea>" +
+            '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">' +
+            '<button class="btn btn-sm btn-ghost" data-save-note>Guardar</button>' +
+            '<span class="muted" data-note-msg style="font-size:12px"></span>' +
+            "</div></div>"
+          );
+          noteCell.appendChild(noteBox);
+          noteBox.querySelector("[data-save-note]").addEventListener("click", function () {
+            var msg = noteBox.querySelector("[data-note-msg]");
+            var val = noteBox.querySelector("textarea").value;
+            msg.textContent = "Guardando…";
+            q("teacher_student_notes").upsert({
+              teacher_id: ME.teacher_id, student_id: s.id, note: val, updated_at: new Date().toISOString()
+            }).then(function (u) {
+              if (u.error) throw u.error;
+              msg.textContent = "Guardado.";
+              setTimeout(function () { msg.textContent = ""; }, 2000);
+            }).catch(function (e) { msg.textContent = friendly(e); });
+          });
         }
         t.body.appendChild(tr);
       });
-      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="9" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
+      if (!res[0].data.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía' + (isAdminView ? '. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).' : " asignados.") + "</td></tr>"));
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
@@ -740,7 +839,7 @@
   // materiales, con un enlace para abrir cada uno en Classroom (no se
   // embebe ni se pide acceso a Drive, no hace falta).
   function secClassroom(main) {
-    head(main, "Google Classroom", "Tus cursos y materiales, organizados igual que en Classroom.");
+    head(main, "Planificador", "Tus cursos y materiales de Google Classroom, organizados igual que allá.");
 
     var qs = new URLSearchParams(location.search);
     var googleStatus = qs.get("google");
@@ -879,6 +978,198 @@
         (hasContent ? groupsHtml + looseHtml : '<p class="muted" style="margin-top:10px;font-size:13px">Todavía no hay materiales publicados en este curso.</p>') +
         "</div>"
       );
+    }
+  }
+
+  /* ============ RECURSOS DE LA CLASE (solo profesor) ============ */
+  // Misma mecánica de "carpetas dentro de carpetas" que "Mis recursos" en el
+  // portal del estudiante: lista -> nivel -> contenido, cada uno con su
+  // botón "Volver". Libro de trabajo reusa el mismo visor de Heyzine
+  // (.resource-frame-wrap) que ya ve el estudiante, pero aquí el profesor
+  // elige con cuál módulo entrar mediante una barra de búsqueda.
+  function secRecursosClase(main) {
+    renderRecursosRoot(main);
+  }
+
+  function renderRecursosRoot(main) {
+    head(main, "Recursos de la clase", "Material de apoyo para tus clases.");
+    [
+      { id: "libro", label: "Libro de trabajo" },
+      { id: "materiales", label: "Materiales" }
+    ].forEach(function (it) {
+      var row = h('<div class="resource-row" tabindex="0" role="button"><span>' + esc(it.label) +
+        '</span><span class="resource-row__chevron" aria-hidden="true">›</span></div>');
+      row.addEventListener("click", function () {
+        if (it.id === "libro") renderLibroTrabajo(main); else renderMateriales(main);
+      });
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
+      main.appendChild(row);
+    });
+  }
+
+  function renderLibroTrabajo(main) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Recursos de la clase</button>');
+    back.addEventListener("click", function () { renderRecursosRoot(main); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">Libro de trabajo</h1>'));
+    main.appendChild(h('<p class="pnl-sub">Busca el módulo cuyo libro quieres abrir.</p>'));
+
+    var searchBox = h('<input type="search" placeholder="Buscar módulo (ej. A1.1, Hello World)…" style="max-width:360px;margin-bottom:14px;display:block">');
+    var listBox = h("<div></div>");
+    var viewerBox = h("<div></div>");
+    main.appendChild(searchBox); main.appendChild(listBox); main.appendChild(viewerBox);
+
+    q("modules").select("id,level,title,heyzine_url,module_number").eq("active", true).order("module_number")
+      .then(function (r) {
+        if (r.error) throw r.error;
+        var mods = r.data || [];
+
+        function paintList(filter) {
+          listBox.innerHTML = "";
+          var f = (filter || "").trim().toLowerCase();
+          var filtered = !f ? mods : mods.filter(function (m) {
+            return (m.level + " " + m.title).toLowerCase().indexOf(f) !== -1;
+          });
+          if (!filtered.length) { listBox.appendChild(h('<p class="muted">Sin resultados.</p>')); return; }
+          filtered.forEach(function (m) {
+            var row = h(
+              '<div class="resource-row" tabindex="0" role="button">' +
+              '<div><div class="lvl-tag" style="margin-bottom:2px">' + esc(m.level) + "</div>" +
+              '<span style="font-size:13.5px;color:var(--grafito)">' + esc(m.title) + "</span></div>" +
+              '<span class="resource-row__chevron" aria-hidden="true">›</span></div>'
+            );
+            row.addEventListener("click", function () { paintViewer(m); });
+            listBox.appendChild(row);
+          });
+        }
+
+        function paintViewer(m) {
+          searchBox.style.display = "none";
+          listBox.style.display = "none";
+          viewerBox.innerHTML = "";
+          var backToList = h('<button type="button" class="resource-back">&larr; Elegir otro módulo</button>');
+          backToList.addEventListener("click", function () {
+            viewerBox.innerHTML = "";
+            searchBox.style.display = ""; listBox.style.display = "";
+          });
+          viewerBox.appendChild(backToList);
+          viewerBox.appendChild(h('<h2 style="font-size:16px;margin:0 0 12px">' + esc(m.level) + " — " + esc(m.title) + "</h2>"));
+          if (m.heyzine_url) {
+            viewerBox.appendChild(h('<div class="resource-frame-wrap"><iframe src="' + esc(m.heyzine_url) + '" allowfullscreen loading="lazy"></iframe></div>'));
+          } else {
+            viewerBox.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene un libro cargado.</div>'));
+          }
+        }
+
+        paintList("");
+        searchBox.addEventListener("input", function () { paintList(searchBox.value); });
+      }).catch(function (e) { listBox.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function renderMateriales(main) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Recursos de la clase</button>');
+    back.addEventListener("click", function () { renderRecursosRoot(main); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">Materiales</h1>'));
+    main.appendChild(h('<p class="pnl-sub">Elige qué quieres ver.</p>'));
+    ["Talleres", "Recursos interactivos", "Material bibliográfico"].forEach(function (label) {
+      var row = h('<div class="resource-row" tabindex="0" role="button"><span>' + esc(label) +
+        '</span><span class="resource-row__chevron" aria-hidden="true">›</span></div>');
+      row.addEventListener("click", function () { renderMaterialCategory(main, label); });
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
+      main.appendChild(row);
+    });
+  }
+
+  function renderMaterialCategory(main, label) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Materiales</button>');
+    back.addEventListener("click", function () { renderMateriales(main); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:14px">' + esc(label) + "</h1>"));
+    main.appendChild(h('<div class="pnl-alert ok">Todavía no hay contenido cargado aquí — LEF lo agregará pronto.</div>'));
+  }
+
+  /* ============ CALENDARIO (solo profesor) ============ */
+  // Usa la misma conexión de Google que Planificador (mismo token, se pidió
+  // el scope de Calendar en la misma pantalla de consentimiento) — no hay un
+  // botón "Conectar" aparte aquí.
+  function secCalendario(main) {
+    head(main, "Calendario", "Tus próximos eventos de Google Calendar.");
+    var body = h("<div></div>");
+    main.appendChild(body);
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+
+    rpc("get_my_classroom_connection").then(function (r) {
+      var conn = (r && r[0]) || { connected: false };
+      body.innerHTML = "";
+      if (!conn.connected) {
+        var card = h(
+          '<div class="pnl-table-wrap" style="padding:24px;text-align:center">' +
+          '<p class="pnl-sub" style="margin-bottom:16px">Conecta tu cuenta de Google desde <strong>Planificador</strong> para ver aquí tu calendario.</p>' +
+          '<button class="btn btn-blue" data-go>Ir a Planificador</button></div>'
+        );
+        body.appendChild(card);
+        card.querySelector("[data-go]").addEventListener("click", function () { location.hash = "classroom"; });
+        return;
+      }
+      loadAgenda();
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+
+    function loadAgenda() {
+      var loading = h('<p class="muted">Cargando tu calendario…</p>');
+      body.appendChild(loading);
+      callEdgeFn("calendar-list").then(function (d) {
+        loading.remove();
+        if (!d || d.connected === false) {
+          body.appendChild(h('<div class="pnl-alert err">Tu conexión con Google expiró — desconéctate y vuelve a conectarte desde Planificador.</div>'));
+          return;
+        }
+        var events = d.events || [];
+        if (!events.length) {
+          body.appendChild(h('<div class="pnl-alert ok">No tienes eventos próximos en tu calendario.</div>'));
+          return;
+        }
+        renderAgenda(events);
+      }).catch(function (e) {
+        loading.remove();
+        body.appendChild(h('<div class="pnl-alert err">No pudimos cargar tu calendario: ' + esc((e && e.message) || e) + "</div>"));
+      });
+    }
+
+    function dayLabel(dayKey) {
+      var d = new Date(dayKey + "T00:00:00");
+      var label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+    function fmtEventTime(iso) {
+      if (!iso || iso.length <= 10) return "";
+      return new Date(iso).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" });
+    }
+
+    function renderAgenda(events) {
+      var byDay = {}, order = [];
+      events.forEach(function (ev) {
+        var dayKey = (ev.start || "").slice(0, 10);
+        if (!byDay[dayKey]) { byDay[dayKey] = []; order.push(dayKey); }
+        byDay[dayKey].push(ev);
+      });
+      order.forEach(function (dayKey) {
+        body.appendChild(h('<p style="font-weight:700;font-size:13.5px;margin:18px 0 8px">' + esc(dayLabel(dayKey)) + "</p>"));
+        byDay[dayKey].forEach(function (ev) {
+          var timeLabel = ev.allDay ? "Todo el día" : fmtEventTime(ev.start) + (ev.end ? " – " + fmtEventTime(ev.end) : "");
+          body.appendChild(h(
+            '<div class="pnl-table-wrap" style="padding:14px 18px;margin-bottom:10px">' +
+            '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+            "<div><p style=\"font-weight:600;font-size:14px\">" + esc(ev.summary) + "</p>" +
+            '<p class="muted" style="font-size:12.5px">' + esc(timeLabel) + (ev.location ? " · " + esc(ev.location) : "") + "</p></div>" +
+            (ev.htmlLink ? '<a href="' + esc(ev.htmlLink) + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--azul);text-decoration:none;white-space:nowrap">Ver en Calendar ↗</a>' : "") +
+            "</div></div>"
+          ));
+        });
+      });
     }
   }
 
