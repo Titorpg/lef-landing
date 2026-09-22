@@ -1,5 +1,90 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 22 sep 2026 (continuación) — Interfaz completa del profesor
+
+**Pedido del usuario:** mientras resuelve lo de las cuentas de Workspace de
+los profesores (paso pendiente de la integración con Classroom), pidió
+construir toda la interfaz del profesor, que hasta ahora no se había tocado
+(compartía casi todo con el admin). Siete puntos concretos:
+
+1. Dashboard propio (no el del admin): cursos asignados, grupos activos,
+   estudiantes asignados + una métrica más a mi criterio.
+2. Estudiantes: quitar Pre-inscritos/Inscripción/Cuenta portal (irrelevantes
+   para el profesor); "Acciones" → "Anotaciones" (texto libre por estudiante).
+3. Pestaña nueva "Recursos de la clase", mecánica de carpetas anidadas (igual
+   que "Mis recursos" del estudiante): "Libro de trabajo" con buscador de
+   módulo para abrir el libro de Heyzine correspondiente.
+4. Dentro de "Recursos de la clase" también "Materiales" → Talleres /
+   Recursos interactivos / Material bibliográfico (vacíos por ahora).
+5. "Mi cuenta" para el profesor, igual que la del estudiante.
+6. Renombrar "Google Classroom" → "Planificador".
+7. Pestaña nueva "Calendario", integrando el Google Calendar del profesor —
+   arrastrando la conexión ya hecha para Classroom (mismo login de Google).
+
+**Construido (commit `8068b51`, Edge Functions desplegadas, frontend en
+Vercel):**
+1. **Dashboard del profesor** (`secDashboardTeacher`): tiles — Cursos
+   asignados, Grupos activos, Estudiantes asignados, **Cupos disponibles**
+   (la métrica extra sugerida) + tabla "Mis grupos" (módulo/horario/
+   estudiantes por cupo). Todo scoped a `groups.teacher_id = ME.teacher_id`
+   — nada del resto del colegio.
+2. **Estudiantes (vista profesor)**: sin pestaña Pre-inscritos, sin columnas
+   Inscripción/Cuenta portal. Columna **Anotaciones**: textarea + botón
+   Guardar por estudiante, respaldado por la tabla nueva
+   `teacher_student_notes` (migración `20260922010000_anotaciones_profesor.sql`,
+   RLS por `teacher_id = current_teacher_id()` — un profesor no puede leer ni
+   escribir anotaciones de otro). **Nota:** la lista de estudiantes que ve el
+   profesor sigue siendo la de siempre (no se acotó a "solo sus grupos") —
+   eso no se pidió explícitamente; avisar si también hay que acotarla.
+3. **"Recursos de la clase"** (nueva, solo profesor): mismo patrón de
+   navegación en niveles que "Mis recursos" del portal (lista → categoría →
+   contenido, con "← Volver" en cada nivel, reusando `.resource-row`/
+   `.resource-back`/`.resource-frame-wrap`/`.lvl-tag`). "Libro de trabajo"
+   trae los módulos activos con un buscador (por nivel/título) y abre el
+   `heyzine_url` del módulo elegido en el mismo visor que ya usa el
+   estudiante. "Materiales" → Talleres / Recursos interactivos / Material
+   bibliográfico, cada uno con "Todavía no hay contenido — LEF lo agregará
+   pronto" (mismo texto placeholder que las categorías vacías del portal).
+4. **"Google Classroom" renombrada a "Planificador"** — mismo `id` interno
+   (`classroom`) y mismo flujo de conexión; no hubo que tocar el redirect de
+   `classroom-oauth-callback`.
+5. **"Mi cuenta" habilitada para profesor** — resultó no necesitar código
+   nuevo: `secMiCuenta` ya era genérica (foto/avatar de 6 dibujos o subida
+   propia, nombre, correo, contraseña, todo vía RPCs de autoservicio
+   `update_my_avatar`/`update_my_name` que no filtran por rol). Solo hubo que
+   agregar `"teacher"` a sus `roles` y **arreglar un bloqueo real**:
+   `manage-users` (Edge Function) exigía rol admin para *cualquier* acción,
+   incluida `update_email` — ahora deja pasar `update_email` cuando
+   `payload.user_id` es la propia cuenta que llama, sin abrir ninguna otra
+   acción a no-admins.
+6. **Pestaña "Calendario"** (nueva, solo profesor): agrega el scope
+   `calendar.readonly` a la **misma** pantalla de consentimiento de Google
+   que ya pedía Classroom (no hay un botón "Conectar" aparte — comparte el
+   token guardado). Edge Function nueva `calendar-list` trae los próximos
+   eventos del calendario principal (`primary`) del profesor, agrupados por
+   día en una agenda simple (no un calendario visual tipo grilla — se
+   priorizó algo confiable sobre embeber el widget de Google Calendar, que
+   para calendarios privados no es fiable de incrustar).
+7. **`supabase/functions/_shared/google-auth.ts`** (nuevo): la lógica de
+   "verificar JWT del profesor → buscar su token de Google → refrescarlo si
+   venció" estaba duplicada en `classroom-list`; ahora la comparten
+   `classroom-list` y `calendar-list`.
+
+**⏳ Pendiente de aplicar a mano:** la migración
+`20260922010000_anotaciones_profesor.sql` (tabla + política RLS nuevas, no
+toca nada existente).
+
+**⚠️ Importante para cuando retomes lo de Google Cloud Console:** como se
+agregó el scope `calendar.readonly` a la conexión, hay que sumarle dos cosas
+a los pasos ya conocidos (ver sección de abajo, "Integración de solo lectura
+con Google Classroom"): (a) habilitar también la **Google Calendar API** en
+la biblioteca de APIs (además de Classroom API), y (b) agregar
+`https://www.googleapis.com/auth/calendar.readonly` a la lista de scopes de
+la pantalla de consentimiento OAuth. Si algún profesor ya se había conectado
+antes de este cambio, tiene que **desconectarse y volver a conectarse** para
+que Google le pida también el permiso de Calendar (los scopes no se agregan
+solos a una conexión ya autorizada).
+
 ## Sesión 22 sep 2026 — Integración de solo lectura con Google Classroom (por profesor)
 
 **Pedido del usuario:** el usuario ya tiene los cursos y actividades del día
