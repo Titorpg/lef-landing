@@ -32,10 +32,10 @@ abono el estudiante quede **activo**, pero que se siga viendo la anotación de
    curso no se activa hasta completarla"); comentario equivalente corregido
    en `lef-portal.js`.
 
-**⏳ Pendiente de aplicar a mano:** la migración
-`20260921000000_activacion_con_abono_parcial.sql` — el usuario debe pegarla
-en el SQL Editor de Supabase (Claude no puede aplicar SQL a producción). El
-resto (Edge Function + frontend) ya está en vivo.
+**✅ Migración aplicada por el usuario el 21 sep 2026** (SQL Editor de
+Supabase, "Success. No rows returned" — esperado, son dos `create or replace
+function`). Sin pendientes de esta sesión: Edge Function, frontend y base de
+datos quedan alineados.
 
 ## Sesión 17–18 sep 2026 — Pagos: se quitan las fechas fijas, se agregan abonos
 
