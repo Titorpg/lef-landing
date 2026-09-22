@@ -70,9 +70,9 @@ Vercel):**
    venció" estaba duplicada en `classroom-list`; ahora la comparten
    `classroom-list` y `calendar-list`.
 
-**⏳ Pendiente de aplicar a mano:** la migración
-`20260922010000_anotaciones_profesor.sql` (tabla + política RLS nuevas, no
-toca nada existente).
+**✅ Migración aplicada por el usuario el 22 sep 2026** (SQL Editor de
+Supabase, sin errores). Estudiantes → Anotaciones ya queda operativo del
+lado de base de datos.
 
 **⚠️ Importante para cuando retomes lo de Google Cloud Console:** como se
 agregó el scope `calendar.readonly` a la conexión, hay que sumarle dos cosas
