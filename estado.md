@@ -1,5 +1,40 @@
 # Estado del proyecto — Landing LEF
 
+## Sesión 22 sep 2026 (4ª parte) — Bug real: cuentas de profesor sin vincular rompían el panel
+
+**Encontrado al probar:** el Dashboard del profesor tiró
+`invalid input syntax for type uuid: "null"`. Causa: la cuenta de prueba
+(`jorgeradash@gmail.com`, rol `teacher`) tiene `profiles.teacher_id = null`
+— nunca quedó vinculada a una fila de `teachers`. Mis consultas nuevas
+(`secDashboardTeacher`, Anotaciones) asumían que un profesor siempre tenía
+ese vínculo y no lo comprobaban.
+
+**Causa de fondo, más allá de esta cuenta puntual:** revisando el panel, el
+selector "Vincular a profesor" solo existe en el modal de **crear** una
+cuenta de staff (Usuarios → + Cuenta de staff) — quedaba **opcional** y no
+había ninguna forma de vincularlo o corregirlo después si se creaba sin
+elegirlo o si cambiaba. Es un hueco real del panel, no solo un dato mal
+cargado.
+
+**Corregido (commit `3a88892`, desplegado):**
+1. `secDashboardTeacher`, la carga de Anotaciones y el botón "Guardar" de
+   una anotación ahora comprueban `ME.teacher_id` primero y muestran un
+   aviso claro ("Tu cuenta no está vinculada a un profesor — pide al admin
+   que la revise en Usuarios") en vez de la excepción de Postgres.
+2. **Usuarios → Editar** ahora incluye, cuando el rol es profesor, un
+   selector **"Vincular a profesor"** (con "— sin vincular —" si aplica) —
+   acción nueva `set_teacher_link` en `manage-users` (admin-only). Antes no
+   existía ninguna forma de tocar ese vínculo después de crear la cuenta.
+
+**⏳ Pendiente de que el usuario haga en el panel (no requiere SQL):** en
+**Usuarios**, buscar la cuenta de prueba y usar "Editar" → "Vincular a
+profesor" para conectarla a un registro de `teachers` (hoy solo existe uno
+en la base, "Luis Caballero" / `director@lefcenter.com` — parece dato de
+semilla, revisar si conviene crear uno nuevo con el nombre real en Académico
+→ Profesores en vez de reusar ese). Sin ese vínculo, el Dashboard y las
+Anotaciones del profesor van a seguir sin poder mostrar nada (avisan en vez
+de romperse, pero igual no hay datos que mostrar).
+
 ## Sesión 22 sep 2026 (continuación) — Interfaz completa del profesor
 
 **Pedido del usuario:** mientras resuelve lo de las cuentas de Workspace de
