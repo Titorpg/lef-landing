@@ -68,7 +68,7 @@
      Cambio de contraseña obligatorio en el 1er ingreso (`must_change_password`;
      resolver antes el choque de `audit_log` de la migración `20260906130000`,
      que nunca se aplicó — la tabla actual es la de `20260906180000`).
-  5. MFA (2 pasos) obligatorio para admin. **Hay 2 admins activos (verificado 23 sep): "Administrador LEF" y "Admin Sistemas"** (esta última era la cuenta de profesor de prueba jorgeradash, pasada a admin; sigue con `teacher_id` del profesor "Jorge Rada"). Uno puede restablecer al otro si pierde el celular. "Luis Caballero" = profesor de prueba viejo sin cuenta, a eliminar.
+  5. MFA (2 pasos) obligatorio para admin. **Hay 2 admins activos (verificado 23 sep): "Administrador LEF" y "Admin Sistemas"** (esta última era la cuenta de profesor de prueba jorgeradash, pasada a admin; el 23 sep se le quitó el `teacher_id` y se borró el registro de profesor "Jorge Rada" — desde `0e230b9` el cambio de rol desliga todo solo). Uno puede restablecer al otro si pierde el celular. "Luis Caballero" = profesor de prueba viejo sin cuenta, a eliminar.
 - **⏸ Guardar tarjeta / cobro automático recurrente**: PENDIENTE A CONFIRMAR
   por el cliente. Se quitó de la parte visual (botón "Guardar tarjeta…" del
   portal eliminado el 23 sep). No construir hasta que se confirme.
