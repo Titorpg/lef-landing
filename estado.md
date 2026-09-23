@@ -1,5 +1,15 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 (3ª parte) — Eliminar cobros de estudiantes borrados
+
+Commit `670c8af`, desplegado. En Pagos, las filas con "estudiante eliminado"
+ocultaban TODOS los botones salvo "Ver pagos", así que un cobro huérfano sin
+pagos (caso: Jorge Rada, A1.1, $297.500, pagado $0) no se podía borrar.
+Ahora "Eliminar" sale también ahí (mismo `admin_delete_subscription`, con
+motivo y Registro de eventos). Por qué existía: `admin_delete_student` solo
+conserva cobros CON pagos; ese tenía pagos al borrar al estudiante y luego
+se borraron uno por uno desde "Ver pagos", quedando el cobro vacío.
+
 ## Sesión 23 sep 2026 (2ª parte) — "Mi curso" se actualiza sin recargar
 
 Commit `d9dc2c7`, desplegado. Al confirmar "Matricularme en el módulo X",
