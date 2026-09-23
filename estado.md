@@ -18,9 +18,20 @@
   `LEF_LOGIN_URL=https://www.lefcenter.com/login`; correo de prueba enviado
   por la API de Resend (id `01a0cfb7…`) — ✅ **llegó a Recibidos** de Gmail
   (no a spam), confirmado por el usuario.
+  **Parte 2 ✅ desplegada (23 sep, `de8b71f`)**: `manage-users` acepta
+  `send_email` en `create_account` y `reset_password` y manda usuario +
+  contraseña temporal por Resend (`sendCredentials`). Nunca rompe la acción:
+  si el correo falla responde `ok` con `email_sent:false` + `email_error` y el
+  panel avisa "compártelos por WhatsApp". Panel: casilla "Enviar también el
+  usuario y la contraseña por correo" (marcada por defecto) en las 6 ventanas
+  (crear estudiante desde solicitud, crear cuenta de portal, restablecer
+  contraseña del estudiante, cuenta de staff, cuenta de profesor sin cuenta,
+  restablecer en Usuarios). La contraseña se sigue mostrando para WhatsApp.
+  Función verificada en vivo (responde 401 sin sesión); **falta prueba real
+  del usuario desde el panel**.
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
-  2. Correo de credenciales al crear cuenta / reiniciar contraseña
+  2. (hecho — ver arriba) Correo de credenciales al crear cuenta / reiniciar contraseña
      (`manage-users`). Hoy el admin copia la contraseña y la manda por
      WhatsApp — que el correo sea adicional, no quitar esa opción.
   3. SMTP propio en Supabase (Authentication → Emails → SMTP: host
