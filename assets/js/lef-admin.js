@@ -2953,6 +2953,22 @@
                 }).then(function (res) { toastMail("Cuenta creada.", res); load(); });
               }, "Crear");
             }));
+            // Registro de profesor sin cuenta de acceso (queda así, p. ej., al
+            // eliminar la cuenta de un profesor): se borra de Académico → Profesores.
+            // Con grupos asignados la BD lo impide (on delete restrict) y
+            // friendly() lo explica en palabras.
+            cell.appendChild(btn("Eliminar", "btn-danger", function () {
+              confirmDelete("Eliminar profesor",
+                "Vas a eliminar el registro de profesor de " + r.name + " (no tiene cuenta de acceso). " +
+                "También se borran sus anotaciones sobre estudiantes y su conexión con Google Classroom. " +
+                "Si tiene grupos asignados no se podrá: reasígnalos primero en Académico → Grupos.",
+                function () {
+                  return q("teachers").delete().eq("id", r.teacher_id).then(function (d) {
+                    if (d.error) throw d.error;
+                    toast("Profesor eliminado."); load();
+                  });
+                });
+            }));
             t.body.appendChild(tr); return;
           }
           if (r.user_id === ME.user_id) { cell.innerHTML = '<span class="muted">tú</span>'; t.body.appendChild(tr); return; }
