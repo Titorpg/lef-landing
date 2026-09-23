@@ -26,6 +26,29 @@
 - Cuenta de profesor de prueba `jorgeradash@gmail.com` sin vincular.
 - Entrega: transferir repo GitHub y rotar tokens.
 
+## Sesión 23 sep 2026 (8ª parte) — CAPTCHA Turnstile en el login (EN VIVO ✅)
+
+Retomando el endurecimiento del login **por partes** (el paquete completo de
+`3d737a4` se revirtió el 6 sep en `b08c0da` porque rompió el login de todos;
+`lef-security.js`, `lef-recuperar.js` y `recuperar.html` siguen huérfanos en
+el repo). Parte 1 = solo CAPTCHA:
+- `lef-auth.js`: widget Turnstile (render explícito, en español) bajo la
+  contraseña; el token va en `signInWithPassword({ options: { captchaToken } })`;
+  se resetea tras cada intento (un token = un uso); mensajes en español.
+- `login.html` carga `challenges.cloudflare.com/turnstile/v0/api.js`.
+- `supabase-config.js`: `turnstileSiteKey = 0x4AAAAAAFA1gLmMV0cvOocb`
+  (widget "LEF login", hostnames lefcenter.com + www). Secret key en `.env`
+  (`TURNSTILE_SECRET_KEY`).
+- **El usuario activó el CAPTCHA en Supabase** (Authentication → Attack
+  Protection → Turnstile + secret) y confirmó que el login funciona. Commit
+  `6bb15e0`.
+- Siguiente: Resend (falta API key + dominio verificado); luego, por partes:
+  correo de credenciales al crear cuenta → "¿Olvidaste tu contraseña?" →
+  cambio obligatorio en 1er ingreso (requiere `must_change_password`; ojo con
+  el choque de `audit_log` de `20260906130000`) → MFA admin. Ajustes de panel
+  aún pendientes (SEGURIDAD.md paso 6): sign-ups OFF, contraseña 12+, leaked
+  password ON, rate limits.
+
 ## Sesión 23 sep 2026 (7ª parte) — Sin "Guardar tarjeta", recibos DIAN, legales y FAQ al día
 
 **Pedidos del usuario:** (1) verificar datos antes de listar pendientes (se
