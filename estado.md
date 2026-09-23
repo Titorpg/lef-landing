@@ -57,7 +57,15 @@
      `smtp.resend.com`, puerto 465, usuario `resend`, clave = API key) y
      "¿Olvidaste tu contraseña?" (`recuperar.html` + `lef-recuperar.js`, hoy
      huérfanos).
-  4. Cambio de contraseña obligatorio en el 1er ingreso (`must_change_password`;
+  4. **EN VIVO (23 sep, `018907c`)** — migración `20260923050000` aplicada por
+     el usuario en el SQL Editor (verificado: columna existe, 3 cuentas en
+     false, RPC existe y anon no la puede ejecutar). `manage-users` marca al
+     crear/restablecer; `lef-primer-ingreso.js` muestra "Crea tu contraseña
+     personal" antes del panel/portal; Mi cuenta y /recuperar quitan la marca.
+     `scripts/apply-migration.mjs` sirve para migraciones desde la terminal
+     (desde el teléfono el `!` no ejecuta: usar SQL Editor). **Falta prueba
+     del usuario.** Nota vieja:
+     Cambio de contraseña obligatorio en el 1er ingreso (`must_change_password`;
      resolver antes el choque de `audit_log` de la migración `20260906130000`,
      que nunca se aplicó — la tabla actual es la de `20260906180000`).
   5. MFA (2 pasos) obligatorio para admin — mantener 2+ admins antes.
