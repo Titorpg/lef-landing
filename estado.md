@@ -19,8 +19,18 @@ matricula; (3) el cobro NO debe copiar lo pagado en el módulo anterior (los
 - Admin → Pagos → "Generar pago" ahora precarga 297.500 en la mensualidad
   (antes salía vacía); constante `MONTHLY_PRICE` en `lef-admin.js`.
 
-**⏳ Pendiente del usuario:** aplicar la migración en el SQL Editor (sin
-ella, el portal sigue proponiendo el monto anterior).
+**Ajuste siguiente (mismo día):** al CREAR un cobro (Pagos → Generar pago y
+Pre-inscritos → Crear estudiante) la mensualidad ya no es editable: se
+muestra el precio fijo en solo lectura, y solo **Pagos → Editar** permite
+poner otro valor. Refuerzo en BD, migración
+`20260923010000_precio_fijo_al_generar_pago.sql`: `admin_create_subscription`
+ignora el monto del navegador y guarda `lef_monthly_price()`, y
+`subscriptions.monthly_amount` tiene ese precio como default.
+
+**⏳ Pendiente del usuario:** aplicar en el SQL Editor las DOS migraciones
+(`20260923000000_precio_fijo_modulo.sql` y
+`20260923010000_precio_fijo_al_generar_pago.sql`, en ese orden). Sin la
+primera, el portal sigue proponiendo el monto anterior.
 
 ## Sesión 22 sep 2026 (7ª parte) — Ciclo de vida de las inscripciones (sin "rebabas")
 

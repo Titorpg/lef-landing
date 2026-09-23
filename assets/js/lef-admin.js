@@ -38,6 +38,14 @@
 
   // Precio fijo de la mensualidad de un módulo (mismo valor que lef_monthly_price() en la BD).
   var MONTHLY_PRICE = 297500;
+  // Mensualidad al CREAR un cobro: fija, de solo lectura. Para un valor
+  // distinto (descuento, beca…) se cambia después con Pagos → Editar.
+  function fixedPriceField() {
+    return field("Mensualidad (COP)", '<input type="text" readonly value="' +
+      new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(MONTHLY_PRICE) +
+      '" style="background:var(--papel);color:var(--grafito)">') +
+      '<p class="pnl-sub" style="margin:-6px 0 12px;font-size:12.5px">Precio fijo de los módulos. Si este estudiante tiene un valor distinto, cámbialo después con <strong>Pagos → Editar</strong>.</p>';
+  }
   var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reversado" };
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
   var DOC_TYPES = ["TI", "CC", "CE", "PP"];
@@ -804,7 +812,7 @@
       field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
       field("Módulo", moduleSelect("mod", mods, defaultMod)) +
       field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
-      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + MONTHLY_PRICE + '">') +
+      fixedPriceField() +
       field("Contraseña temporal del portal", '<input name="pw" value="' + pwd + '">') +
       '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>), su cuenta de portal y su cobro de la mensualidad, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que entre y pague. Si quien paga no es el estudiante, corrige el pagador después desde Pagos → Editar.</p>' +
       "</div>");
@@ -833,7 +841,7 @@
       var accountPwd = b.querySelector("[name=pw]").value;
       var moduleId = b.querySelector("[name=mod]").value;
       var docType = b.querySelector("[name=dt]").value;
-      var monthly = +b.querySelector("[name=amt]").value || 0;
+      var monthly = MONTHLY_PRICE;
       return rpc("admin_convert_preinscripcion", {
         p_id: p.id,
         p_module_id: moduleId,
@@ -1570,7 +1578,8 @@
       }).join("") + "</select>")) +
       (r ? field("Módulo", moduleSelect("mod", mods, r.module_id))
          : fieldBlock("Módulo", '<div data-modpick></div>') + '<p class="pnl-sub" data-modnote style="margin:-4px 0 12px"></p>') +
-      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : MONTHLY_PRICE) + '">') +
+      (r ? field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + r.monthly_amount + '">')
+         : fixedPriceField()) +
       (r ? "" :
         field("Abono inicial (COP, opcional)", '<input name="abono" type="number" min="0" value="0">') +
         field("Método del abono", '<select name="abonoM">' + Object.keys(METHOD_ES).map(function (k) {
@@ -1627,7 +1636,8 @@
       var payer = readPayer(body);
       var payload = {
         module_id: r ? body.querySelector("[name=mod]").value : pickedValue(body, "mod"),
-        monthly_amount: +body.querySelector("[name=amt]").value || 0,
+        // Al crear, siempre el precio fijo; solo "Editar" permite cambiarlo.
+        monthly_amount: r ? (+body.querySelector("[name=amt]").value || 0) : MONTHLY_PRICE,
         payer_name: payer.p_payer_name, payer_doc_type: payer.p_payer_doc_type,
         payer_doc_number: payer.p_payer_doc_number, payer_email: payer.p_payer_email,
         payer_phone: payer.p_payer_phone
