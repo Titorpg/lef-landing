@@ -38,16 +38,16 @@
   (`lefEmail()`), incluidas las plantillas de Supabase Auth de la parte 3
   (recuperar contraseña, aviso "tu contraseña fue cambiada", etc.): generar
   el HTML con Node desde el `.ts` y pegarlo con las variables de Supabase.
-  **Parte 3 — código listo (`0156de4`), NO desplegado en Vercel todavía**:
+  **Parte 3 — EN VIVO (23 sep; config de Auth aplicada por el usuario, Vercel desplegado)**:
   login con "¿Olvidaste tu contraseña?" (CAPTCHA propio, `redirectTo`
   `/recuperar`), `/recuperar` reescrita autónoma, plantillas recovery + aviso
   "contraseña cambiada" en `supabase/templates/` (generadas con `lefEmail`).
-  **Falta aplicar la config de Auth** (SMTP Resend, `site_url` — estaba en
+  Config de Auth ✅ aplicada (SMTP Resend, `site_url` — estaba en
   `http://localhost:3000`! — `uri_allow_list`, plantillas, rate limit 30/h):
   `node --no-warnings supabase/templates/apply-auth-templates.mjs`. A Claude
   se lo bloqueó el clasificador ("Production Deploy"); lo corre el usuario.
   Respaldo de la config previa en el scratchpad de la sesión del 23 sep.
-  Después: desplegar Vercel y probar el flujo completo.
+  ✅ Vercel desplegado. **Falta prueba del usuario** (en ventana de incógnito: olvidé → correo → /recuperar → aviso "contraseña cambiada").
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
   2. (hecho — ver arriba) Correo de credenciales al crear cuenta / reiniciar contraseña
