@@ -31,6 +31,13 @@ estado de cuenta. Con imágenes de Pexels para decorar.
 - Fotos Pexels (comprimidas, 1200 px): 17653299 (hero), 6671599, 5355644,
   4144927, 6502817, 5649518.
 
+**✅ Migración aplicada por el usuario (23 sep 2026)**, desplegado (commit
+`c0c5077`). Probado en vivo con la sesión de Liam: saludo, aviso "Ya puedes
+matricularte en A1.2", tarjetas (Al día / 1 de 12), novedad de bienvenida con
+portada, "Leer más" abre el recuadro, y el logo lleva de Facturación a
+Inicio sin salir del portal. Falta probar Admin → Novedades con una sesión de
+admin.
+
 ## Sesión 23 sep 2026 (4ª parte) — Registro de eventos: explicación en palabras para TODO
 
 **Reclamo del usuario:** había pedido que "Ver" en el Registro de eventos
