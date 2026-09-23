@@ -1,5 +1,14 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 (2ª parte) — "Mi curso" se actualiza sin recargar
+
+Commit `d9dc2c7`, desplegado. Al confirmar "Matricularme en el módulo X",
+"Mi curso" se vuelve a pintar sola: desaparece la sugerencia, sale un aviso
+"¡Listo! Quedaste matriculado en el módulo X" y la tarjeta normal del
+módulo nuevo. Esa tarjeta muestra, mientras la inscripción esté
+`PendingPayment`, un aviso amarillo "Pendiente de pago" con botón "Ir a
+Facturación" (se quita solo con el primer abono). Solo frontend, sin SQL.
+
 ## Sesión 23 sep 2026 — "Matricular el siguiente curso": confirmación + precio fijo
 
 **Pedido del usuario:** (1) recuadro de confirmación antes de matricularse
