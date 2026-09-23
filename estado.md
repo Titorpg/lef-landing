@@ -38,8 +38,11 @@ eran `lef` + 8 caracteres (11, sin mayúscula ni símbolo). Ahora:
   contraseña que va a `manage-users`; "Mi cuenta" (admin y portal) exige la
   misma regla y muestra la pista; errores `weak_password` / contraseña
   filtrada de Supabase traducidos al español.
-- Pendiente del usuario: activar en el panel (contraseña 12 + requisitos,
-  leaked password protection — requiere plan Pro — y rate limits).
+- **✅ Activado por el usuario (23 sep 2026)**: contraseña mínimo 12 +
+  minúscula/mayúscula/número/símbolo, y rate limits. **Leaked password
+  protection: NO** — requiere plan Pro de Supabase; el usuario decidió no
+  hacer la alternativa propia (chequeo HIBP en el navegador), "con lo que
+  tenemos es suficiente".
 
 ## Sesión 23 sep 2026 (8ª parte) — CAPTCHA Turnstile en el login (EN VIVO ✅)
 
