@@ -1,5 +1,23 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 (4ª parte) — Registro de eventos: explicación en palabras para TODO
+
+**Reclamo del usuario:** había pedido que "Ver" en el Registro de eventos
+explicara en palabras lo que se hizo en vez de mostrar código, y solo quedó
+hecho para el primer evento (`payment.receipt_backfill`, texto fijo en
+`AUDIT_ACTION_EXPLAIN_ES`). Los demás seguían mostrando el JSON.
+
+**Hecho:** `explainAudit()` en `lef-admin.js` arma la explicación con los
+datos guardados en `details` para cada tipo: `payment.delete`,
+`payment.update` (lista "antes → después" de lo que cambió),
+`payment.reverse`, `subscription.delete` (con nombre del módulo) y
+`cycle.finish` (conteos + estudiantes afectados). Nombres de estudiante y
+módulo se resuelven con consultas a `students`/`modules`. Arriba: fecha/hora
+y quién lo hizo; abajo el motivo escrito. El JSON queda en un desplegable
+cerrado "Detalle técnico (solo para soporte)". **Regla para lo que venga:**
+toda acción nueva que escriba en `audit_log` debe traer su caso en
+`explainAudit()`.
+
 ## Sesión 23 sep 2026 (3ª parte) — Eliminar cobros de estudiantes borrados
 
 Commit `670c8af`, desplegado. En Pagos, las filas con "estudiante eliminado"

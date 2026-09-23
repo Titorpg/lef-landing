@@ -1730,9 +1730,104 @@
       "¿Hay algo que hacer? No. Este registro queda aquí solo como comprobante permanente de que se hizo " +
       "esa corrección — nadie, ni el admin, puede borrar este historial."
   };
+  // Explicación en palabras de un evento, armada con los datos que guardó el
+  // registro (el código técnico queda aparte, en un desplegable para soporte).
+  //   lk.students { id: nombre } · lk.modules { id: "A1.1 · Título" }
+  function explainAudit(r, lk) {
+    var d = r.details || {};
+    var who = function (x) {
+      return (x && (x.student_name || lk.students[x.student_id])) || (x && x.payer_name) || "un estudiante ya eliminado";
+    };
+    var payer = function (x) {
+      return x && x.payer_name ? x.payer_name + (x.payer_doc_number ? " (" + (x.payer_doc_type || "") + " " + x.payer_doc_number + ")" : "") : "sin dato";
+    };
+    var month = function (s) {
+      if (!s) return "—";
+      var p = String(s).slice(0, 7).split("-");
+      return (["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][+p[1] - 1] || p[1]) + " de " + p[0];
+    };
+    var method = function (m) { return METHOD_ES[m] || m || "—"; };
+    var receipt = function (x) { return x.receipt_number || "sin número de recibo"; };
+    var line = function (label, val) { return "• " + label + ": " + val; };
+
+    switch (r.action) {
+      case "payment.delete":
+        return [
+          "Se ELIMINÓ por completo un pago de " + who(d) + ". Ese pago ya no existe en el sistema: este registro es la única constancia de que existió.",
+          "Datos del pago que se borró:\n" + [
+            line("Recibo", receipt(d)),
+            line("Monto", money(d.amount, d.currency)),
+            line("Método", method(d.method)),
+            line("Mes que cubría", month(d.period_month)),
+            line("Fecha en que se registró", date(d.paid_at)),
+            line("Pagado por", payer(d))
+          ].join("\n")
+        ];
+      case "payment.update": {
+        var b = d.before || {}, changes = [];
+        if (d.new_amount != null && +d.new_amount !== +b.amount) changes.push(line("Monto", money(b.amount, b.currency) + " → " + money(d.new_amount, b.currency)));
+        if (d.new_method && d.new_method !== b.method) changes.push(line("Método", method(b.method) + " → " + method(d.new_method)));
+        if (d.new_period_month && String(d.new_period_month).slice(0, 7) !== String(b.period_month || "").slice(0, 7)) changes.push(line("Mes que cubre", month(b.period_month) + " → " + month(d.new_period_month)));
+        if (d.new_notes != null && d.new_notes !== b.notes) changes.push(line("Nota", (b.notes || "(vacía)") + " → " + d.new_notes));
+        return [
+          "Se CORRIGIÓ un dato del pago con recibo " + receipt(b) + " de " + who(b) + " (pagado por " + payer(b) + ").",
+          changes.length ? "Qué cambió (antes → después):\n" + changes.join("\n") : "Se guardó la corrección sin que ningún dato quedara distinto al que ya tenía."
+        ];
+      }
+      case "payment.reverse":
+        return [
+          "Se REVERSÓ el pago con recibo " + receipt(d) + " de " + who(d) + ". El pago original NO se borró: sigue en el libro contable, y se creó un asiento de reverso por el mismo valor que lo anula (en “Ver pagos” aparece marcado como “reverso”).",
+          "Pago reversado:\n" + [
+            line("Monto", money(d.amount, d.currency)),
+            line("Método", method(d.method)),
+            line("Mes que cubría", month(d.period_month)),
+            line("Pagado por", payer(d))
+          ].join("\n")
+        ];
+      case "subscription.delete":
+        return [
+          "Se ELIMINÓ un cobro (suscripción) de " + who(d) + ". No tenía pagos registrados en el momento de borrarse, así que no afectó ningún pago.",
+          "Cobro que se borró:\n" + [
+            line("Módulo", lk.modules[d.module_id] || "(módulo no identificado)"),
+            line("Mensualidad", money(d.monthly_amount, d.currency)),
+            line("Creado el", date(d.created_at)),
+            line("Pagador registrado", payer(d))
+          ].join("\n")
+        ];
+      case "cycle.finish": {
+        var auto = !r.actor_email;
+        var est = (d.estudiantes || []).map(function (e) { return "• " + e.estudiante + " — " + e.modulo + ": " + e.resultado; });
+        return [
+          (auto ? "El sistema CERRÓ AUTOMÁTICAMENTE el ciclo " : "Se FINALIZÓ A MANO (antes de su fecha) el ciclo ") +
+            (d.ciclo || "") + " (" + date(d.inicio) + " – " + date(d.fin) + ")" + (auto ? ", porque ya había pasado su fecha de fin." : "."),
+          "Qué se hizo:\n" + [
+            line("Estudiantes que completaron su módulo", d.modulos_completados || 0),
+            line("Inscripciones canceladas porque nunca se pagaron", d.inscripciones_canceladas_sin_pago || 0),
+            line("Grupos eliminados", d.grupos_eliminados || 0),
+            line("Horarios eliminados", d.horarios_eliminados || 0),
+            "• El ciclo también se eliminó."
+          ].join("\n"),
+          est.length ? "Estudiantes afectados:\n" + est.join("\n") : "No había estudiantes inscritos en ese ciclo.",
+          "Todos quedaron sin módulo en Estudiantes, a la espera de su siguiente inscripción. Los módulos completados se siguen viendo en su “Detalle” y en el portal."
+        ];
+      }
+    }
+    return null;
+  }
+
   function secRegistro(main) {
     head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción, o se cierra un ciclo, queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
-    rpc("admin_list_audit_log", { p_limit: 300 }).then(function (rows) {
+    // Nombres de estudiantes y módulos para que la explicación hable en palabras, no en códigos.
+    var lk = { students: {}, modules: {} };
+    Promise.all([
+      rpc("admin_list_audit_log", { p_limit: 300 }),
+      q("students").select("id,full_name"),
+      q("modules").select("id,level,title")
+    ]).then(function (res) {
+      (res[1].data || []).forEach(function (s) { lk.students[s.id] = s.full_name; });
+      (res[2].data || []).forEach(function (m) { lk.modules[m.id] = m.level + " · " + m.title; });
+      return res[0];
+    }).then(function (rows) {
       rows = rows || [];
       var t = tableWrap(["Fecha", "Quién", "Acción", "Motivo", "Detalle"]);
       rows.forEach(function (r) {
@@ -1745,15 +1840,21 @@
         tr.appendChild(td);
         detailBtn.onclick = function () {
           var box = h("<div></div>");
-          var explain = AUDIT_ACTION_EXPLAIN_ES[r.action];
-          if (explain) {
-            box.appendChild(h('<p style="margin:0 0 16px;line-height:1.55;white-space:pre-wrap">' + esc(explain) + "</p>"));
-            box.appendChild(h('<p class="muted" style="font-size:12px;margin:0 0 6px">Motivo técnico original (para soporte):</p>'));
-            box.appendChild(h('<p class="muted" style="font-size:12.5px;margin:0 0 14px">' + esc(r.reason) + "</p>"));
-          }
-          var pre = h('<pre style="white-space:pre-wrap;font-size:12px;max-height:60vh;overflow:auto;background:var(--niebla);padding:12px;border-radius:8px">' +
-            esc(JSON.stringify(r.details, null, 2)) + "</pre>");
-          box.appendChild(pre);
+          var fixed = AUDIT_ACTION_EXPLAIN_ES[r.action];
+          var paras = fixed ? [fixed] : explainAudit(r, lk);
+          var when = date(r.created_at) + " a las " + new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+          var by = r.actor_email || (r.action === "cycle.finish" ? "el sistema (automático)" : "—");
+          box.appendChild(h('<p class="muted" style="font-size:12.5px;margin:0 0 12px">' + esc(when) + " · hecho por " + esc(by) + "</p>"));
+          (paras || ["No hay una explicación preparada para este tipo de evento. Abajo está el detalle técnico."]).forEach(function (p) {
+            box.appendChild(h('<p style="margin:0 0 14px;line-height:1.55;white-space:pre-wrap">' + esc(p) + "</p>"));
+          });
+          if (!fixed) box.appendChild(h('<p style="margin:0 0 14px;line-height:1.55"><strong>Motivo escrito:</strong> ' + esc(r.reason) + "</p>"));
+          // Detalle técnico: escondido por defecto, solo para soporte.
+          var tech = h('<details style="margin-top:6px"><summary class="muted" style="font-size:12px;cursor:pointer">Detalle técnico (solo para soporte)</summary>' +
+            (fixed ? '<p class="muted" style="font-size:12.5px;margin:8px 0">Motivo técnico original: ' + esc(r.reason) + "</p>" : "") +
+            '<pre style="white-space:pre-wrap;font-size:12px;max-height:50vh;overflow:auto;background:var(--niebla);padding:12px;border-radius:8px;margin-top:8px">' +
+            esc(JSON.stringify(r.details, null, 2)) + "</pre></details>");
+          box.appendChild(tech);
           modal("Detalle — " + (AUDIT_ACTION_ES[r.action] || r.action), box, function () { return Promise.resolve(); }, "Cerrar");
         };
         t.body.appendChild(tr);
