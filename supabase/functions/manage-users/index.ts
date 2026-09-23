@@ -34,6 +34,28 @@ async function markMustChange(admin: any, uid: string) {
   } catch { /* noop */ }
 }
 
+// Regla del usuario (23 sep 2026): nunca dos cuentas con el mismo correo.
+// Devuelve "cuenta" si otra cuenta (profile) ya usa el correo, "profesor" si
+// hay un registro de profesor SIN cuenta con ese correo, o null si está libre.
+// exceptUid: la propia cuenta al editarla. checkTeachers: solo al crear.
+// deno-lint-ignore no-explicit-any
+async function emailInUse(admin: any, email: string, exceptUid?: string, checkTeachers = false) {
+  // ilike = sin distinguir mayúsculas; se escapan % y _ (comodines) para comparar exacto.
+  const pat = email.replace(/[\%_]/g, (c) => "\\" + c);
+  const { data: profs } = await admin.from("profiles").select("user_id, teacher_id").ilike("email", pat);
+  if ((profs ?? []).some((p: { user_id: string }) => p.user_id !== exceptUid)) return "cuenta";
+  if (checkTeachers) {
+    const linked = new Set((profs ?? []).map((p: { teacher_id: string | null }) => p.teacher_id).filter(Boolean));
+    const { data: ts } = await admin.from("teachers").select("id").ilike("email", pat);
+    if ((ts ?? []).some((t: { id: string }) => !linked.has(t.id))) return "profesor";
+  }
+  return null;
+}
+// Supabase Auth también rechaza correos repetidos (cuentas sin profile).
+function authEmailError(msg: string) {
+  return /already (been )?registered|already exists|email_exists/i.test(msg) ? "correo_en_uso" : msg;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -112,10 +134,16 @@ Deno.serve(async (req) => {
       if (!email || !password || password.length < 8) return json({ error: "email_o_password_invalido" }, 400);
       if (!["student", "teacher", "admin"].includes(role)) return json({ error: "rol_invalido" }, 400);
 
+      // Un profesor nuevo crearía un 2º registro en teachers si ya hay uno sin
+      // cuenta con ese correo; si llega teacher_id es justo ese registro.
+      const inUse = await emailInUse(admin, email, undefined, role === "teacher" && !teacher_id);
+      if (inUse === "cuenta") return json({ error: "correo_en_uso" }, 409);
+      if (inUse === "profesor") return json({ error: "correo_en_profesor" }, 409);
+
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email, password, email_confirm: true, user_metadata: { full_name },
       });
-      if (cErr) return json({ error: cErr.message }, 400);
+      if (cErr) return json({ error: authEmailError(cErr.message) }, 400);
 
       let createdTeacherId: string | null = null;
       if (role === "teacher" && !teacher_id) {
@@ -140,6 +168,14 @@ Deno.serve(async (req) => {
       await markMustChange(admin, created.user.id);
       const mail = payload.send_email ? await sendCredentials("new", email, full_name, password) : {};
       return json({ ok: true, user_id: created.user.id, ...mail });
+    }
+
+    if (action === "check_email") {
+      // Revisión previa (p. ej. antes de crear un estudiante desde una solicitud,
+      // para no dejar matrícula y cobro creados sin cuenta).
+      const email = String(payload.email ?? "").trim().toLowerCase();
+      if (!email) return json({ error: "email_invalido" }, 400);
+      return json({ ok: true, in_use: await emailInUse(admin, email, undefined, !!payload.check_teachers) });
     }
 
     if (action === "set_role") {
@@ -186,8 +222,9 @@ Deno.serve(async (req) => {
       const uid = String(payload.user_id);
       const email = String(payload.email ?? "").trim().toLowerCase();
       if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
+      if (await emailInUse(admin, email, uid)) return json({ error: "correo_en_uso" }, 409);
       const { error } = await admin.auth.admin.updateUserById(uid, { email, email_confirm: true });
-      if (error) return json({ error: error.message }, 400);
+      if (error) return json({ error: authEmailError(error.message) }, 400);
       await admin.from("profiles").update({ email }).eq("user_id", uid);
       return json({ ok: true });
     }
@@ -199,8 +236,9 @@ Deno.serve(async (req) => {
       const full_name = String(payload.full_name ?? "").trim();
       if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "email_invalido" }, 400);
       if (!full_name) return json({ error: "nombre_invalido" }, 400);
+      if (await emailInUse(admin, email, uid)) return json({ error: "correo_en_uso" }, 409);
       const { error: aErr } = await admin.auth.admin.updateUserById(uid, { email, email_confirm: true });
-      if (aErr) return json({ error: aErr.message }, 400);
+      if (aErr) return json({ error: authEmailError(aErr.message) }, 400);
       const { error: pErr } = await admin.from("profiles").update({ email, full_name }).eq("user_id", uid);
       if (pErr) return json({ error: pErr.message }, 400);
       return json({ ok: true });

@@ -230,6 +230,8 @@
     url_invalida: "Esa imagen no es válida.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
     email_invalido: "El correo no es válido.",
+    correo_en_uso: "Ese correo ya está asociado a otra cuenta. Cada cuenta debe tener un correo distinto: usa otro correo o revisa la cuenta existente en Usuarios.",
+    correo_en_profesor: "Ya hay un profesor registrado con ese correo (aparece en Usuarios como “sin cuenta”). Usa el botón “Crear cuenta” de su fila, o elimínalo primero.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
     requiere_admin: "Necesitas permisos de administrador para esta acción."
   };
@@ -896,6 +898,13 @@
       var sendMail = wantsMail(b);
       var pwErr = checkPassword(accountPwd);
       if (pwErr) throw new Error(pwErr); // antes de crear nada, para no dejar el estudiante a medias
+      // Igual con el correo: si ya lo usa otra cuenta, se avisa ANTES de crear
+      // matrícula y cobro (si no, quedaría el estudiante creado sin cuenta).
+      return callFn({ action: "check_email", email: p.email }).then(function (chk) {
+        if (chk && chk.in_use) throw new Error("correo_en_uso");
+        return crearDesdeSolicitud();
+      });
+      function crearDesdeSolicitud() {
       var moduleId = b.querySelector("[name=mod]").value;
       var docType = b.querySelector("[name=dt]").value;
       var monthly = MONTHLY_PRICE;
@@ -938,6 +947,7 @@
           });
         });
       });
+      }
     }, "Crear estudiante");
   }
 
