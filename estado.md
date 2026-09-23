@@ -25,6 +25,9 @@ hizo explícito en el formulario.
   (público, 5 MB, solo imágenes) + políticas (lectura pública; subir/cambiar/
   borrar solo admin).
 
+**✅ Migración aplicada por el usuario** (bucket verificado: público, 5 MB,
+solo imágenes). Desplegado (commit `88136b3`).
+
 ## Sesión 23 sep 2026 (5ª parte) — Portal: pestaña "Inicio" (tablón) + Novedades en el admin
 
 **Pedido del usuario:** el logo del portal del estudiante sacaba de la
