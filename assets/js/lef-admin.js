@@ -62,6 +62,28 @@
   // genérico — de ahí no se puede "corregir" a mano sin crear el módulo siguiente.
   var ENROLL_ES = { PendingPayment: "Pendiente de pago", Active: "Activo", Completed: "Completado", Cancelled: "Cancelada" };
 
+  // Política de contraseñas (la misma que exige Supabase → Authentication →
+  // Passwords): mínimo 12, con minúscula, mayúscula, número y símbolo.
+  var PW_HINT = "Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo (por ejemplo ! @ # $ % * ? - _).";
+  function checkPassword(pw) {
+    pw = String(pw || "");
+    if (pw.length < 12) return "La contraseña debe tener al menos 12 caracteres.";
+    if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw)) return "La contraseña debe tener mayúsculas y minúsculas.";
+    if (!/[0-9]/.test(pw)) return "La contraseña debe tener al menos un número.";
+    if (!/[^A-Za-z0-9]/.test(pw)) return "La contraseña debe tener al menos un símbolo (por ejemplo ! @ # $ % * ? - _).";
+    return "";
+  }
+  // Contraseña temporal que cumple la política (sin letras que se confunden: 0/O, 1/l/I).
+  function genPassword() {
+    var lo = "abcdefghijkmnpqrstuvwxyz", up = "ABCDEFGHJKLMNPQRSTUVWXYZ", di = "23456789", sy = "!@#$%*?-_";
+    var all = lo + up + di + sy, rnd = new Uint32Array(14), out = [];
+    (window.crypto || window.msCrypto).getRandomValues(rnd);
+    [lo, up, di, sy].forEach(function (set, i) { out.push(set[rnd[i] % set.length]); });
+    for (var i = 4; i < 14; i++) out.push(all[rnd[i] % all.length]);
+    for (var j = out.length - 1; j > 0; j--) { var k = rnd[j] % (j + 1); var t = out[j]; out[j] = out[k]; out[k] = t; }
+    return out.join("");
+  }
+
   function toast(msg, kind) {
     var t = h('<div class="pnl-alert ' + (kind || "ok") + '" style="position:fixed;right:20px;bottom:20px;z-index:80;max-width:360px;box-shadow:0 8px 24px rgba(0,0,0,.15)">' + esc(msg) + "</div>");
     document.body.appendChild(t);
@@ -195,6 +217,11 @@
   };
   function friendly(e) {
     var m = (e && e.message) || String(e);
+    if ((e && e.code === "weak_password") || /weak_password|Password should|password is known to be weak|pwned/i.test(m)) {
+      return /pwned|known to be weak|leaked/i.test(m)
+        ? "Esa contraseña aparece en filtraciones públicas de internet. Elige otra distinta."
+        : "La contraseña no cumple los requisitos: " + PW_HINT;
+    }
     var key = Object.keys(CODE_ES).find(function (k) { return m.indexOf(k) === 0 || m.indexOf(k) > -1; });
     if (key) return CODE_ES[key];
     if (e && (e.code === "23503" || /foreign key|violates/i.test(m))) {
@@ -216,6 +243,10 @@
       .then(function (r) { if (r.error) throw r.error; return r.data || []; });
   }
   function callFn(body) {
+    if (body && body.password != null) {
+      var pwErr = checkPassword(body.password);
+      if (pwErr) return Promise.reject(new Error(pwErr));
+    }
     return fetch(window.LEF_SUPABASE.url + "/functions/v1/manage-users", {
       method: "POST",
       headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" },
@@ -802,7 +833,7 @@
     if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
     var defaultMod = (p.desired_module_id && mods.some(function (m) { return m.id === p.desired_module_id; }))
       ? p.desired_module_id : mods[0].id;
-    var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+    var pwd = genPassword();
     var b = h("<div>" +
       '<p class="pnl-sub" style="margin-bottom:6px">Solicitud de <strong>' + esc(p.full_name) + "</strong><br>" +
       esc(p.whatsapp) + " · " + esc(p.email) + (p.age ? " · " + esc(p.age) + " años" : "") + (p.city ? " · " + esc(p.city) : "") + "</p>" +
@@ -840,6 +871,8 @@
       var dn = b.querySelector("[name=dn]").value.trim();
       if (!dn) throw new Error("El número de documento es obligatorio.");
       var accountPwd = b.querySelector("[name=pw]").value;
+      var pwErr = checkPassword(accountPwd);
+      if (pwErr) throw new Error(pwErr); // antes de crear nada, para no dejar el estudiante a medias
       var moduleId = b.querySelector("[name=mod]").value;
       var docType = b.querySelector("[name=dt]").value;
       var monthly = MONTHLY_PRICE;
@@ -1000,7 +1033,7 @@
   }
 
   function resetStudentPwd(s, prof) {
-    var np = "lef" + Math.random().toString(36).slice(2, 10);
+    var np = genPassword();
     var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
       '<p class="pnl-sub">Compártela con el estudiante. Podrá cambiarla luego.</p></div>');
     modal("Restablecer contraseña — " + s.full_name, bb, function () {
@@ -1042,7 +1075,7 @@
   }
 
   function crearCuentaEstudiante(s) {
-    var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+    var pwd = genPassword();
     var body = h("<div>" +
       field("Nombre", '<input name="fn" value="' + esc(s.full_name) + '">') +
       field("Correo (usuario para entrar)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
@@ -2212,20 +2245,22 @@
       '<p style="font-weight:600;margin-bottom:10px">Cambiar contraseña</p>' +
       field("Nueva contraseña", '<input type="password" name="p1" autocomplete="new-password">') +
       field("Confirmar contraseña", '<input type="password" name="p2" autocomplete="new-password">') +
+      '<p class="pnl-sub" style="margin:-4px 0 12px;font-size:12.5px">' + esc(PW_HINT) + "</p>" +
       '<button class="btn btn-blue" data-save-pw>Guardar contraseña</button>' +
       '<p class="muted" data-pw-msg style="font-size:12.5px;margin-top:8px"></p></div>');
     main.appendChild(pwBox);
     pwBox.querySelector("[data-save-pw]").onclick = function () {
       var msg = pwBox.querySelector("[data-pw-msg]");
       var p1 = pwBox.querySelector("[name=p1]").value, p2 = pwBox.querySelector("[name=p2]").value;
-      if (p1.length < 8) { msg.textContent = "La contraseña debe tener al menos 8 caracteres."; return; }
+      var pwErr = checkPassword(p1);
+      if (pwErr) { msg.textContent = pwErr; return; }
       if (p1 !== p2) { msg.textContent = "Las contraseñas no coinciden."; return; }
       msg.textContent = "Guardando…";
       sb.auth.updateUser({ password: p1 }).then(function (r) {
         if (r.error) throw r.error;
         pwBox.querySelector("[name=p1]").value = pwBox.querySelector("[name=p2]").value = "";
         msg.textContent = "Contraseña actualizada.";
-      }).catch(function (err) { msg.textContent = "No pudimos cambiar la contraseña: " + ((err && err.message) || err); });
+      }).catch(function (err) { msg.textContent = "No pudimos cambiar la contraseña: " + friendly(err); });
     };
   }
 
@@ -2821,7 +2856,7 @@
     var host = h("<div></div>"); main.appendChild(host);
 
     bar.querySelector("[data-new]").onclick = function () {
-      var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+      var pwd = genPassword();
       var b = h("<div>" +
         field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
         field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
@@ -2877,7 +2912,7 @@
           var cell = tr.children[5];
           if (r.kind === "profesor-sin-cuenta") {
             cell.appendChild(btn("Crear cuenta", "btn-blue", function () {
-              var pwd = "lef" + Math.random().toString(36).slice(2, 10);
+              var pwd = genPassword();
               var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name) + '">') +
                 field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
                 field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + "</div>");
@@ -2906,7 +2941,7 @@
             }, "Guardar");
           }));
           cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () {
-            var np = "lef" + Math.random().toString(36).slice(2, 10);
+            var np = genPassword();
             var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
               '<p class="pnl-sub">Compártela con ' + esc(r.name) + '. Podrá cambiarla luego.</p></div>');
             modal("Restablecer contraseña — " + r.name, bb, function () {

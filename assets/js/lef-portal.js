@@ -65,6 +65,24 @@
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
   var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reverso" };
 
+  // Misma política que exige Supabase (Authentication → Passwords).
+  var PW_HINT = "Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo (por ejemplo ! @ # $ % * ? - _).";
+  function checkPassword(pw) {
+    pw = String(pw || "");
+    if (pw.length < 12) return "La contraseña debe tener al menos 12 caracteres.";
+    if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw)) return "La contraseña debe tener mayúsculas y minúsculas.";
+    if (!/[0-9]/.test(pw)) return "La contraseña debe tener al menos un número.";
+    if (!/[^A-Za-z0-9]/.test(pw)) return "La contraseña debe tener al menos un símbolo (por ejemplo ! @ # $ % * ? - _).";
+    return "";
+  }
+  function pwErrorEs(e) {
+    var m = (e && e.message) || String(e);
+    if (/pwned|known to be weak|leaked/i.test(m)) return "Esa contraseña aparece en filtraciones públicas de internet. Elige otra distinta.";
+    if ((e && e.code === "weak_password") || /weak_password|Password should/i.test(m)) return "La contraseña no cumple los requisitos: " + PW_HINT;
+    if (/same_password|different from the old/i.test(m)) return "La nueva contraseña debe ser distinta de la actual.";
+    return m;
+  }
+
   var WHATSAPP_NUMBER = "573173962244";
   function waLink(s) {
     var msg = "Hola LEF, ya hice la transferencia de mi mensualidad" +
@@ -967,6 +985,7 @@
       '<p style="font-weight:600;margin-bottom:10px">Cambiar contraseña</p>' +
       field("Nueva contraseña", '<input type="password" data-pw-new autocomplete="new-password">') +
       field("Confirmar contraseña", '<input type="password" data-pw-confirm autocomplete="new-password">') +
+      '<p class="pnl-sub" style="margin:-4px 0 12px;font-size:12.5px">' + esc(PW_HINT) + "</p>" +
       '<button class="btn btn-blue" data-pw-save>Guardar contraseña</button>' +
       '<p class="muted" data-pw-msg style="font-size:12.5px;margin-top:8px"></p>' +
       "</div>"
@@ -976,7 +995,8 @@
       var msg = pwBox.querySelector("[data-pw-msg]");
       var pw1 = pwBox.querySelector("[data-pw-new]").value;
       var pw2 = pwBox.querySelector("[data-pw-confirm]").value;
-      if (pw1.length < 8) { msg.textContent = "La contraseña debe tener al menos 8 caracteres."; return; }
+      var pwErr = checkPassword(pw1);
+      if (pwErr) { msg.textContent = pwErr; return; }
       if (pw1 !== pw2) { msg.textContent = "Las contraseñas no coinciden."; return; }
       msg.textContent = "Guardando…";
       sb.auth.updateUser({ password: pw1 }).then(function (r) {
@@ -985,7 +1005,7 @@
         pwBox.querySelector("[data-pw-new]").value = "";
         pwBox.querySelector("[data-pw-confirm]").value = "";
       }).catch(function (e) {
-        msg.textContent = "No pudimos cambiar la contraseña: " + ((e && e.message) || e);
+        msg.textContent = "No pudimos cambiar la contraseña: " + pwErrorEs(e);
       });
     });
 

@@ -26,6 +26,21 @@
 - Cuenta de profesor de prueba `jorgeradash@gmail.com` sin vincular.
 - Entrega: transferir repo GitHub y rotar tokens.
 
+## Sesión 23 sep 2026 (9ª parte) — Política de contraseñas lista para activar en Supabase
+
+Antes de que el usuario active en Supabase (Authentication → Sign In /
+Providers → Email) "mínimo 12 + minúscula/mayúscula/número/símbolo", se
+ajustó el panel para no romper altas ni reinicios: las contraseñas temporales
+eran `lef` + 8 caracteres (11, sin mayúscula ni símbolo). Ahora:
+- `genPassword()` (admin): 14 caracteres con los 4 tipos, sin caracteres
+  confundibles, con `crypto.getRandomValues`. Reemplaza las 6 generaciones.
+- `checkPassword()` + `PW_HINT` en admin y portal; `callFn` valida toda
+  contraseña que va a `manage-users`; "Mi cuenta" (admin y portal) exige la
+  misma regla y muestra la pista; errores `weak_password` / contraseña
+  filtrada de Supabase traducidos al español.
+- Pendiente del usuario: activar en el panel (contraseña 12 + requisitos,
+  leaked password protection — requiere plan Pro — y rate limits).
+
 ## Sesión 23 sep 2026 (8ª parte) — CAPTCHA Turnstile en el login (EN VIVO ✅)
 
 Retomando el endurecimiento del login **por partes** (el paquete completo de
