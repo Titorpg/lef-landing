@@ -107,13 +107,18 @@
       if (!r.data.session) return window.location.replace("login.html");
       TOKEN = r.data.session.access_token;
       var uid = r.data.session.user.id;
-      sb.from("profiles").select("user_id,role,full_name,active,avatar_url").eq("user_id", uid).maybeSingle()
+      // select("*") y no una lista de columnas: así, si must_change_password aún
+      // no existe en la BD, la consulta no falla (una columna inexistente en la
+      // lista haría fallar el login de todos los estudiantes).
+      sb.from("profiles").select("*").eq("user_id", uid).maybeSingle()
         .then(function (p) {
           if (p.error || !p.data || !p.data.active) {
             return sb.auth.signOut().then(function () { window.location.replace("login.html"); });
           }
           if (p.data.role !== "student") return window.location.replace("admin.html");
           ME = p.data;
+          // Contraseña temporal puesta por un admin → primero crear una personal.
+          if (window.LEFPrimerIngreso) return window.LEFPrimerIngreso.check(sb, ME, app, renderShell);
           renderShell();
         });
     });
@@ -1001,6 +1006,7 @@
       msg.textContent = "Guardando…";
       sb.auth.updateUser({ password: pw1 }).then(function (r) {
         if (r.error) throw r.error;
+        if (window.LEFPrimerIngreso) window.LEFPrimerIngreso.markChanged(sb);
         msg.textContent = "Contraseña actualizada.";
         pwBox.querySelector("[data-pw-new]").value = "";
         pwBox.querySelector("[data-pw-confirm]").value = "";

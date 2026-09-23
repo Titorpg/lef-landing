@@ -64,6 +64,11 @@
       btn.disabled = true; btn.textContent = "Guardando…";
       sb.auth.updateUser({ password: p1 }).then(function (r) {
         if (r.error) throw r.error;
+        // Ya es una contraseña personal: quita la marca de "debe cambiarla"
+        // (parte 4). Si la RPC no existe o falla, se sigue igual.
+        return Promise.resolve().then(function () { return sb.rpc("mark_my_password_changed"); })
+          .then(function () {}, function () {});
+      }).then(function () {
         return sb.auth.signOut();
       }).then(function () {
         card('<div class="pnl-alert ok">Listo. Tu contraseña quedó actualizada.</div>' +

@@ -23,6 +23,17 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Parte 4 (23 sep 2026): una contraseña puesta por el admin es temporal → la
+// cuenta queda marcada para crear una personal al entrar. Va aparte y sin
+// lanzar: si la columna aún no existe (migración 20260923050000 sin aplicar)
+// la creación/reseteo sigue funcionando igual que antes.
+// deno-lint-ignore no-explicit-any
+async function markMustChange(admin: any, uid: string) {
+  try {
+    await admin.from("profiles").update({ must_change_password: true }).eq("user_id", uid);
+  } catch { /* noop */ }
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -126,6 +137,7 @@ Deno.serve(async (req) => {
         if (createdTeacherId) await admin.from("teachers").delete().eq("id", createdTeacherId);
         return json({ error: pErr.message }, 400);
       }
+      await markMustChange(admin, created.user.id);
       const mail = payload.send_email ? await sendCredentials("new", email, full_name, password) : {};
       return json({ ok: true, user_id: created.user.id, ...mail });
     }
@@ -152,6 +164,7 @@ Deno.serve(async (req) => {
       const password = String(payload.password);
       const { data: upd, error } = await admin.auth.admin.updateUserById(uid, { password });
       if (error) return json({ error: error.message }, 400);
+      await markMustChange(admin, uid);
       if (!payload.send_email) return json({ ok: true });
       const { data: prof } = await admin.from("profiles").select("full_name").eq("user_id", uid).maybeSingle();
       const to = upd.user?.email ?? "";

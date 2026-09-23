@@ -302,7 +302,10 @@
         // Cierra los ciclos cuya fecha de fin ya pasó (libera estudiantes y
         // borra grupo → horario → ciclo). Lo hace también el cron nocturno;
         // esto es el respaldo por si el cron no corrió. Si falla, igual se abre el panel.
-        return rpc("close_ended_cycles").catch(function () {}).then(renderShell);
+        function open() { return rpc("close_ended_cycles").catch(function () {}).then(renderShell); }
+        // Contraseña temporal puesta por un admin → primero crear una personal.
+        if (window.LEFPrimerIngreso) return window.LEFPrimerIngreso.check(sb, ME, app, open);
+        return open();
       });
     });
   }
@@ -2280,6 +2283,7 @@
       msg.textContent = "Guardando…";
       sb.auth.updateUser({ password: p1 }).then(function (r) {
         if (r.error) throw r.error;
+        if (window.LEFPrimerIngreso) window.LEFPrimerIngreso.markChanged(sb);
         pwBox.querySelector("[name=p1]").value = pwBox.querySelector("[name=p2]").value = "";
         msg.textContent = "Contraseña actualizada.";
       }).catch(function (err) { msg.textContent = "No pudimos cambiar la contraseña: " + friendly(err); });
