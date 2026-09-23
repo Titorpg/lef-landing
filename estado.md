@@ -81,7 +81,7 @@
 - Reseñas "Voces de LEF" inventadas; revisión legal de política/términos;
   fotos reales. **Traducciones: completas** (FAQ, política y términos tienen
   EN desde antes — una nota vieja decía lo contrario, era incorrecta).
-- Antes de arrancar: borrar datos de prueba (Liam) y reiniciar el consecutivo
+- ✅ (23 sep) Limpieza de arranque aplicada por el usuario y verificada: único pago = recibo **RC1** (Liam, A1.1 completado; siguiente RC2), contador viejo por año borrado; matrícula de Liam renumerada a **LEF-2026-00001** (siguiente 00002); borradas 4 preinscripciones de prueba y 2 inscripciones canceladas; `audit_log` vacío. Páginas `reference-*.html` y `scripts/` fuera de la web (`.vercelignore`). Liam se QUEDA (decisión del usuario). Pendiente del usuario: borrar 2 avatares huérfanos en Storage (carpetas 67343848… y ea391b20…). Ciclo "Sep-Oct 2026" se conserva (lo usa el historial de Liam). Nota vieja: Antes de arrancar: borrar datos de prueba (Liam) y reiniciar el consecutivo
   de recibos a 1 (`update receipt_counters set next_seq = 1 where year = 0`).
 - Cuenta de profesor de prueba `jorgeradash@gmail.com`: ✅ ya vinculada
   (perfil `teacher` con `teacher_id` "Jorge Rada", verificado en BD 23 sep).
