@@ -15,6 +15,7 @@
 // { ok: true, email_sent: false, email_error } para que el admin la comparta
 // por WhatsApp como siempre.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { credentialsEmail } from "../_shared/email-layout.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -29,10 +30,6 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function escHtml(v: string) {
-  return v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
-
 // Envía usuario + contraseña temporal. Nunca lanza: devuelve el resultado.
 async function sendCredentials(
   kind: "new" | "reset", to: string, name: string, password: string,
@@ -42,22 +39,7 @@ async function sendCredentials(
   const loginUrl = Deno.env.get("LEF_LOGIN_URL") || "https://www.lefcenter.com/login";
   if (!apiKey || !from) return { email_sent: false, email_error: "correo_no_configurado" };
 
-  const intro = kind === "new"
-    ? "Se creó tu cuenta en la plataforma de LEF. Estos son tus datos para entrar:"
-    : "Se restableció la contraseña de tu cuenta en la plataforma de LEF. Estos son tus nuevos datos para entrar:";
-  const subject = kind === "new" ? "Tu cuenta de LEF" : "Tu nueva contraseña de LEF";
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a;max-width:520px">
-<p>${name ? `Hola, ${escHtml(name)}:` : "Hola:"}</p>
-<p>${intro}</p>
-<table style="border-collapse:collapse;margin:12px 0">
-<tr><td style="padding:4px 12px 4px 0;color:#555">Usuario</td><td style="padding:4px 0"><strong>${escHtml(to)}</strong></td></tr>
-<tr><td style="padding:4px 12px 4px 0;color:#555">Contraseña temporal</td><td style="padding:4px 0"><code style="font-size:16px;background:#f2f2f2;padding:2px 6px;border-radius:4px">${escHtml(password)}</code></td></tr>
-</table>
-<p><a href="${escHtml(loginUrl)}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:6px">Entrar a LEF</a></p>
-<p>Te recomendamos cambiar la contraseña al entrar, en <strong>Mi cuenta</strong>.</p>
-<p style="color:#777;font-size:13px">Si no esperabas este correo, comunícate con LEF. Este buzón no recibe respuestas.</p>
-</div>`;
-  const text = `${name ? `Hola, ${name}:` : "Hola:"}\n\n${intro}\n\nUsuario: ${to}\nContraseña temporal: ${password}\n\nEntra en: ${loginUrl}\n\nTe recomendamos cambiar la contraseña al entrar, en Mi cuenta.`;
+  const { subject, html, text } = credentialsEmail(kind, to, name, password, loginUrl);
 
   try {
     const r = await fetch("https://api.resend.com/emails", {
