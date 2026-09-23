@@ -27,8 +27,13 @@
   (crear estudiante desde solicitud, crear cuenta de portal, restablecer
   contraseña del estudiante, cuenta de staff, cuenta de profesor sin cuenta,
   restablecer en Usuarios). La contraseña se sigue mostrando para WhatsApp.
-  Función verificada en vivo (responde 401 sin sesión); **falta prueba real
-  del usuario desde el panel**.
+  ✅ Probado por el usuario desde el panel (restablecer contraseña → llegó).
+  **Diseño LEF (`4e9d8fc`)**: plantilla en `_shared/email-layout.ts`
+  (`lefEmail` + `credentialsEmail`): logo arriba (URL absoluta del sitio),
+  botón azul "Entrar a LEF", recuadro amarillo "Por favor no respondas este
+  correo", pie negro con WhatsApp, correo, Instagram, Facebook y web. Reusar
+  este HTML para las plantillas de Supabase Auth en la parte 3. Vista previa:
+  se puede generar con Node 24 importando el `.ts` directamente.
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
   2. (hecho — ver arriba) Correo de credenciales al crear cuenta / reiniciar contraseña
