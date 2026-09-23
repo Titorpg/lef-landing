@@ -44,6 +44,8 @@ términos y FAQ con todo lo construido.
   la DIAN). Contador global en `receipt_counters` fila `year = 0`, arranca
   donde quedó el de 2026 (sin saltos ni repetidos). Los recibos ya emitidos
   (`REC-2026-000xx`) no se renombran (pagos inmutables).
+  **✅ Aplicada por el usuario el 23 sep 2026** (verificado: contador global
+  `year = 0` en 9 → el próximo recibo será `RC9`; prefijo `RC`).
 - **Términos de uso** (15 secciones): + solicitud de inscripción que no cobra,
   cuenta del portal (credenciales), Mis recursos (acceso a módulos cursados),
   módulos/ciclos/paso al siguiente (completado, no se repite, sin pago →
