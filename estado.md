@@ -28,7 +28,7 @@
   contraseña del estudiante, cuenta de staff, cuenta de profesor sin cuenta,
   restablecer en Usuarios). La contraseña se sigue mostrando para WhatsApp.
   ✅ Probado por el usuario desde el panel (restablecer contraseña → llegó).
-  **Diseño LEF (`4e9d8fc`)**: plantilla en `_shared/email-layout.ts`
+  **Diseño LEF v2 (tarjeta única, "más estilizado"; v1 `4e9d8fc` era "cuadriculada")**: plantilla en `_shared/email-layout.ts`
   (`lefEmail` + `credentialsEmail`): logo arriba (URL absoluta del sitio),
   botón azul "Entrar a LEF", recuadro amarillo "Por favor no respondas este
   correo", pie negro con WhatsApp, correo, Instagram, Facebook y web. Reusar
