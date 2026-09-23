@@ -44,8 +44,8 @@ panel + portal):**
 "marcarlo como completado" (solo si está activo).
 
 **✅ Migración aplicada por el usuario el 23 sep 2026** (verificado con una
-consulta de solo lectura: la A1.1 duplicada de Liam quedó  y su
-A1.1 completada tiene la copia ). Commit `6922322`, desplegado en
+consulta de solo lectura: la A1.1 duplicada de Liam quedó `Cancelled` y su
+A1.1 completada tiene la copia `hist_*`). Commit `6922322`, desplegado en
 Vercel. Sin pendientes de este frente.
 
 ## Cierre de sesión — 22 sep 2026
