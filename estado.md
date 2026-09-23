@@ -49,7 +49,9 @@
   EN desde antes — una nota vieja decía lo contrario, era incorrecta).
 - Antes de arrancar: borrar datos de prueba (Liam) y reiniciar el consecutivo
   de recibos a 1 (`update receipt_counters set next_seq = 1 where year = 0`).
-- Cuenta de profesor de prueba `jorgeradash@gmail.com` sin vincular.
+- Cuenta de profesor de prueba `jorgeradash@gmail.com`: ✅ ya vinculada
+  (perfil `teacher` con `teacher_id` "Jorge Rada", verificado en BD 23 sep).
+  Borrarla o desactivarla antes de la entrega si no se va a usar.
 - Entrega: transferir repo GitHub y rotar tokens.
 
 ## Sesión 23 sep 2026 (9ª parte) — Política de contraseñas lista para activar en Supabase
