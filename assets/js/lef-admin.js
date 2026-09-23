@@ -233,6 +233,11 @@
     correo_en_uso: "Ese correo ya está asociado a otra cuenta. Cada cuenta debe tener un correo distinto: usa otro correo o revisa la cuenta existente en Usuarios.",
     correo_en_profesor: "Ya hay un profesor registrado con ese correo (aparece en Usuarios como “sin cuenta”). Usa el botón “Crear cuenta” de su fila, o elimínalo primero.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
+    no_cambiar_tu_rol: "No puedes cambiar tu propio rol. Pídeselo a otro administrador.",
+    rol_estudiante_fijo: "Las cuentas de estudiante no cambian de rol.",
+    rol_invalido: "Ese rol no es válido.",
+    cuenta_no_encontrada: "No se encontró esa cuenta (quizás ya fue eliminada).",
+    profesor_con_grupos: "No se puede pasar a Administrador: todavía tiene grupos asignados como profesor. Reasígnalos primero en Académico → Grupos.",
     requiere_admin: "Necesitas permisos de administrador para esta acción."
   };
   function friendly(e) {
@@ -3010,9 +3015,26 @@
           if (r.role !== "student") {
             var rl = h('<select style="width:auto"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>');
             rl.value = r.role;
+            // Cambio de rol real (manage-users set_role): se confirma explicando
+            // qué se borra/crea. El select vuelve a su valor hasta que se confirme.
             rl.onchange = function () {
-              callFn({ action: "set_role", user_id: r.user_id, role: rl.value })
-                .then(function () { toast("Rol actualizado."); }).catch(function (e) { toast(friendly(e), "err"); });
+              var target = rl.value;
+              rl.value = r.role;
+              var toAdmin = target === "admin";
+              var bodyTxt = toAdmin
+                ? "Pasará a ser Administrador y dejará de ser profesor: se borra su registro en Académico → Profesores, " +
+                  "sus anotaciones sobre estudiantes y su conexión con Google Classroom. Si tiene grupos asignados no se podrá: " +
+                  "reasígnalos primero en Académico → Grupos."
+                : "Pasará a ser Profesor y dejará de ser administrador: pierde el acceso a la administración y se le crea " +
+                  "su registro en Académico → Profesores para poder asignarle grupos.";
+              modal("Cambiar rol — " + (r.name || r.email), h('<p class="pnl-sub" style="margin-bottom:4px">' + esc(bodyTxt) + "</p>"), function () {
+                return callFn({ action: "set_role", user_id: r.user_id, role: target }).then(function (res) {
+                  toast(toAdmin
+                    ? "Ahora es Administrador." + (res && res.removed_teacher ? " Se borró su registro de profesor." : "")
+                    : "Ahora es Profesor." + (res && res.created_teacher ? " Se creó su registro en Académico → Profesores." : ""));
+                  load();
+                });
+              }, toAdmin ? "Pasar a Administrador" : "Pasar a Profesor", toAdmin);
             };
             cell.appendChild(rl);
           }

@@ -179,9 +179,74 @@ Deno.serve(async (req) => {
     }
 
     if (action === "set_role") {
+      // Cambio de rol REAL (pedido del usuario, 23 sep 2026): la cuenta queda
+      // desligada de todo lo del rol anterior y enlazada solo a lo del nuevo.
+      //   profesor → admin: se quita teacher_id y se BORRA su registro en
+      //     teachers (cascada: anotaciones y conexión de Classroom). Con grupos
+      //     asignados no se permite (quedarían sin profesor).
+      //   admin → profesor: se crea (o reutiliza, si hay uno sin cuenta con su
+      //     correo) su registro en teachers y se enlaza. Nunca al último admin.
+      // Estudiantes no cambian de rol; nadie cambia el suyo propio.
+      const uid = String(payload.user_id ?? "");
+      const newRole = String(payload.role ?? "");
+      if (!["teacher", "admin"].includes(newRole)) return json({ error: "rol_invalido" }, 400);
+      if (uid === auth.user.id) return json({ error: "no_cambiar_tu_rol" }, 400);
+      const { data: prof } = await admin.from("profiles")
+        .select("role, teacher_id, full_name, email").eq("user_id", uid).maybeSingle();
+      if (!prof) return json({ error: "cuenta_no_encontrada" }, 404);
+      if (prof.role === "student") return json({ error: "rol_estudiante_fijo" }, 400);
+
+      if (newRole === "admin") {
+        const oldTeacher = prof.teacher_id as string | null;
+        if (oldTeacher) {
+          const { count } = await admin.from("groups")
+            .select("id", { count: "exact", head: true }).eq("teacher_id", oldTeacher);
+          if ((count ?? 0) > 0) return json({ error: "profesor_con_grupos" }, 409);
+        }
+        const { error } = await admin.from("profiles")
+          .update({ role: "admin", teacher_id: null }).eq("user_id", uid);
+        if (error) return json({ error: error.message }, 400);
+        let removed_teacher = false;
+        if (oldTeacher) {
+          const { error: dErr } = await admin.from("teachers").delete().eq("id", oldTeacher);
+          removed_teacher = !dErr;
+        }
+        return json({ ok: true, removed_teacher });
+      }
+
+      // newRole === "teacher"
+      if (prof.role === "admin") {
+        const { count } = await admin.from("profiles").select("user_id", { count: "exact", head: true })
+          .eq("role", "admin").eq("active", true).neq("user_id", uid);
+        if ((count ?? 0) === 0) return json({ error: "ultimo_admin" }, 409);
+      }
+      let teacherId = prof.teacher_id as string | null;
+      let created_teacher = false;
+      if (!teacherId) {
+        const email = String(prof.email ?? "").trim().toLowerCase();
+        // ¿Registro de profesor sin cuenta con su mismo correo? Se reutiliza.
+        const { data: linked } = await admin.from("profiles").select("teacher_id").not("teacher_id", "is", null);
+        const used = new Set((linked ?? []).map((p: { teacher_id: string }) => p.teacher_id));
+        const pat = email.replace(/[\%_]/g, (c) => "\\" + c);
+        const { data: same } = email ? await admin.from("teachers").select("id").ilike("email", pat) : { data: [] };
+        const free = (same ?? []).find((t: { id: string }) => !used.has(t.id));
+        if (free) {
+          teacherId = free.id;
+        } else {
+          const { data: nt, error: tErr } = await admin.from("teachers")
+            .insert({ full_name: prof.full_name || email, email }).select("id").single();
+          if (tErr) return json({ error: tErr.message }, 400);
+          teacherId = nt.id;
+          created_teacher = true;
+        }
+      }
       const { error } = await admin.from("profiles")
-        .update({ role: String(payload.role) }).eq("user_id", String(payload.user_id));
-      return error ? json({ error: error.message }, 400) : json({ ok: true });
+        .update({ role: "teacher", teacher_id: teacherId }).eq("user_id", uid);
+      if (error) {
+        if (created_teacher) await admin.from("teachers").delete().eq("id", teacherId);
+        return json({ error: error.message }, 400);
+      }
+      return json({ ok: true, created_teacher });
     }
 
     if (action === "set_active") {
