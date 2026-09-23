@@ -1,5 +1,36 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 (5ª parte) — Portal: pestaña "Inicio" (tablón) + Novedades en el admin
+
+**Pedido del usuario:** el logo del portal del estudiante sacaba de la
+plataforma (iba a `index.html`); debe llevar a una primera pestaña nueva
+"Inicio", que funcione como tablón de noticias (investigado cómo se arman en
+plataformas educativas): novedades de LEF + info de sus cursos, pagos y
+estado de cuenta. Con imágenes de Pexels para decorar.
+
+**Construido:**
+- Portal (`lef-portal.js`, `renderHome`): logo → `#inicio`, Inicio es la
+  primera pestaña. De arriba abajo: saludo con foto de fondo y módulo actual →
+  avisos urgentes en franjas de color (cuenta congelada, saldo pendiente/
+  parcial, siguiente módulo disponible, sin horario) → 3 tarjetas resumen
+  (Mi curso con **próxima clase** calculada del horario; Mis pagos con saldo
+  y último pago; Mi progreso X/12 módulos) con acceso a cada pestaña →
+  **Novedades de LEF** (tarjetas con portada, categoría, "Fijado", "Nuevo" si
+  tiene <7 días, "Leer más" abre el texto completo + botón de enlace) →
+  contacto por WhatsApp.
+- Admin: sección nueva **Novedades** (Fijar/Desfijar, Publicar/Ocultar,
+  Editar, Eliminar). Formulario: título, categoría (Novedad, Académico,
+  Evento, Pagos, Importante), texto, portada (galería de 6 fotos de Pexels
+  incluidas en `assets/inicio/` o enlace https), enlace opcional con texto del
+  botón, dirigida a todos o a un módulo, publicar desde (programable), vence
+  el, fijar, borrador.
+- Migración `20260923020000_novedades_inicio.sql`: tabla `announcements`
+  (RLS solo admin) + `get_my_announcements()` (filtra publicadas, vigentes y
+  del módulo en curso del estudiante; fijadas primero). Siembra una novedad de
+  bienvenida fijada.
+- Fotos Pexels (comprimidas, 1200 px): 17653299 (hero), 6671599, 5355644,
+  4144927, 6502817, 5649518.
+
 ## Sesión 23 sep 2026 (4ª parte) — Registro de eventos: explicación en palabras para TODO
 
 **Reclamo del usuario:** había pedido que "Ver" en el Registro de eventos

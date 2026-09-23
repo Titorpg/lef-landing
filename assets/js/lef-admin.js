@@ -267,6 +267,7 @@
     { id: "classroom", label: "Planificador", roles: ["teacher"] },
     { id: "calendario", label: "Calendario", roles: ["teacher"] },
     { id: "pagos", label: "Pagos", roles: ["admin"] },
+    { id: "novedades", label: "Novedades", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
     { id: "registro", label: "Registro de eventos", roles: ["admin"] },
@@ -310,7 +311,7 @@
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes, misgrupos: secMisGrupos,
       recursos_clase: secRecursosClase, classroom: secClassroom, calendario: secCalendario,
-      pagos: secPagos, academico: secAcademico, usuarios: secUsuarios,
+      pagos: secPagos, novedades: secNovedades, academico: secAcademico, usuarios: secUsuarios,
       registro: secRegistro, micuenta: secMiCuenta
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
@@ -1701,6 +1702,119 @@
         p_notes: body.querySelector("[name=note]").value.trim() || null
       }, payer)).then(function () { toast("Pago registrado."); route(); });
     }, "Registrar");
+  }
+
+  /* ============ NOVEDADES (tablón "Inicio" del portal) ============ */
+  var NEWS_CAT_ES = { novedad: "Novedad", academico: "Académico", evento: "Evento", pagos: "Pagos", importante: "Importante" };
+  // Fotos de Pexels ya incluidas en el sitio, para elegir portada sin buscar enlaces.
+  var NEWS_GALLERY = [
+    "assets/inicio/noticia-clase-online.jpg", "assets/inicio/noticia-online-classes.jpg",
+    "assets/inicio/noticia-apuntes.jpg", "assets/inicio/noticia-tablero.jpg",
+    "assets/inicio/noticia-curso.jpg", "assets/inicio/hero-estudio.jpg"
+  ];
+
+  function secNovedades(main) {
+    head(main, "Novedades", "Lo que publiques aquí aparece en el Inicio del portal de los estudiantes: primero las fijadas, luego las más recientes.");
+    var bar = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Nueva novedad</button></div>');
+    main.appendChild(bar);
+    Promise.all([
+      q("announcements").select("*,modules(level)").order("pinned", { ascending: false }).order("publish_at", { ascending: false }),
+      activeModules()
+    ]).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      var rows = res[0].data || [], mods = res[1];
+      bar.querySelector("button").onclick = function () { editNovedad(null, mods); };
+      var todayStr = new Date().toISOString().slice(0, 10);
+      var t = tableWrap(["Novedad", "Categoría", "Para", "Publicada", "Vence", "Estado", "Acciones"]);
+      rows.forEach(function (n) {
+        var expired = n.expires_at && n.expires_at < todayStr;
+        var future = new Date(n.publish_at) > new Date();
+        var st = !n.published ? '<span class="badge neutral">borrador</span>'
+          : expired ? '<span class="badge neutral">vencida</span>'
+          : future ? '<span class="badge warn">programada</span>'
+          : '<span class="badge ok">visible</span>';
+        var tr = h("<tr><td class=\"wrap\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
+          '<br><span class="muted" style="font-size:12px">' + esc((n.body || "").slice(0, 90)) + ((n.body || "").length > 90 ? "…" : "") + "</span></td>" +
+          "<td>" + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
+          "<td>" + esc(n.modules ? "Módulo " + n.modules.level : "Todos") + "</td>" +
+          "<td>" + date(n.publish_at) + "</td><td>" + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
+          "<td>" + st + '</td><td class="acts"></td></tr>');
+        var cell = tr.children[6];
+        cell.appendChild(btn(n.pinned ? "Desfijar" : "Fijar", "btn-ghost", function () {
+          q("announcements").update({ pinned: !n.pinned, updated_at: new Date().toISOString() }).eq("id", n.id)
+            .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else route(); });
+        }));
+        cell.appendChild(btn(n.published ? "Ocultar" : "Publicar", "btn-ghost", function () {
+          q("announcements").update({ published: !n.published, updated_at: new Date().toISOString() }).eq("id", n.id)
+            .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else route(); });
+        }));
+        cell.appendChild(btn("Editar", "btn-ghost", function () { editNovedad(n, mods); }));
+        cell.appendChild(btn("Eliminar", "btn-danger", function () {
+          confirmDelete("Eliminar novedad", "Se borra “" + n.title + "” y deja de verse en el portal de los estudiantes.", function () {
+            return q("announcements").delete().eq("id", n.id).then(function (d) { if (d.error) throw d.error; toast("Novedad eliminada."); route(); });
+          });
+        }));
+        t.body.appendChild(tr);
+      });
+      if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Todavía no hay novedades. Crea la primera con “+ Nueva novedad”.</td></tr>'));
+      main.appendChild(t.wrap);
+    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  function editNovedad(n, mods) {
+    n = n || {};
+    var img = n.image_url || "";
+    var custom = img && NEWS_GALLERY.indexOf(img) === -1 ? img : "";
+    var pubLocal = n.publish_at ? new Date(new Date(n.publish_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+    var b = h("<div>" +
+      field("Título", '<input name="t" maxlength="140" value="' + esc(n.title || "") + '">') +
+      field("Categoría", '<select name="c">' + Object.keys(NEWS_CAT_ES).map(function (k) {
+        return '<option value="' + k + '"' + ((n.category || "novedad") === k ? " selected" : "") + ">" + esc(NEWS_CAT_ES[k]) + "</option>";
+      }).join("") + "</select>") +
+      field("Texto", '<textarea name="b" rows="6" placeholder="Lo que quieres contarle a los estudiantes. Los saltos de línea se respetan.">' + esc(n.body || "") + "</textarea>") +
+      fieldBlock("Imagen de portada", '<div class="news-gal">' +
+        '<label class="news-gal__opt news-gal__none"><input type="radio" name="img" value=""' + (!img ? " checked" : "") + "><span>Sin imagen</span></label>" +
+        NEWS_GALLERY.map(function (src) {
+          return '<label class="news-gal__opt"><input type="radio" name="img" value="' + src + '"' + (img === src ? " checked" : "") + '><img src="' + src + '" alt=""></label>';
+        }).join("") +
+        '<label class="news-gal__opt news-gal__none"><input type="radio" name="img" value="__custom"' + (custom ? " checked" : "") + "><span>Otra (enlace)</span></label>" +
+        "</div>" +
+        '<input name="imgurl" placeholder="https://images.pexels.com/…  (solo si elegiste “Otra”)" value="' + esc(custom) + '" style="margin-top:8px">') +
+      field("Enlace (opcional)", '<input name="l" placeholder="https://…" value="' + esc(n.link_url || "") + '">') +
+      field("Texto del botón del enlace", '<input name="ll" placeholder="Ej.: Inscríbete aquí" value="' + esc(n.link_label || "") + '">') +
+      field("¿Para quién?", '<select name="m"><option value="">Todos los estudiantes</option>' + mods.map(function (m) {
+        return '<option value="' + m.id + '"' + (n.module_id === m.id ? " selected" : "") + ">Solo estudiantes de " + esc(m.level + " · " + m.title) + "</option>";
+      }).join("") + "</select>") +
+      field("Publicar desde (vacío = ahora)", '<input name="pa" type="datetime-local" value="' + esc(pubLocal) + '">') +
+      field("Deja de verse después del (opcional)", '<input name="ex" type="date" value="' + esc(n.expires_at || "") + '">') +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 8px"><input type="checkbox" name="pin" style="width:auto"' + (n.pinned ? " checked" : "") + "> Fijar arriba del tablón</label>" +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" name="pub" style="width:auto"' + (n.id && !n.published ? "" : " checked") + "> Publicada (si la desmarcas queda como borrador)</label>" +
+      "</div>");
+    modal(n.id ? "Editar novedad" : "Nueva novedad", b, function () {
+      var val = function (k) { return (b.querySelector("[name=" + k + "]").value || "").trim(); };
+      var title = val("t");
+      if (title.length < 3) throw new Error("Escribe un título.");
+      var pick = pickedValue(b, "img");
+      var imageUrl = pick === "__custom" ? val("imgurl") : pick;
+      if (imageUrl && !/^(https:\/\/|assets\/)/.test(imageUrl)) throw new Error("El enlace de la imagen debe empezar por https://");
+      var link = val("l");
+      if (link && !/^https?:\/\//.test(link)) throw new Error("El enlace debe empezar por https://");
+      var pa = val("pa");
+      var payload = {
+        title: title, category: val("c"), body: val("b"),
+        image_url: imageUrl || null, link_url: link || null, link_label: val("ll") || null,
+        module_id: val("m") || null,
+        publish_at: pa ? new Date(pa).toISOString() : (n.publish_at || new Date().toISOString()),
+        expires_at: val("ex") || null,
+        pinned: b.querySelector("[name=pin]").checked,
+        published: b.querySelector("[name=pub]").checked,
+        updated_at: new Date().toISOString()
+      };
+      var pr = n.id
+        ? q("announcements").update(payload).eq("id", n.id)
+        : q("announcements").insert(Object.assign({ created_by: ME.user_id }, payload));
+      return pr.then(function (r) { if (r.error) throw r.error; toast(n.id ? "Novedad actualizada." : "Novedad publicada."); route(); });
+    }, n.id ? "Guardar" : "Publicar", false, true);
   }
 
   /* ============ REGISTRO DE EVENTOS ============ */

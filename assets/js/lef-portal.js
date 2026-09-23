@@ -1,4 +1,5 @@
-﻿/* LEF — Portal del estudiante. 3 pestañas: Facturación, Mi curso, Mi cuenta.
+﻿/* LEF — Portal del estudiante. Pestañas: Inicio (tablón), Facturación, Mi curso,
+   Mis recursos, Mi cuenta. El logo lleva a Inicio.
    El cobro en línea usa el Widget oficial de Wompi (checkout.wompi.co/widget.js);
    la firma de integridad se calcula en el Edge Function wompi-checkout (nunca en el
    navegador) y el pago se confirma por el webhook wompi-webhook, no por el resultado
@@ -101,6 +102,7 @@
   }
 
   var TABS = [
+    { id: "inicio", label: "Inicio", render: renderHome },
     { id: "facturacion", label: "Facturación", render: renderBilling },
     { id: "curso", label: "Mi curso", render: renderCourse },
     { id: "recursos", label: "Mis recursos", render: renderResources },
@@ -111,7 +113,8 @@
     app.innerHTML = "";
     app.appendChild(h(
       '<div class="pnl-top">' +
-      '<a class="brand" href="index.html"><img src="assets/logo-horizontal.png" alt="LEF"><span class="tag">Mi cuenta</span></a>' +
+      // El logo lleva a Inicio (antes sacaba de la plataforma, a la página pública).
+      '<a class="brand" href="#inicio"><img src="assets/logo-horizontal.png" alt="LEF"><span class="tag">Mi cuenta</span></a>' +
       '<div class="who">' +
       '<img src="' + esc(ME.avatar_url || "assets/logo-isotype.png") + '" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none">' +
       '<span class="name-text">' + esc(ME.full_name || "") + '</span>' +
@@ -139,6 +142,211 @@
     if (!main) return;
     main.innerHTML = '<p class="muted">Cargando…</p>';
     tab.render(main);
+  }
+
+  /* ---------- Inicio (tablón) ---------- */
+  // Estructura (buenas prácticas de portales educativos): saludo personal
+  // arriba → avisos urgentes en franjas de color → resumen de curso, pagos y
+  // progreso con acceso directo a cada pestaña → novedades de LEF (fijadas
+  // primero, luego las más recientes, con imagen de portada) → contacto.
+  var NEWS_CAT = {
+    novedad: { label: "Novedad", cls: "cat-novedad" },
+    academico: { label: "Académico", cls: "cat-academico" },
+    evento: { label: "Evento", cls: "cat-evento" },
+    pagos: { label: "Pagos", cls: "cat-pagos" },
+    importante: { label: "Importante", cls: "cat-importante" }
+  };
+  var TOTAL_MODULES = 12;
+
+  function go(tab) { location.hash = tab; }
+  function firstName(n) { return String(n || "").trim().split(/\s+/)[0] || ""; }
+  function safeUrl(u) { return /^(https:\/\/|assets\/)/.test(u || "") ? u : ""; }
+  function safeLink(u) { return /^https?:\/\//.test(u || "") ? u : ""; }
+
+  // Próxima clase a partir de los días y la hora de inicio del horario.
+  function nextClass(days, startTime) {
+    if (!days || !days.length || !startTime) return null;
+    var p = startTime.split(":"), now = new Date();
+    for (var i = 0; i < 8; i++) {
+      var d = new Date(now); d.setDate(now.getDate() + i);
+      d.setHours(+p[0], +p[1] || 0, 0, 0);
+      if (days.indexOf(DAY_ORDER[(d.getDay() + 6) % 7]) !== -1 && d > now) return d;
+    }
+    return null;
+  }
+  function whenLabel(d) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var dd = new Date(d); dd.setHours(0, 0, 0, 0);
+    var diff = Math.round((dd - today) / 86400000);
+    var hhmm = fmtTime(String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"));
+    return (diff === 0 ? "Hoy" : diff === 1 ? "Mañana" : DAY_ES[DAY_ORDER[(d.getDay() + 6) % 7]]) + ", " + hhmm;
+  }
+
+  function renderHome(main) {
+    sb.rpc("close_ended_cycles").then(function () {}, function () {}).then(function () {
+      return Promise.all([
+        sb.rpc("get_my_course"),
+        sb.rpc("get_my_billing"),
+        sb.rpc("get_next_module_offer"),
+        sb.rpc("get_my_announcements")
+      ]);
+    }).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      var courses = res[0].data || [];
+      var billing = (res[1] && res[1].data) || {};
+      var offer = (res[2] && res[2].data && res[2].data[0]) || null;
+      var news = (res[3] && !res[3].error && res[3].data) || [];
+
+      var current = courses.filter(function (c) { return !isCourseDone(c); })[0] || null;
+      var doneCount = courses.filter(isCourseDone).length;
+      var subs = (billing.subscriptions || []).filter(function (s) { return s.status !== "cancelled"; });
+      var owing = subs.filter(function (s) { return s.status !== "cancelled" && (s.paid_amount || 0) < s.monthly_amount; });
+      var frozen = subs.some(function (s) { return s.status === "frozen"; });
+      var balance = owing.reduce(function (a, s) { return a + (s.monthly_amount - (s.paid_amount || 0)); }, 0);
+      var pays = (billing.payments || []).filter(function (p) { return p.status === "approved" && !p.reverses_payment; })
+        .sort(function (a, b) { return new Date(b.paid_at) - new Date(a.paid_at); });
+
+      main.innerHTML = "";
+
+      // 1) Saludo personal
+      var today = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+      main.appendChild(h(
+        '<section class="home-hero">' +
+        '<div class="home-hero__txt">' +
+        '<p class="home-hero__date">' + esc(today.charAt(0).toUpperCase() + today.slice(1)) + "</p>" +
+        "<h1>¡Hola, " + esc(firstName(ME.full_name) || "bienvenido") + "!</h1>" +
+        '<p class="home-hero__sub">' + (current
+          ? "Estás cursando el <strong>módulo " + esc(current.module_level) + "</strong> — " + esc(current.module_title) + "."
+          : doneCount ? "Ya completaste " + doneCount + (doneCount === 1 ? " módulo" : " módulos") + ". ¡Sigue avanzando!"
+          : "Bienvenido a tu plataforma de LEF.") + "</p>" +
+        "</div></section>"
+      ));
+
+      // 2) Avisos urgentes (franjas de color, lo primero que se ve)
+      var alerts = [];
+      if (frozen) alerts.push(["bad", "Tu cuenta está <strong>congelada</strong> por falta de pago. Ponte al día para reactivar tu curso.", "Ir a Facturación", "facturacion"]);
+      else if (owing.length) {
+        var partial = owing.some(function (s) { return (s.paid_amount || 0) > 0; });
+        alerts.push(["warn", partial
+          ? "Te falta <strong>" + money(balance, "COP") + "</strong> para completar tu mensualidad."
+          : "Tienes una mensualidad pendiente de <strong>" + money(balance, "COP") + "</strong>" +
+            (current && current.enrollment_status === "PendingPayment" ? " — págala para activar tu módulo." : "."),
+          "Pagar ahora", "facturacion"]);
+      }
+      if (offer) alerts.push(["info", "Ya puedes matricularte en el <strong>módulo " + esc(offer.next_module_level) + "</strong> — " + esc(offer.next_module_title) + ".", "Ver en Mi curso", "curso"]);
+      if (current && current.enrollment_status === "Active" && !(current.schedule_days && current.schedule_days.length)) {
+        alerts.push(["neutral", "Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.", "", ""]);
+      }
+      alerts.forEach(function (a) {
+        var el = h('<div class="home-alert home-alert--' + a[0] + '"><span>' + a[1] + "</span>" +
+          (a[2] ? '<button type="button" class="btn btn-sm ' + (a[0] === "info" ? "btn-blue" : "btn-dark") + '">' + esc(a[2]) + "</button>" : "") + "</div>");
+        var b = el.querySelector("button"); if (b) b.addEventListener("click", function () { go(a[3]); });
+        main.appendChild(el);
+      });
+
+      // 3) Resumen: curso · pagos · progreso
+      var courseBody;
+      if (current) {
+        var nc = nextClass(current.schedule_days, current.schedule_start_time);
+        courseBody = '<div class="home-card__big">' + esc(current.module_level) + "</div>" +
+          '<div class="home-card__line">' + esc(current.module_title) + "</div>" +
+          (current.enrollment_status === "PendingPayment" ? '<span class="badge warn">pendiente de pago</span>'
+            : nc ? '<div class="home-card__line"><strong>Próxima clase:</strong> ' + esc(whenLabel(nc)) + "</div>"
+            : current.cycle_end_date ? '<div class="home-card__line">Ciclo hasta el ' + esc(date(current.cycle_end_date)) + "</div>"
+            : '<div class="home-card__line muted">Sin horario asignado todavía</div>');
+      } else {
+        courseBody = '<div class="home-card__big">—</div><div class="home-card__line">' +
+          (offer ? "Tu siguiente módulo es " + esc(offer.next_module_level) : "Sin módulo en curso") + "</div>";
+      }
+      var payBody = !subs.length
+        ? '<div class="home-card__big">—</div><div class="home-card__line">Aún no tienes mensualidades</div>'
+        : frozen ? '<div class="home-card__big home-card__big--bad">Congelada</div><div class="home-card__line">Saldo: ' + money(balance, "COP") + "</div>"
+        : owing.length ? '<div class="home-card__big home-card__big--warn">' + money(balance, "COP") + '</div><div class="home-card__line">Saldo pendiente</div>'
+        : '<div class="home-card__big home-card__big--ok">Al día</div><div class="home-card__line">No tienes saldos pendientes</div>';
+      if (pays[0]) payBody += '<div class="home-card__line muted">Último pago: ' + money(pays[0].amount, pays[0].currency) + " · " + esc(date(pays[0].paid_at)) + "</div>";
+      var pct = Math.round(doneCount / TOTAL_MODULES * 100);
+      var progBody = '<div class="home-card__big">' + doneCount + '<span class="home-card__of"> / ' + TOTAL_MODULES + "</span></div>" +
+        '<div class="home-card__line">módulos completados (A1.1 → B2.3)</div>' +
+        '<div class="home-card__bar"><div style="width:' + pct + '%"></div></div>';
+
+      var cards = h('<div class="home-cards"></div>');
+      [["Mi curso", courseBody, "Ver mi curso", "curso"],
+       ["Mis pagos", payBody, "Ir a Facturación", "facturacion"],
+       ["Mi progreso", progBody, "Ver mis recursos", "recursos"]].forEach(function (c) {
+        var card = h('<div class="home-card"><div class="home-card__k">' + esc(c[0]) + "</div>" + c[1] +
+          '<button type="button" class="link home-card__go">' + esc(c[2]) + " →</button></div>");
+        card.querySelector(".home-card__go").addEventListener("click", function () { go(c[3]); });
+        cards.appendChild(card);
+      });
+      main.appendChild(cards);
+
+      // 4) Novedades de LEF
+      main.appendChild(h('<div class="home-sec"><h2 class="pnl-h">Novedades de LEF</h2></div>'));
+      if (!news.length) {
+        main.appendChild(h('<div class="home-empty">Por ahora no hay novedades nuevas. Cuando LEF publique algo, lo verás aquí primero.</div>'));
+      } else {
+        var grid = h('<div class="news-grid"></div>');
+        var weekAgo = Date.now() - 7 * 86400000;
+        news.forEach(function (n) {
+          var cat = NEWS_CAT[n.category] || NEWS_CAT.novedad;
+          var img = safeUrl(n.image_url);
+          var isNew = new Date(n.publish_at).getTime() > weekAgo;
+          var excerpt = (n.body || "").length > 160 ? n.body.slice(0, 157).trim() + "…" : (n.body || "");
+          var card = h(
+            '<article class="news-card' + (n.pinned ? " news-card--pinned" : "") + '" tabindex="0" role="button">' +
+            (img ? '<div class="news-card__img"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : "") +
+            '<div class="news-card__body">' +
+            '<div class="news-card__meta"><span class="news-cat ' + cat.cls + '">' + esc(cat.label) + "</span>" +
+            (n.pinned ? '<span class="news-pin">📌 Fijado</span>' : "") +
+            (isNew ? '<span class="news-new">Nuevo</span>' : "") +
+            (n.module_level ? '<span class="news-mod">Módulo ' + esc(n.module_level) + "</span>" : "") + "</div>" +
+            "<h3>" + esc(n.title) + "</h3>" +
+            '<p class="news-card__date">' + esc(date(n.publish_at)) + "</p>" +
+            (excerpt ? '<p class="news-card__excerpt">' + esc(excerpt) + "</p>" : "") +
+            '<span class="news-card__more">Leer más →</span>' +
+            "</div></article>"
+          );
+          function open() { openNews(n); }
+          card.addEventListener("click", open);
+          card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+          grid.appendChild(card);
+        });
+        main.appendChild(grid);
+      }
+
+      // 5) Contacto
+      main.appendChild(h(
+        '<div class="home-help"><div><strong>¿Tienes dudas sobre tus clases o tus pagos?</strong>' +
+        '<p class="muted" style="font-size:13.5px;margin-top:2px">Escríbenos por WhatsApp y te respondemos lo antes posible.</p></div>' +
+        '<a class="btn btn-dark btn-sm" target="_blank" rel="noopener" href="https://wa.me/' + WHATSAPP_NUMBER + '">Escribir a LEF</a></div>'
+      ));
+    }).catch(function (e) {
+      main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu inicio: ' + esc((e && e.message) || e) + "</div>";
+    });
+  }
+
+  // Novedad completa en un recuadro (el tablón solo muestra el resumen).
+  function openNews(n) {
+    var cat = NEWS_CAT[n.category] || NEWS_CAT.novedad;
+    var img = safeUrl(n.image_url), link = safeLink(n.link_url);
+    var bg = h('<div class="pnl-modal-bg"></div>');
+    var box = h(
+      '<div class="pnl-modal news-modal">' +
+      '<button type="button" class="pay-modal__close" data-close aria-label="Cerrar">×</button>' +
+      (img ? '<img class="news-modal__img" src="' + esc(img) + '" alt="">' : "") +
+      '<div class="news-card__meta"><span class="news-cat ' + cat.cls + '">' + esc(cat.label) + "</span>" +
+      (n.module_level ? '<span class="news-mod">Módulo ' + esc(n.module_level) + "</span>" : "") + "</div>" +
+      '<h3 class="news-modal__title">' + esc(n.title) + "</h3>" +
+      '<p class="news-card__date">' + esc(date(n.publish_at)) + "</p>" +
+      '<div class="news-modal__body">' + esc(n.body || "") + "</div>" +
+      (link ? '<a class="btn btn-blue btn-sm" style="margin-top:14px" target="_blank" rel="noopener" href="' + esc(link) + '">' + esc(n.link_label || "Ver más") + "</a>" : "") +
+      "</div>"
+    );
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    box.querySelector("[data-close]").addEventListener("click", close);
   }
 
   /* ---------- Facturación ---------- */
