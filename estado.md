@@ -34,6 +34,10 @@
   correo", pie negro con WhatsApp, correo, Instagram, Facebook y web. Reusar
   este HTML para las plantillas de Supabase Auth en la parte 3. Vista previa:
   se puede generar con Node 24 importando el `.ts` directamente.
+  **REGLA (usuario, 23 sep): TODO correo automático nuevo usa este diseño v2**
+  (`lefEmail()`), incluidas las plantillas de Supabase Auth de la parte 3
+  (recuperar contraseña, aviso "tu contraseña fue cambiada", etc.): generar
+  el HTML con Node desde el `.ts` y pegarlo con las variables de Supabase.
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
   2. (hecho — ver arriba) Correo de credenciales al crear cuenta / reiniciar contraseña
