@@ -88,6 +88,22 @@ table.pnl td.wrap{white-space:normal;}
 input,select,textarea{font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--niebla);
   border-radius:8px;background:#fff;color:var(--ink);width:100%;}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul);}
+/* Contraseñas (lef-password.js): puntos grandes y contables, ojito y contador. */
+.pw-wrap{position:relative;display:block;}
+.pw-wrap input{padding-right:92px;}
+input[type=password]{font-family:Verdana,Tahoma,sans-serif;font-size:18px;font-weight:700;letter-spacing:.28em;
+  padding-top:6px;padding-bottom:6px;line-height:1.5;}
+.pw-wrap.pw-shown input{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:16px;font-weight:600;letter-spacing:.08em;
+  padding-top:8px;padding-bottom:8px;}
+input::-ms-reveal,input::-ms-clear{display:none;} /* Edge trae su propio ojito: se oculta para no duplicar */
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;
+  align-items:center;justify-content:center;border:0;background:none;color:var(--grafito);cursor:pointer;border-radius:8px;padding:0;}
+.pw-eye:hover{background:var(--papel);color:var(--ink);}
+.pw-eye:focus-visible{outline:2px solid var(--azul);outline-offset:1px;}
+.pw-count{position:absolute;right:42px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:600;
+  color:var(--plata);pointer-events:none;font-variant-numeric:tabular-nums;letter-spacing:0;}
+.pw-count.short{color:var(--warn);}
+.pw-count.ok{color:var(--ok);}
 label.fld{display:block;margin-bottom:12px;}
 label.fld span{display:block;font-size:12px;font-weight:600;color:var(--carbon);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
 
