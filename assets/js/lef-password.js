@@ -4,8 +4,10 @@
    - puntos grandes, en negrita y espaciados, fáciles de contar (CSS en
      lef-panel.css → .pw-wrap);
    - un ojito a la derecha para ver/ocultar lo escrito;
-   - un contador de caracteres; en las casillas de contraseña NUEVA muestra
-     "n/12" y se pone verde al llegar al mínimo de la política.
+   - solo en las casillas de contraseña NUEVA (autocomplete="new-password"):
+     contador "n/12" que se pone verde al llegar al mínimo de la política.
+     En el login NO hay contador (decisión del usuario: para confirmar lo
+     escrito está el ojito).
    Se carga en login, recuperar, admin y portal antes del resto de scripts. */
 (function () {
   "use strict";
@@ -20,14 +22,17 @@
     var isNew = input.getAttribute("autocomplete") === "new-password";
 
     var wrap = document.createElement("div");
-    wrap.className = "pw-wrap";
+    wrap.className = "pw-wrap" + (isNew ? " pw-has-count" : "");
     input.parentNode.insertBefore(wrap, input);
     wrap.appendChild(input);
 
-    var count = document.createElement("small");
-    count.className = "pw-count";
-    count.setAttribute("aria-live", "polite");
-    wrap.appendChild(count);
+    var count = null;
+    if (isNew) {
+      count = document.createElement("small");
+      count.className = "pw-count";
+      count.setAttribute("aria-live", "polite");
+      wrap.appendChild(count);
+    }
 
     var btn = document.createElement("button");
     btn.type = "button"; // nunca envía el formulario
@@ -42,10 +47,11 @@
       wrap.classList.toggle("pw-shown", shown);
     }
     function paintCount() {
+      if (!count) return;
       var n = input.value.length;
       if (!n) { count.textContent = ""; count.className = "pw-count"; return; }
-      count.textContent = isNew ? n + "/" + MIN : String(n);
-      count.className = "pw-count" + (isNew ? (n >= MIN ? " ok" : " short") : "");
+      count.textContent = n + "/" + MIN;
+      count.className = "pw-count" + (n >= MIN ? " ok" : " short");
       count.title = n + (n === 1 ? " carácter" : " caracteres");
     }
 

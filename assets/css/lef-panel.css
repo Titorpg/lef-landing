@@ -90,7 +90,8 @@ input,select,textarea{font:inherit;font-size:14px;padding:9px 11px;border:1px so
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul);}
 /* Contraseñas (lef-password.js): puntos grandes y contables, ojito y contador. */
 .pw-wrap{position:relative;display:block;}
-.pw-wrap input{padding-right:92px;}
+.pw-wrap input{padding-right:46px;}
+.pw-wrap.pw-has-count input{padding-right:92px;}
 input[type=password]{font-family:Verdana,Tahoma,sans-serif;font-size:18px;font-weight:700;letter-spacing:.28em;
   padding-top:6px;padding-bottom:6px;line-height:1.5;}
 .pw-wrap.pw-shown input{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:16px;font-weight:600;letter-spacing:.08em;
