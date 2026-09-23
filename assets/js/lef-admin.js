@@ -1736,7 +1736,7 @@
         var tr = h("<tr><td class=\"wrap\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
           '<br><span class="muted" style="font-size:12px">' + esc((n.body || "").slice(0, 90)) + ((n.body || "").length > 90 ? "…" : "") + "</span></td>" +
           "<td>" + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
-          "<td>" + esc(n.modules ? "Módulo " + n.modules.level : "Todos") + "</td>" +
+          "<td>" + esc(n.modules ? "Quienes cursan " + n.modules.level : "Todos") + "</td>" +
           "<td>" + date(n.publish_at) + "</td><td>" + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
           "<td>" + st + '</td><td class="acts"></td></tr>');
         var cell = tr.children[6];
@@ -1761,12 +1761,51 @@
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
+  // Quién la verá: estudiantes con cuenta de portal activa; si va dirigida a un
+  // módulo, solo los que lo están CURSANDO (pendiente de pago o activo) — los
+  // que ya lo completaron no la ven. Se cuenta en vivo en el formulario.
+  function loadNewsAudience() {
+    return Promise.all([
+      q("profiles").select("student_id").eq("role", "student").eq("active", true),
+      q("enrollments").select("student_id,module_id").in("status", ["PendingPayment", "Active"])
+    ]).then(function (res) {
+      var withAccount = {};
+      (res[0].data || []).forEach(function (p) { if (p.student_id) withAccount[p.student_id] = true; });
+      var byModule = {};
+      (res[1].data || []).forEach(function (e) {
+        if (!withAccount[e.student_id]) return;
+        (byModule[e.module_id] = byModule[e.module_id] || {})[e.student_id] = true;
+      });
+      return { all: Object.keys(withAccount).length, byModule: byModule };
+    }).catch(function () { return null; });
+  }
+
+  // Achica la imagen en el navegador antes de subirla (máx. 1600 px de ancho,
+  // JPEG): una foto de celular de 5-10 MB queda en unos cientos de KB.
+  function shrinkImage(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return resolve(file);
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var scale = Math.min(1, 1600 / img.naturalWidth);
+        var c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (blob) { resolve(blob || file); }, "image/jpeg", 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
   function editNovedad(n, mods) {
     n = n || {};
     var img = n.image_url || "";
     var custom = img && NEWS_GALLERY.indexOf(img) === -1 ? img : "";
     var pubLocal = n.publish_at ? new Date(new Date(n.publish_at).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
-    var b = h("<div>" +
+    var modById = {}; mods.forEach(function (m) { modById[m.id] = m; });
+    var b = h('<div class="news-editor"><div class="news-editor__form">' +
       field("Título", '<input name="t" maxlength="140" value="' + esc(n.title || "") + '">') +
       field("Categoría", '<select name="c">' + Object.keys(NEWS_CAT_ES).map(function (k) {
         return '<option value="' + k + '"' + ((n.category || "novedad") === k ? " selected" : "") + ">" + esc(NEWS_CAT_ES[k]) + "</option>";
@@ -1777,25 +1816,123 @@
         NEWS_GALLERY.map(function (src) {
           return '<label class="news-gal__opt"><input type="radio" name="img" value="' + src + '"' + (img === src ? " checked" : "") + '><img src="' + src + '" alt=""></label>';
         }).join("") +
-        '<label class="news-gal__opt news-gal__none"><input type="radio" name="img" value="__custom"' + (custom ? " checked" : "") + "><span>Otra (enlace)</span></label>" +
+        '<label class="news-gal__opt news-gal__none" data-custom-tile><input type="radio" name="img" value="__custom"' + (custom ? " checked" : "") + ">" +
+        (custom ? '<img src="' + esc(custom) + '" alt="">' : "<span>Tu imagen</span>") + "</label>" +
         "</div>" +
-        '<input name="imgurl" placeholder="https://images.pexels.com/…  (solo si elegiste “Otra”)" value="' + esc(custom) + '" style="margin-top:8px">') +
+        '<div class="news-upload">' +
+        '<button type="button" class="btn btn-sm btn-blue" data-upload>Subir imagen desde tu equipo</button>' +
+        '<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file hidden>' +
+        '<span class="muted" data-upload-msg style="font-size:12.5px"></span></div>' +
+        '<input name="imgurl" placeholder="…o pega el enlace de una imagen (https://…)" value="' + esc(custom) + '">') +
       field("Enlace (opcional)", '<input name="l" placeholder="https://…" value="' + esc(n.link_url || "") + '">') +
       field("Texto del botón del enlace", '<input name="ll" placeholder="Ej.: Inscríbete aquí" value="' + esc(n.link_label || "") + '">') +
       field("¿Para quién?", '<select name="m"><option value="">Todos los estudiantes</option>' + mods.map(function (m) {
-        return '<option value="' + m.id + '"' + (n.module_id === m.id ? " selected" : "") + ">Solo estudiantes de " + esc(m.level + " · " + m.title) + "</option>";
+        return '<option value="' + m.id + '"' + (n.module_id === m.id ? " selected" : "") + ">Solo quienes están cursando " + esc(m.level + " · " + m.title) + "</option>";
       }).join("") + "</select>") +
+      '<p class="news-audience" data-audience>Calculando a cuántos estudiantes les llega…</p>' +
       field("Publicar desde (vacío = ahora)", '<input name="pa" type="datetime-local" value="' + esc(pubLocal) + '">') +
       field("Deja de verse después del (opcional)", '<input name="ex" type="date" value="' + esc(n.expires_at || "") + '">') +
       '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 8px"><input type="checkbox" name="pin" style="width:auto"' + (n.pinned ? " checked" : "") + "> Fijar arriba del tablón</label>" +
       '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" name="pub" style="width:auto"' + (n.id && !n.published ? "" : " checked") + "> Publicada (si la desmarcas queda como borrador)</label>" +
-      "</div>");
+      '</div><div class="news-editor__preview"><div class="news-editor__sticky">' +
+      '<p class="fld-title">Vista previa — así la verá el estudiante</p><div data-prev-card></div>' +
+      '<p class="fld-title" style="margin-top:16px">Al darle “Leer más”</p><div class="news-prev-open" data-prev-open></div>' +
+      "</div></div></div>");
+
+    var val = function (k) { return (b.querySelector("[name=" + k + "]").value || "").trim(); };
+    function currentImage() {
+      var pick = pickedValue(b, "img");
+      return pick === "__custom" ? val("imgurl") : pick;
+    }
+    var okImg = function (u) { return /^(https:\/\/|assets\/)/.test(u || "") ? u : ""; };
+
+    // Vista previa en vivo: mismo HTML y estilos que el Inicio del portal.
+    function renderPreview() {
+      var cat = val("c"), title = val("t") || "Título de la novedad", body = val("b");
+      var imgUrl = okImg(currentImage());
+      var mod = modById[val("m")];
+      var pinned = b.querySelector("[name=pin]").checked;
+      var excerpt = body.length > 160 ? body.slice(0, 157).trim() + "…" : body;
+      var pa = val("pa"), when = (pa ? new Date(pa) : new Date()).toISOString();
+      var metaOpen = '<div class="news-card__meta"><span class="news-cat cat-' + esc(cat) + '">' + esc(NEWS_CAT_ES[cat] || cat) + "</span>";
+      var modTag = mod ? '<span class="news-mod">Módulo ' + esc(mod.level) + "</span>" : "";
+      b.querySelector("[data-prev-card]").innerHTML =
+        '<article class="news-card' + (pinned ? " news-card--pinned" : "") + '">' +
+        (imgUrl ? '<div class="news-card__img"><img src="' + esc(imgUrl) + '" alt=""></div>' : "") +
+        '<div class="news-card__body">' + metaOpen +
+        (pinned ? '<span class="news-pin">📌 Fijado</span>' : "") + '<span class="news-new">Nuevo</span>' + modTag + "</div>" +
+        "<h3>" + esc(title) + "</h3>" +
+        '<p class="news-card__date">' + esc(date(when)) + "</p>" +
+        (excerpt ? '<p class="news-card__excerpt">' + esc(excerpt) + "</p>" : "") +
+        '<span class="news-card__more">Leer más →</span></div></article>';
+      var link = /^https?:\/\//.test(val("l")) ? val("l") : "";
+      b.querySelector("[data-prev-open]").innerHTML =
+        (imgUrl ? '<img class="news-prev-open__img" src="' + esc(imgUrl) + '" alt="">' : "") +
+        metaOpen + modTag + "</div>" +
+        '<h3 class="news-modal__title">' + esc(title) + "</h3>" +
+        '<p class="news-card__date">' + esc(date(when)) + "</p>" +
+        '<div class="news-modal__body">' + (esc(body) || '<span class="muted">(sin texto)</span>') + "</div>" +
+        (link ? '<span class="btn btn-blue btn-sm" style="margin-top:12px;display:inline-block">' + esc(val("ll") || "Ver más") + "</span>" : "");
+    }
+
+    var audience = null;
+    function renderAudience() {
+      var el = b.querySelector("[data-audience]");
+      if (!audience) { el.textContent = ""; return; }
+      var modId = val("m");
+      var nn = modId ? Object.keys(audience.byModule[modId] || {}).length : audience.all;
+      var who = modId ? "estudiante(s) que están cursando " + (modById[modId] ? modById[modId].level : "ese módulo") : "estudiante(s) con cuenta en el portal";
+      el.className = "news-audience" + (nn ? "" : " news-audience--none");
+      el.innerHTML = nn
+        ? "👥 La verán <strong>" + nn + "</strong> " + esc(who) + "."
+        : "⚠️ Hoy <strong>nadie</strong> la vería: no hay " + esc(who) + ". Quienes ya completaron un módulo no ven las novedades dirigidas a él.";
+    }
+    loadNewsAudience().then(function (a) { audience = a; renderAudience(); });
+
+    b.addEventListener("input", renderPreview);
+    b.addEventListener("change", function (e) {
+      if (e.target.name === "m") renderAudience();
+      renderPreview();
+    });
+    // Escribir un enlace de imagen la deja elegida automáticamente.
+    b.querySelector("[name=imgurl]").addEventListener("input", function () {
+      if (val("imgurl")) b.querySelector("[name=img][value=__custom]").checked = true;
+    });
+
+    // Subir imagen: se achica, se sube al bucket "novedades" y queda elegida.
+    var fileIn = b.querySelector("[data-file]"), upMsg = b.querySelector("[data-upload-msg]");
+    b.querySelector("[data-upload]").addEventListener("click", function () { fileIn.click(); });
+    fileIn.addEventListener("change", function () {
+      var file = fileIn.files && fileIn.files[0];
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { upMsg.textContent = "Ese archivo no es una imagen."; return; }
+      upMsg.textContent = "Subiendo…";
+      shrinkImage(file).then(function (blob) {
+        var ext = blob.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "jpg").toLowerCase();
+        var path = Date.now() + "_" + file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40) + "." + ext;
+        return sb.storage.from("novedades").upload(path, blob, { contentType: blob.type || file.type, upsert: false }).then(function (up) {
+          if (up.error) throw up.error;
+          var url = sb.storage.from("novedades").getPublicUrl(path).data.publicUrl;
+          b.querySelector("[name=imgurl]").value = url;
+          b.querySelector("[name=img][value=__custom]").checked = true;
+          var tile = b.querySelector("[data-custom-tile]");
+          var old = tile.querySelector("img, span"); if (old) old.remove();
+          tile.appendChild(h('<img src="' + esc(url) + '" alt="">'));
+          upMsg.textContent = "Imagen subida ✓";
+          renderPreview();
+        });
+      }).catch(function (err) {
+        upMsg.textContent = "No se pudo subir: " + friendly(err);
+      }).then(function () { fileIn.value = ""; });
+    });
+
+    renderPreview();
+
     modal(n.id ? "Editar novedad" : "Nueva novedad", b, function () {
-      var val = function (k) { return (b.querySelector("[name=" + k + "]").value || "").trim(); };
       var title = val("t");
       if (title.length < 3) throw new Error("Escribe un título.");
-      var pick = pickedValue(b, "img");
-      var imageUrl = pick === "__custom" ? val("imgurl") : pick;
+      var imageUrl = currentImage();
+      if (pickedValue(b, "img") === "__custom" && !imageUrl) throw new Error("Sube una imagen o pega su enlace, o elige otra portada.");
       if (imageUrl && !/^(https:\/\/|assets\/)/.test(imageUrl)) throw new Error("El enlace de la imagen debe empezar por https://");
       var link = val("l");
       if (link && !/^https?:\/\//.test(link)) throw new Error("El enlace debe empezar por https://");

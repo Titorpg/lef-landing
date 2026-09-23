@@ -1,5 +1,30 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 (6ª parte) — Novedades: subir imagen + vista previa + a quién le llega
+
+**Pedidos del usuario:** (1) poder SUBIR una imagen de portada (no solo
+galería o enlace) y ver una vista previa de cómo queda la publicación; (2)
+creó "¡Échale un ojo a tu libro de trabajo!" y no le salía a Liam.
+
+**Diagnóstico de (2):** no era un error — la novedad está dirigida a "Solo
+estudiantes de A1.1" y Liam ya COMPLETÓ A1.1 (hoy no cursa nada). El filtro
+por módulo solo incluye a quienes lo cursan (`PendingPayment`/`Active`). Se
+hizo explícito en el formulario.
+
+**Hecho:**
+- Editor en dos columnas: formulario + **vista previa en vivo** (la tarjeta
+  del tablón y el recuadro de "Leer más", con el mismo HTML/CSS del portal).
+- **Subir imagen desde el equipo**: se achica en el navegador (máx. 1600 px,
+  JPEG) y se sube al bucket público `novedades` de Storage; queda elegida.
+  Se mantiene galería + enlace.
+- **Contador de destinatarios** bajo "¿Para quién?": "La verán N
+  estudiante(s)…"; si es 0, aviso amarillo explicando que quienes ya
+  completaron el módulo no la ven. Opciones renombradas a "Solo quienes están
+  cursando A1.x"; columna de la lista: "Quienes cursan A1.x".
+- Migración `20260923030000_novedades_subir_imagen.sql`: bucket `novedades`
+  (público, 5 MB, solo imágenes) + políticas (lectura pública; subir/cambiar/
+  borrar solo admin).
+
 ## Sesión 23 sep 2026 (5ª parte) — Portal: pestaña "Inicio" (tablón) + Novedades en el admin
 
 **Pedido del usuario:** el logo del portal del estudiante sacaba de la
