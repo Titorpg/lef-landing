@@ -116,6 +116,16 @@ Deno.serve(async (req) => {
   // cambiar SU PROPIO correo desde "Mi cuenta" — todo lo demás sigue admin-only.
   const isSelfEmailUpdate = action === "update_email" && String(payload.user_id ?? "") === auth.user.id;
   if (!isSelfEmailUpdate && me.role !== "admin") return json({ error: "requiere_admin" }, 403);
+  // Parte 5b: las acciones de administrador exigen sesión con 2 pasos (aal2).
+  // El token ya fue validado por getUser(); aquí solo se lee su claim "aal".
+  if (!isSelfEmailUpdate) {
+    let aal = "";
+    try {
+      const b64 = (authHeader.replace(/^Bearer\s+/i, "").split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/");
+      aal = String(JSON.parse(atob(b64 + "===".slice((b64.length + 3) % 4))).aal ?? "");
+    } catch { /* token raro → aal vacío → se rechaza */ }
+    if (aal !== "aal2") return json({ error: "requiere_2_pasos" }, 403);
+  }
 
   try {
     if (action === "create_account") {

@@ -234,6 +234,7 @@
     correo_en_profesor: "Ya hay un profesor registrado con ese correo (aparece en Usuarios como “sin cuenta”). Usa el botón “Crear cuenta” de su fila, o elimínalo primero.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
     no_cambiar_tu_rol: "No puedes cambiar tu propio rol. Pídeselo a otro administrador.",
+    requiere_2_pasos: "Tu sesión no pasó la verificación en 2 pasos. Cierra sesión y vuelve a entrar con el código de tu app.",
     no_resetear_tu_mfa: "No puedes restablecer tu propia verificación en 2 pasos. Pídeselo al otro administrador.",
     rol_estudiante_fijo: "Las cuentas de estudiante no cambian de rol.",
     rol_invalido: "Ese rol no es válido.",
