@@ -47,13 +47,13 @@
   `node --no-warnings supabase/templates/apply-auth-templates.mjs`. A Claude
   se lo bloqueó el clasificador ("Production Deploy"); lo corre el usuario.
   Respaldo de la config previa en el scratchpad de la sesión del 23 sep.
-  ✅ Vercel desplegado. **Falta prueba del usuario** (en ventana de incógnito: olvidé → correo → /recuperar → aviso "contraseña cambiada").
+  ✅ Vercel desplegado. ✅ **Probado por el usuario (23 sep)**: olvidé → correo → /recuperar → aviso "contraseña cambiada" → login con la nueva. Todo OK.
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
   2. (hecho — ver arriba) Correo de credenciales al crear cuenta / reiniciar contraseña
      (`manage-users`). Hoy el admin copia la contraseña y la manda por
      WhatsApp — que el correo sea adicional, no quitar esa opción.
-  3. SMTP propio en Supabase (Authentication → Emails → SMTP: host
+  3. (hecho — ver arriba) SMTP propio en Supabase (Authentication → Emails → SMTP: host
      `smtp.resend.com`, puerto 465, usuario `resend`, clave = API key) y
      "¿Olvidaste tu contraseña?" (`recuperar.html` + `lef-recuperar.js`, hoy
      huérfanos).
