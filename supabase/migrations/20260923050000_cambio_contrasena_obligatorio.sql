@@ -1,7 +1,7 @@
 -- LEF — Cambio de contraseña obligatorio en el primer ingreso (parte 4 del
 -- endurecimiento del login, 23 sep 2026).
 --
--- Reemplaza SOLO la sección 1 de 20260906130000_seguridad_cuentas.sql, que
+-- Reemplaza SOLO la sección 1 de 20260906130000_seguridad_cuentas.sql (borrado del repo el 23 sep), que
 -- nunca se aplicó (su sección de audit_log choca con la tabla actual de
 -- 20260906180000 — NO aplicar ese archivo).
 --

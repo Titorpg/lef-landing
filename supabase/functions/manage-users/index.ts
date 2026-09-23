@@ -2,12 +2,8 @@
 // Crea/edita usuarios de auth y su fila en profiles.
 // Se invoca desde el panel admin con el JWT del admin; aquí se re-verifica el rol.
 //
-// Nota (15 sep 2026): esta es la versión que coincide con la desplegada en Supabase.
-// Existe una versión más nueva con endurecimiento de login (contraseñas generadas por
-// el servidor + envío por Resend + profiles.must_change_password + audit_log) en el
-// historial de git (commit 3d737a4), pero depende de una migración que sigue sin
-// aplicarse (ver estado.md / SEGURIDAD.md) — no desplegar esa versión todavía o se
-// rompe la creación/reseteo de cuentas.
+// El endurecimiento del login se rehízo por partes el 23 sep 2026 (el paquete
+// 3d737a4 se revirtió); este archivo es la versión desplegada. Ver estado.md.
 //
 // 23 sep 2026: envío OPCIONAL de credenciales por correo (Resend) al crear una
 // cuenta o restablecer la contraseña (payload.send_email = true). Es adicional:
