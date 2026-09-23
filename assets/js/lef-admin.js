@@ -96,11 +96,56 @@
     }, saveLabel || "Confirmar", true);
   }
   function field(label, inputHtml) { return '<label class="fld"><span>' + esc(label) + "</span>" + inputHtml + "</label>"; }
+  // Como field(), pero sin <label> envolvente: para controles que traen sus propios <label> adentro.
+  function fieldBlock(label, innerHtml) { return '<div class="fld-block"><span class="fld-title">' + esc(label) + "</span>" + innerHtml + "</div>"; }
   function moduleSelect(name, mods, selectedId) {
     return '<select name="' + name + '">' + mods.map(function (m) {
       return '<option value="' + m.id + '"' + (m.id === selectedId ? " selected" : "") + ">" +
         esc(m.level + " · " + m.title) + "</option>";
     }).join("") + "</select>";
+  }
+  // Selector de módulo en forma de lista (en vez de <select>) para poder
+  // marcar con una etiqueta verde los módulos que el estudiante ya completó.
+  //   completed: { module_id: true }  — módulos ya cursados por el estudiante
+  //   opts.lockCompleted: no se pueden elegir (Estudiantes → Editar)
+  //   opts.suggestedId:   se marca con "Sugerido"
+  //   opts.extra:         [{ value, label }] opciones al inicio (p. ej. "Sin módulo")
+  function modulePicker(name, mods, selectedId, completed, opts) {
+    opts = opts || {};
+    completed = completed || {};
+    var rows = (opts.extra || []).map(function (x) {
+      return '<label class="mod-pick__row mod-pick__row--extra"><input type="radio" name="' + name + '" value="' + esc(x.value) + '"' +
+        (x.value === selectedId ? " checked" : "") + "><span>" + esc(x.label) + "</span></label>";
+    });
+    mods.forEach(function (m) {
+      var done = !!completed[m.id];
+      var locked = done && opts.lockCompleted;
+      rows.push('<label class="mod-pick__row' + (done ? " is-done" : "") + (locked ? " is-locked" : "") + '">' +
+        '<input type="radio" name="' + name + '" value="' + m.id + '"' +
+        (m.id === selectedId && !locked ? " checked" : "") + (locked ? " disabled" : "") + ">" +
+        '<span class="mod-pick__dot" style="background:' + modColor(m.module_number) + '"></span>' +
+        '<span class="mod-pick__lbl">' + esc(m.level + " · " + m.title) + "</span>" +
+        (done ? '<span class="mod-pick__done">✓ Completado</span>' : "") +
+        (!done && m.id === opts.suggestedId ? '<span class="mod-pick__sug">Sugerido</span>' : "") +
+        "</label>");
+    });
+    return '<div class="mod-pick">' + rows.join("") + "</div>";
+  }
+  function pickedValue(box, name) {
+    var el = box.querySelector("[name=" + name + "]:checked");
+    return el ? el.value : "";
+  }
+  // Siguiente módulo sugerido: el primero (activo) por encima del más alto
+  // que ya completó, saltando los que ya cursó. null si no ha completado ninguno.
+  function suggestNextModule(mods, completed, modById) {
+    var maxDone = 0;
+    Object.keys(completed || {}).forEach(function (id) {
+      var m = modById[id];
+      if (m && m.module_number > maxDone) maxDone = m.module_number;
+    });
+    if (!maxDone) return null;
+    var next = mods.filter(function (m) { return m.module_number > maxDone && !completed[m.id]; })[0];
+    return next ? next.id : null;
   }
   var BLOCK_TABLE_ES = {
     enrollments: "inscripciones", payments: "pagos", subscriptions: "suscripciones",
@@ -128,6 +173,9 @@
     LEF_ENROLLMENT_NOT_FOUND: "No se encontró la inscripción.",
     LEF_ENROLLMENT_CANCELLED: "Esa inscripción está cancelada.",
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
+    LEF_MODULE_ALREADY_COMPLETED: "Ese estudiante ya completó ese módulo — no se puede volver a matricular. Elige otro.",
+    LEF_ENROLLMENT_NOT_ACTIVE: "Ese módulo todavía no se ha pagado, así que no se puede marcar como completado. Usa “cancelar la inscripción”.",
+    LEF_CYCLE_NOT_FOUND: "No se encontró el ciclo (quizás ya se cerró).",
     no_autenticado: "Tu sesión expiró. Vuelve a iniciar sesión.",
     url_invalida: "Esa imagen no es válida.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
@@ -192,7 +240,10 @@
         }
         if (!["admin", "teacher"].includes(p.data.role)) return (window.location.replace("portal.html"));
         ME = p.data;
-        renderShell();
+        // Cierra los ciclos cuya fecha de fin ya pasó (libera estudiantes y
+        // borra grupo → horario → ciclo). Lo hace también el cron nocturno;
+        // esto es el respaldo por si el cron no corrió. Si falla, igual se abre el panel.
+        return rpc("close_ended_cycles").catch(function () {}).then(renderShell);
       });
     });
   }
@@ -574,15 +625,19 @@
       return Promise.all([
         q("students").select("*").order("created_at", { ascending: false }),
         isAdminView ? q("profiles").select("user_id,student_id,email,active").eq("role", "student") : Promise.resolve({ data: [] }),
-        q("enrollments").select("student_id,module_id,group_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
+        q("enrollments").select("id,student_id,module_id,group_id,status,created_at,modules(level,title,module_number)").order("created_at", { ascending: false }),
         activeModules(),
         isAdminView ? Promise.resolve({ data: [] }) : q("teacher_student_notes").select("student_id,note").eq("teacher_id", ME.teacher_id)
       ]).then(function (res) {
         if (res[0].error) throw res[0].error;
-        var profByStudent = {}, modByStudent = {}, noteByStudent = {}, myStudentIds = null;
+        var profByStudent = {}, modByStudent = {}, noteByStudent = {}, myStudentIds = null, doneByStudent = {};
         (res[1].data || []).forEach(function (p) { if (p.student_id) profByStudent[p.student_id] = p; });
         (res[2].data || []).forEach(function (e) {
-          if (e.status === "Cancelled") return;
+          // Módulo ACTUAL = el más reciente pendiente de pago o activo. Los
+          // completados/cancelados no cuentan: al terminar un módulo, la
+          // columna queda vacía hasta que se genere la inscripción siguiente.
+          if (e.status === "Completed") { (doneByStudent[e.student_id] = doneByStudent[e.student_id] || {})[e.module_id] = true; return; }
+          if (e.status !== "PendingPayment" && e.status !== "Active") return;
           if (!modByStudent[e.student_id]) modByStudent[e.student_id] = e; // el más reciente
         });
         if (!isAdminView) {
@@ -593,7 +648,7 @@
         }
         (res[4].data || []).forEach(function (n) { noteByStudent[n.student_id] = n.note; });
         var mods = res[3];
-        if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods); };
+        if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods, {}); };
 
         var cols = isAdminView
           ? ["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]
@@ -605,9 +660,10 @@
         var enr = modByStudent[s.id];
         var modLabel = enr && enr.modules ? enr.modules.level + " · " + enr.modules.title : "—";
         var modColorDot = enr && enr.modules ? '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(enr.modules.module_number) + '"></span>' : "";
+        var doneCount = Object.keys(doneByStudent[s.id] || {}).length;
         var tr;
         if (isAdminView) {
-          var enrBadge = !enr ? "—" : enr.status === "Active" ? '<span class="badge ok">activo</span>'
+          var enrBadge = !enr ? '<span class="badge neutral">sin módulo</span>' : enr.status === "Active" ? '<span class="badge ok">activo</span>'
             : enr.status === "PendingPayment" ? '<span class="badge warn">pendiente de pago</span>'
             : '<span class="badge neutral">' + esc(ENROLL_ES[enr.status] || enr.status) + "</span>";
           var estado = !prof ? '<span class="badge neutral">sin cuenta</span>'
@@ -615,7 +671,9 @@
           tr = h([
             "<tr><td>", esc(s.full_name), "</td>",
             "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
-            "<td>", modColorDot, esc(modLabel), "</td>",
+            "<td>", modColorDot, esc(modLabel),
+            (doneCount ? '<br><span class="muted" style="font-size:12px">' + doneCount + (doneCount === 1 ? " módulo completado" : " módulos completados") + "</span>" : ""),
+            "</td>",
             "<td>", enrBadge, "</td>",
             "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
             "<td>", esc(s.city || "—"), "</td>",
@@ -631,7 +689,8 @@
                 .then(function () { toast("Actualizado."); route(); }).catch(function (e) { toast(friendly(e), "err"); });
             }));
           }
-          cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s, enr ? enr.module_id : null, mods); }));
+          cell.appendChild(btn("Detalle", "btn-ghost", function () { studentDetail(s); }));
+          cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s, enr || null, mods, doneByStudent[s.id] || {}); }));
           cell.appendChild(btn("Eliminar", "btn-danger", function () { deleteStudent(s, prof); }));
         } else {
           tr = h([
@@ -813,19 +872,39 @@
     }, "Crear estudiante");
   }
 
-  function editStudent(s, currentModuleId, mods) {
+  // curEnr: inscripción ACTUAL (PendingPayment/Active) o null si está sin módulo.
+  // completed: { module_id: true } con los módulos que ya cursó.
+  function editStudent(s, curEnr, mods, completed) {
     if (!mods.length) { toast("No hay módulos activos. Activa alguno en Académico.", "err"); return; }
+    completed = completed || {};
+    var modById = {}; mods.forEach(function (m) { modById[m.id] = m; });
+    var extra, selected;
+    if (curEnr) {
+      extra = [{ value: "__cancel", label: "— Quitar módulo actual: cancelar la inscripción —" }];
+      if (curEnr.status === "Active") extra.push({ value: "__complete", label: "— Quitar módulo actual: marcarlo como completado —" });
+      selected = curEnr.module_id;
+    } else {
+      extra = [{ value: "", label: "— Sin módulo por ahora —" }];
+      var firstOpen = mods.filter(function (m) { return !completed[m.id]; })[0];
+      selected = s ? "" : (firstOpen ? firstOpen.id : "");
+    }
+    var suggested = curEnr ? null : suggestNextModule(mods, completed, modById);
+    var note = curEnr
+      ? (curEnr.status === "Active"
+        ? "Si eliges otro módulo, el actual (" + (curEnr.modules ? curEnr.modules.level : "") + ", ya pagado) queda como <strong>completado</strong> y se crea la inscripción nueva pendiente de pago."
+        : "Si eliges otro módulo, la inscripción pendiente de pago se cambia a ese módulo (si tenía grupo asignado, se libera).")
+      : (s ? "Hoy no tiene módulo en curso. Elige el siguiente para inscribirlo" + (suggested ? " (el sugerido es el que sigue a lo que ya cursó)" : "") + ", o déjalo sin módulo." : "");
     var b = h("<div>" +
       field("Nombre completo del estudiante", '<input name="n" value="' + esc(s ? s.full_name : "") + '">') +
       field("Tipo de documento", docSelect("dt", s ? s.doc_type : "TI")) +
       field("Número de documento", '<input name="dn" value="' + esc(s ? (s.doc_number || "") : "") + '">') +
-      field("Módulo en que se inscribe", moduleSelect("mod", mods, currentModuleId || mods[0].id)) +
+      fieldBlock("Módulo en que se inscribe", modulePicker("mod", mods, selected, completed, { lockCompleted: true, suggestedId: suggested, extra: extra })) +
+      (note ? '<p class="pnl-sub" style="margin:-4px 0 12px">' + note + "</p>" : "") +
       field("WhatsApp", '<input name="w" value="' + esc(s ? s.whatsapp : "") + '">') +
       field("Correo", '<input name="e" type="email" value="' + esc(s ? s.email : "") + '">') +
       field("Edad (opcional)", '<input name="a" type="number" min="5" max="100" value="' + (s && s.age ? s.age : "") + '">') +
       field("Ciudad (opcional)", '<input name="c" value="' + esc(s ? (s.city || "") : "") + '">') +
       '<p class="pnl-sub">El documento del estudiante es obligatorio. Si es menor de edad, va su tarjeta de identidad; el documento de quien paga se registra aparte, en la suscripción.</p>' +
-      (s ? '<p class="pnl-sub">Cambiar el módulo actualiza su inscripción (si tenía grupo asignado, se libera).</p>' : "") +
       "</div>");
     modal(s ? "Editar estudiante" : "Nuevo estudiante", b, function () {
       var docNum = b.querySelector("[name=dn]").value.trim();
@@ -839,14 +918,74 @@
         age: +b.querySelector("[name=a]").value || null,
         city: b.querySelector("[name=c]").value.trim() || null
       };
-      var moduleId = b.querySelector("[name=mod]").value;
+      var moduleVal = pickedValue(b, "mod");
       var pr = s
         ? q("students").update(payload).eq("id", s.id).then(function (r) { if (r.error) throw r.error; return s.id; })
         : q("students").insert(payload).select("id").single().then(function (r) { if (r.error) throw r.error; return r.data.id; });
       return pr.then(function (sid) {
-        return rpc("admin_assign_module", { p_student_id: sid, p_module_id: moduleId });
-      }).then(function () { toast(s ? "Estudiante actualizado." : "Estudiante inscrito."); route(); });
+        if (moduleVal === "__cancel") return rpc("admin_release_module", { p_student_id: sid, p_mode: "cancel" });
+        if (moduleVal === "__complete") return rpc("admin_release_module", { p_student_id: sid, p_mode: "complete" });
+        if (!moduleVal) return null;
+        return rpc("admin_assign_module", { p_student_id: sid, p_module_id: moduleVal });
+      }).then(function () { toast(s ? "Estudiante actualizado." : (moduleVal ? "Estudiante inscrito." : "Estudiante creado, sin módulo por ahora.")); route(); });
     }, s ? "Guardar" : "Inscribir");
+  }
+
+  // Estudiantes → "Detalle": módulo en curso + módulos que ya culminó (con la
+  // copia hist_* de ciclo/horario/profesor, porque el grupo, el horario y el
+  // ciclo se borran solos cuando el ciclo termina).
+  function studentDetail(s) {
+    var box = h('<div><p class="muted">Cargando…</p></div>');
+    modal("Detalle — " + s.full_name, box, null, "Cerrar", false, true);
+    q("enrollments")
+      .select("id,registration_number,status,created_at,completed_at,hist_cycle_name,hist_cycle_start,hist_cycle_end,hist_days,hist_start_time,hist_end_time,hist_teacher_name," +
+        "modules(level,title,module_number),cycles(name,start_date,end_date),groups(schedules(days,start_time,end_time),teachers(full_name))")
+      .eq("student_id", s.id).order("created_at", { ascending: false })
+      .then(function (r) {
+        if (r.error) throw r.error;
+        var rows = r.data || [];
+        var current = rows.filter(function (e) { return e.status === "PendingPayment" || e.status === "Active"; })[0];
+        var done = rows.filter(function (e) { return e.status === "Completed"; })
+          .sort(function (a, b) { return ((a.modules && a.modules.module_number) || 0) - ((b.modules && b.modules.module_number) || 0); });
+        var cancelled = rows.filter(function (e) { return e.status === "Cancelled"; });
+        function modName(e) { return e.modules ? e.modules.level + " · " + e.modules.title : "—"; }
+        function dot(e) { return '<span class="mod-pick__dot" style="background:' + modColor(e.modules && e.modules.module_number) + '"></span>'; }
+        function infoLine(e) {
+          var sc = e.groups && e.groups.schedules;
+          var d = sc ? sc.days : e.hist_days, st = sc ? sc.start_time : e.hist_start_time, et = sc ? sc.end_time : e.hist_end_time;
+          var teacher = (e.groups && e.groups.teachers && e.groups.teachers.full_name) || e.hist_teacher_name;
+          var cs = e.cycles ? e.cycles.start_date : e.hist_cycle_start, ce = e.cycles ? e.cycles.end_date : e.hist_cycle_end;
+          var parts = [];
+          if (cs && ce) parts.push("Ciclo " + date(cs) + " – " + date(ce));
+          if (d && d.length) parts.push(days(d) + " " + time(st) + "–" + time(et));
+          if (teacher) parts.push("Prof. " + teacher);
+          return parts.length ? esc(parts.join(" · ")) : "Sin grupo asignado";
+        }
+        box.innerHTML = "";
+
+        box.appendChild(h('<h3 style="font-size:14px;margin-bottom:8px">Módulo en curso</h3>'));
+        box.appendChild(current
+          ? h('<div class="det-card"><div class="det-card__top">' + dot(current) + "<strong>" + esc(modName(current)) + "</strong>" +
+              (current.status === "Active" ? '<span class="badge ok">activo</span>' : '<span class="badge warn">pendiente de pago</span>') +
+              '</div><p class="muted" style="font-size:12.5px;margin-top:4px">Matrícula ' + esc(current.registration_number) + " · " + infoLine(current) + "</p></div>")
+          : h('<p class="pnl-sub">Sin módulo en curso — queda a la espera de que se genere su siguiente inscripción (desde Editar, desde Pagos → Generar pago, o por el propio estudiante en su portal).</p>'));
+
+        box.appendChild(h('<h3 style="font-size:14px;margin:18px 0 8px">Módulos completados (' + done.length + ")</h3>"));
+        if (!done.length) box.appendChild(h('<p class="pnl-sub">Todavía no ha culminado ningún módulo.</p>'));
+        done.forEach(function (e) {
+          box.appendChild(h('<div class="det-card"><div class="det-card__top">' + dot(e) + "<strong>" + esc(modName(e)) + "</strong>" +
+            '<span class="mod-pick__done">✓ Completado</span></div>' +
+            '<p class="muted" style="font-size:12.5px;margin-top:4px">Matrícula ' + esc(e.registration_number) +
+            (e.completed_at ? " · cerrado el " + date(e.completed_at) : "") + " · " + infoLine(e) + "</p></div>"));
+        });
+
+        if (cancelled.length) {
+          box.appendChild(h('<h3 style="font-size:14px;margin:18px 0 8px">Inscripciones canceladas (' + cancelled.length + ")</h3>"));
+          box.appendChild(h('<p class="muted" style="font-size:12.5px">' + cancelled.map(function (e) {
+            return esc(modName(e) + " (matrícula " + e.registration_number + ")");
+          }).join("<br>") + "</p>"));
+        }
+      }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
   function resetStudentPwd(s, prof) {
@@ -1258,12 +1397,20 @@
     Promise.all([
       rpc("admin_billing_overview"),
       q("students").select("id,full_name,doc_type,doc_number,email,whatsapp").order("full_name"),
-      activeModules()
+      activeModules(),
+      q("enrollments").select("student_id,module_id,status,created_at,modules(level)").order("created_at", { ascending: false })
     ]).then(function (res) {
         var rows = res[0] || [], students = res[1].data || [], mods = res[2];
+        // Por estudiante: módulo actual (más reciente pendiente/activo) y módulos ya completados.
+        var enrInfo = {};
+        ((res[3] && res[3].data) || []).forEach(function (e) {
+          var inf = enrInfo[e.student_id] = enrInfo[e.student_id] || { current: null, completed: {} };
+          if (e.status === "Completed") inf.completed[e.module_id] = true;
+          else if ((e.status === "PendingPayment" || e.status === "Active") && !inf.current) inf.current = e;
+        });
         var newBtn = h('<button class="btn btn-dark btn-sm" data-new>+ Generar pago</button>');
         bar.appendChild(newBtn);
-        newBtn.onclick = function () { editarSuscripcion(null, students, mods); };
+        newBtn.onclick = function () { editarSuscripcion(null, students, mods, enrInfo); };
         var t = tableWrap(["Estudiante / pagador", "Módulo", "Mensualidad", "Pagado", "Último pago", "Estado", "Acciones"]);
         rows.forEach(function (r) {
           var paid = r.paid_amount || 0;
@@ -1408,8 +1555,10 @@
     return s ? { name: s.full_name, docType: s.doc_type, docNumber: s.doc_number, email: s.email, phone: s.whatsapp } : {};
   }
 
-  function editarSuscripcion(r, students, mods) {
+  function editarSuscripcion(r, students, mods, enrInfo) {
+    if (!r && !students.length) { toast("No hay estudiantes todavía.", "err"); return; }
     var byId = {}; students.forEach(function (s) { byId[s.id] = s; });
+    var modById = {}; mods.forEach(function (m) { modById[m.id] = m; });
     var initPayer = r
       ? { name: r.payer_name, docType: r.payer_doc_type, docNumber: r.payer_doc_number, email: r.payer_email, phone: r.payer_phone }
       : payerFromStudent(students[0]);
@@ -1417,7 +1566,8 @@
       (r ? "" : field("Estudiante", '<select name="sid">' + students.map(function (s) {
         return '<option value="' + s.id + '">' + esc(s.full_name) + "</option>";
       }).join("") + "</select>")) +
-      field("Módulo", moduleSelect("mod", mods, r ? r.module_id : (mods[0] && mods[0].id))) +
+      (r ? field("Módulo", moduleSelect("mod", mods, r.module_id))
+         : fieldBlock("Módulo", '<div data-modpick></div>') + '<p class="pnl-sub" data-modnote style="margin:-4px 0 12px"></p>') +
       field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : "") + '">') +
       (r ? "" :
         field("Abono inicial (COP, opcional)", '<input name="abono" type="number" min="0" value="0">') +
@@ -1434,18 +1584,47 @@
       if (body.querySelector("[name=status]")) body.querySelector("[name=status]").value = r.status;
     }
     var sidSel = body.querySelector("[name=sid]");
-    if (sidSel) sidSel.onchange = function () {
-      var p = payerFromStudent(byId[sidSel.value]);
-      body.querySelector("[name=pn]").value = p.name || "";
-      body.querySelector("[name=pdt]").value = p.docType || "CC";
-      body.querySelector("[name=pdn]").value = p.docNumber || "";
-      body.querySelector("[name=pe]").value = p.email || "";
-      body.querySelector("[name=pp]").value = p.phone || "";
-    };
+    // "Generar pago" también inscribe al estudiante en el módulo elegido
+    // (admin_create_subscription): el selector marca lo ya completado y
+    // explica qué va a pasar con su módulo actual antes de guardar.
+    function infoFor(sid) { return (enrInfo && enrInfo[sid]) || { current: null, completed: {} }; }
+    function paintModNote() {
+      var inf = infoFor(sidSel.value), picked = pickedValue(body, "mod"), cur = inf.current;
+      var note = body.querySelector("[data-modnote]"), txt;
+      if (!picked) txt = "";
+      else if (inf.completed[picked]) txt = "Ya completó este módulo: solo se genera el cobro (p. ej. una mensualidad pendiente), <strong>no</strong> se vuelve a inscribir ni cambia su módulo actual.";
+      else if (cur && cur.module_id === picked) txt = "Es su módulo actual: el cobro queda atado a esa inscripción.";
+      else if (cur && cur.status === "Active") txt = "⚠️ Hoy está cursando " + esc(cur.modules ? cur.modules.level : "otro módulo") + " (activo). Si generas el cobro de este módulo, el actual queda como <strong>completado</strong> y se le inscribe en este.";
+      else if (cur) txt = "Hoy tiene " + esc(cur.modules ? cur.modules.level : "otro módulo") + " pendiente de pago: su inscripción se cambia a este módulo.";
+      else txt = "No tiene módulo en curso: queda inscrito en este módulo (pendiente de pago) y aparece así en Estudiantes.";
+      note.innerHTML = txt;
+    }
+    function paintModPicker() {
+      var inf = infoFor(sidSel.value);
+      var suggested = inf.current ? null : suggestNextModule(mods, inf.completed, modById);
+      var firstOpen = mods.filter(function (m) { return !inf.completed[m.id]; })[0];
+      var sel = inf.current ? inf.current.module_id : (suggested || (firstOpen && firstOpen.id) || (mods[0] && mods[0].id));
+      var host = body.querySelector("[data-modpick]");
+      host.innerHTML = modulePicker("mod", mods, sel, inf.completed, { suggestedId: suggested });
+      host.querySelectorAll("[name=mod]").forEach(function (x) { x.onchange = paintModNote; });
+      paintModNote();
+    }
+    if (sidSel) {
+      paintModPicker();
+      sidSel.onchange = function () {
+        var p = payerFromStudent(byId[sidSel.value]);
+        body.querySelector("[name=pn]").value = p.name || "";
+        body.querySelector("[name=pdt]").value = p.docType || "CC";
+        body.querySelector("[name=pdn]").value = p.docNumber || "";
+        body.querySelector("[name=pe]").value = p.email || "";
+        body.querySelector("[name=pp]").value = p.phone || "";
+        paintModPicker();
+      };
+    }
     modal(r ? "Editar suscripción" : "Generar pago", body, function () {
       var payer = readPayer(body);
       var payload = {
-        module_id: body.querySelector("[name=mod]").value,
+        module_id: r ? body.querySelector("[name=mod]").value : pickedValue(body, "mod"),
         monthly_amount: +body.querySelector("[name=amt]").value || 0,
         payer_name: payer.p_payer_name, payer_doc_type: payer.p_payer_doc_type,
         payer_doc_number: payer.p_payer_doc_number, payer_email: payer.p_payer_email,
@@ -1458,13 +1637,16 @@
           if (u.error) throw u.error; toast("Suscripción actualizada."); route();
         });
       }
-      payload.student_id = body.querySelector("[name=sid]").value;
+      if (!payload.module_id) throw new Error("Elige el módulo.");
       var abono = +body.querySelector("[name=abono]").value || 0;
-      return q("subscriptions").insert(payload).select("id").single().then(function (i) {
-        if (i.error) throw i.error;
+      return rpc("admin_create_subscription", Object.assign({
+        p_student_id: body.querySelector("[name=sid]").value,
+        p_module_id: payload.module_id,
+        p_monthly_amount: payload.monthly_amount
+      }, payer)).then(function (subId) {
         if (abono > 0) {
           return rpc("record_payment", Object.assign({
-            p_subscription_id: i.data.id, p_amount: abono,
+            p_subscription_id: subId, p_amount: abono,
             p_method: body.querySelector("[name=abonoM]").value
           }, payer)).then(function () { toast("Pago generado."); route(); });
         }
@@ -1510,7 +1692,8 @@
   var AUDIT_ACTION_ES = {
     "payment.delete": "Pago eliminado", "payment.update": "Pago editado",
     "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada",
-    "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)"
+    "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)",
+    "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)"
   };
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
@@ -1533,7 +1716,7 @@
       "esa corrección — nadie, ni el admin, puede borrar este historial."
   };
   function secRegistro(main) {
-    head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
+    head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción, o se cierra un ciclo, queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
     rpc("admin_list_audit_log", { p_limit: 300 }).then(function (rows) {
       rows = rows || [];
       var t = tableWrap(["Fecha", "Quién", "Acción", "Motivo", "Detalle"]);
@@ -1542,7 +1725,7 @@
         var td = h("<td></td>"); td.appendChild(detailBtn);
         var reasonDisplay = AUDIT_REASON_ES[r.action] || r.reason;
         var tr = h("<tr><td>" + date(r.created_at) + " " + new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) +
-          "</td><td>" + esc(r.actor_email || "—") + "</td><td>" + esc(AUDIT_ACTION_ES[r.action] || r.action) +
+          "</td><td>" + esc(r.actor_email || (r.action === "cycle.finish" ? "Sistema (automático)" : "—")) + "</td><td>" + esc(AUDIT_ACTION_ES[r.action] || r.action) +
           '</td><td class="wrap">' + esc(reasonDisplay) + "</td></tr>");
         tr.appendChild(td);
         detailBtn.onclick = function () {
@@ -1870,6 +2053,10 @@
     box.innerHTML = "";
     var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Ciclo</button></div>');
     box.appendChild(add);
+    box.appendChild(h('<p class="pnl-sub" style="margin-bottom:12px">Cuando pasa la <strong>fecha de fin</strong> de un ciclo, el sistema lo cierra solo: ' +
+      'los estudiantes que lo cursaron quedan con ese módulo <strong>completado</strong>, los que nunca pagaron quedan con la inscripción cancelada, ' +
+      'todos quedan <strong>sin módulo</strong> en Estudiantes, y se eliminan sus grupos, sus horarios y el ciclo. Queda anotado en el Registro de eventos. ' +
+      'Con “Finalizar ahora” haces lo mismo antes de la fecha.</p>'));
     add.querySelector("button").onclick = function () {
       var b = cycleForm(null);
       modal("Nuevo ciclo", b, function () {
@@ -1898,6 +2085,18 @@
               status: b.querySelector("[name=st]").value
             }).eq("id", c.id).then(function (u) { if (u.error) throw u.error; toast("Ciclo actualizado."); acCiclos(box); });
           });
+        }));
+        cell.appendChild(btn("Finalizar ahora", "btn-ghost", function () {
+          var b = h("<div>" +
+            '<p class="pnl-sub" style="margin-bottom:8px">Vas a cerrar el ciclo <strong>' + esc(c.name) + "</strong> antes de su fecha de fin (" + date(c.end_date) + ").</p>" +
+            '<p class="pnl-sub" style="margin-bottom:10px">Los estudiantes activos quedan con su módulo <strong>completado</strong>, los pendientes de pago quedan con la inscripción cancelada, todos quedan sin módulo, y se <strong>eliminan</strong> los grupos, los horarios y el ciclo. No se puede deshacer.</p>' +
+            field("Escribe FINALIZAR para confirmar", '<input name="confirm" autocomplete="off" placeholder="FINALIZAR">') +
+            "</div>");
+          modal("Finalizar ciclo", b, function () {
+            if ((b.querySelector("[name=confirm]").value || "").trim().toUpperCase() !== "FINALIZAR")
+              throw new Error("Escribe FINALIZAR para confirmar.");
+            return rpc("admin_finish_cycle", { p_cycle_id: c.id }).then(function () { toast("Ciclo finalizado y limpiado."); acCiclos(box); });
+          }, "Finalizar ciclo", true);
         }));
         cell.appendChild(btn("Eliminar", "btn-danger", function () {
           confirmDelete("Eliminar ciclo", "No se puede si tiene horarios asociados.", function () {

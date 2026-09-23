@@ -1,5 +1,52 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 22 sep 2026 (7ª parte) — Ciclo de vida de las inscripciones (sin "rebabas")
+
+**Pedido del usuario:** inscribir a un estudiante en su módulo siguiente
+dejaba restos de la inscripción anterior. Caso real: Liam Caballero seguía
+viendo A1.1 "activo y corriendo" en "Mi curso" sin grupo, horario, ciclo ni
+profesor. Diagnóstico (consulta de solo lectura): tenía A1.1 `Completed` +
+**otra** A1.1 `PendingPayment` (la lógica anterior permitía re-matricular un
+módulo ya completado), y por eso "Mi curso" la mostraba como módulo actual.
+
+**Construido (migración `20260922020000_ciclo_de_vida_inscripciones.sql` +
+panel + portal):**
+1. **Módulo actual = solo inscripción pendiente de pago o activa.** Al
+   terminar un módulo, la columna "Módulo" de Estudiantes queda vacía
+   ("sin módulo"). Desde ahí: Editar (selector nuevo) · Pagos → Generar pago
+   (ahora **también inscribe** en el módulo elegido —
+   `admin_create_subscription`) · o el estudiante desde "Mi curso"
+   (`self_enroll_next_module`). Cada mensualidad queda atada a SU inscripción
+   (`subscriptions.enrollment_id`): pagarla activa esa inscripción y no otra
+   (`record_payment` / `record_wompi_payment`).
+2. **Cierre automático del ciclo** al pasar su fecha de fin (desde el día
+   siguiente, hora Colombia): activos → `Completed`, pendientes de pago →
+   `Cancelled`, todos sueltan grupo/ciclo, y se borran grupos → horarios →
+   ciclo (`lef_finish_cycle`). Lo corre **pg_cron** (00:10 Colombia) y, de
+   respaldo, el panel y el portal al abrirse (`close_ended_cycles`,
+   idempotente). Queda en el Registro de eventos ("Ciclo finalizado").
+   Botón nuevo **"Finalizar ahora"** en Académico → Ciclos.
+3. **Estudiantes → "Detalle"**: módulo en curso + módulos completados (con
+   ciclo, horario y profesor) + inscripciones canceladas. El selector de
+   módulo (Editar y Generar pago) es ahora una lista con etiqueta verde
+   **"✓ Completado"**; en Editar esos módulos están bloqueados, y la BD
+   también lo rechaza (`LEF_MODULE_ALREADY_COMPLETED`). La sugerencia del
+   portal salta los módulos ya cursados.
+4. **Historial que sobrevive al borrado**: columnas `enrollments.hist_*`
+   (ciclo, días, horario, profesor) que se congelan al completar, para que el
+   "Ver detalle" de los completados en "Mi curso" siga funcionando aunque el
+   grupo/horario/ciclo ya no existan. Borrar un grupo a mano ahora suelta
+   también el ciclo de las inscripciones en curso (ya no quedan "corriendo").
+5. Limpieza de datos: se cancela la A1.1 pendiente duplicada de Liam.
+
+**Editar estudiante — opciones nuevas del selector:** "Sin módulo por ahora"
+(si no tiene), o "Quitar módulo actual: cancelar la inscripción" /
+"marcarlo como completado" (solo si está activo).
+
+**⏳ Pendiente del usuario:** aplicar la migración en el SQL Editor de
+Supabase. El deploy a Vercel va DESPUÉS (el panel nuevo llama funciones que
+crea la migración).
+
 ## Cierre de sesión — 22 sep 2026
 
 Sesión larga, todo desplegado y subido a `origin/main` (commit `3ce5b68`).

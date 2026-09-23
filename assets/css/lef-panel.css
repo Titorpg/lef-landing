@@ -277,3 +277,25 @@ td.acts .btn{margin:2px 4px 2px 0;}
   .pnl-nav a{white-space:nowrap;margin-bottom:0;}
   .pnl-main{padding:20px 16px;}
 }
+
+/* Selector de módulo con etiqueta "✓ Completado" (Estudiantes → Editar, Pagos → Generar pago) */
+.fld-block{margin-bottom:12px;}
+.fld-block .fld-title{display:block;font-size:12px;font-weight:600;color:var(--carbon);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+.mod-pick{border:1px solid var(--niebla);border-radius:10px;max-height:280px;overflow:auto;background:#fff;}
+.mod-pick__row{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--niebla);}
+.mod-pick__row:last-child{border-bottom:none;}
+.mod-pick__row:hover{background:var(--papel);}
+.mod-pick__row input{width:auto;flex:none;margin:0;}
+.mod-pick__row--extra{color:var(--grafito);font-size:13px;}
+.mod-pick__dot{display:inline-block;width:9px;height:9px;border-radius:3px;flex:none;}
+.mod-pick__lbl{flex:1;min-width:0;}
+.mod-pick__row.is-locked{cursor:not-allowed;}
+.mod-pick__row.is-locked .mod-pick__lbl{color:var(--plata);}
+.mod-pick__done{flex:none;display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:999px;
+  background:var(--ok);color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap;}
+.mod-pick__sug{flex:none;padding:2px 9px;border-radius:999px;background:var(--azul-niebla);color:var(--azul);
+  font-size:11px;font-weight:600;white-space:nowrap;}
+
+/* Estudiantes → Detalle */
+.det-card{border:1px solid var(--niebla);border-radius:10px;padding:10px 13px;margin-bottom:8px;background:#fff;}
+.det-card__top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;}

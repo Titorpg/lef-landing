@@ -392,7 +392,9 @@
     var start = new Date(startStr + "T00:00:00"), end = new Date(endStr + "T00:00:00"), now = new Date();
     var total = end - start, elapsed = now - start;
     var pct = total > 0 ? Math.max(0, Math.min(100, Math.round((elapsed / total) * 100))) : (now >= end ? 100 : 0);
-    var doneMsg = now >= end ? "Tu ciclo ya terminó — LEF actualizará tu siguiente módulo en breve."
+    var dayAfterEnd = new Date(end); dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+    var doneMsg = now >= dayAfterEnd ? "Tu ciclo ya terminó — LEF actualizará tu siguiente módulo en breve."
+      : now >= end ? "Hoy es el último día de tu ciclo."
       : now < start ? "Tu ciclo todavía no empieza."
       : "Va " + pct + "% del ciclo.";
     return '<div class="course-progress">' +
@@ -403,10 +405,14 @@
 
   // Completado = el admin ya archivó ese módulo (asignó el siguiente), o el ciclo
   // ya terminó aunque todavía no le hayan asignado el módulo que sigue.
+  // La fecha de fin es el último día de clase: el curso cuenta como terminado
+  // desde el día siguiente (mismo criterio que el cierre automático del ciclo).
   function isCourseDone(c) {
     if (c.enrollment_status === "Completed") return true;
     if (!c.cycle_end_date) return false;
-    return new Date() >= new Date(c.cycle_end_date + "T00:00:00");
+    var dayAfter = new Date(c.cycle_end_date + "T00:00:00");
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    return new Date() >= dayAfter;
   }
 
   function renderCourseHero(main, c) {
@@ -513,13 +519,20 @@
         msg.insertAdjacentElement("afterend", goBtn);
       }).catch(function (e) {
         btn.disabled = false;
-        msg.textContent = "No pudimos matricularte: " + ((e && e.message) || e);
+        var m = (e && e.message) || String(e);
+        msg.textContent = /LEF_COURSE_NOT_DONE/.test(m) ? "Ya tienes un módulo en curso o pendiente de pago — recarga la página."
+          : /LEF_NO_NEXT_MODULE/.test(m) ? "No hay un módulo siguiente disponible por ahora. Escríbenos por WhatsApp."
+          : "No pudimos matricularte: " + m;
       });
     });
   }
 
   function renderCourse(main) {
-    sb.rpc("get_my_course").then(function (r) {
+    // Primero cierra los ciclos vencidos (lo hace también el cron nocturno) para
+    // que "Mi curso" nunca muestre un módulo corriendo en un ciclo que ya terminó.
+    sb.rpc("close_ended_cycles").then(function () {}, function () {}).then(function () {
+      return sb.rpc("get_my_course");
+    }).then(function (r) {
       if (r.error) throw r.error;
       var rows = r.data || [];
       main.innerHTML = '<h1 class="pnl-h">Mi curso</h1><p class="pnl-sub">El nivel y el módulo en el que estás inscrito actualmente.</p>';
