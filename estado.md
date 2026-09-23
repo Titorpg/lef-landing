@@ -1,5 +1,69 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
+
+- **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD).
+  Faltan **B1.2, B1.3, B2.1, B2.2, B2.3**.
+- **Talleres / Recursos interactivos / Materiales**: sin definir cómo se montan.
+- **Cuentas Workspace de profesores** + agregarlos en Classroom.
+- **Resend + Cloudflare Turnstile**: el usuario YA creó las cuentas (23 sep);
+  es lo siguiente a configurar (`SEGURIDAD.md`). Las llaves NO están guardadas
+  en ningún lado (ni `.env`, ni secrets de Supabase, ni memoria) — pedirlas.
+- **⏸ Guardar tarjeta / cobro automático recurrente**: PENDIENTE A CONFIRMAR
+  por el cliente. Se quitó de la parte visual (botón "Guardar tarjeta…" del
+  portal eliminado el 23 sep). No construir hasta que se confirme.
+- **⏸ Factura electrónica DIAN**: PENDIENTE, el cliente no lo ha indicado.
+  Mientras tanto los recibos usan numeración compatible con la DIAN (`RC` +
+  consecutivo continuo). Si se factura, el número de factura lo da la
+  resolución DIAN vía proveedor y se guarda aparte.
+- **Wompi solo tarjeta**: confirmar con soporte de Wompi; los textos legales/FAQ
+  ya dicen "tarjeta, con los medios que Wompi tenga habilitados".
+- Reseñas "Voces de LEF" inventadas; revisión legal de política/términos;
+  fotos reales. **Traducciones: completas** (FAQ, política y términos tienen
+  EN desde antes — una nota vieja decía lo contrario, era incorrecta).
+- Antes de arrancar: borrar datos de prueba (Liam) y reiniciar el consecutivo
+  de recibos a 1 (`update receipt_counters set next_seq = 1 where year = 0`).
+- Cuenta de profesor de prueba `jorgeradash@gmail.com` sin vincular.
+- Entrega: transferir repo GitHub y rotar tokens.
+
+## Sesión 23 sep 2026 (7ª parte) — Sin "Guardar tarjeta", recibos DIAN, legales y FAQ al día
+
+**Pedidos del usuario:** (1) verificar datos antes de listar pendientes (se
+había dicho mal que solo A1.1 tenía libro y que faltaban traducciones);
+(2) quitar "Guardar tarjeta" de la parte visual y dejarlo pendiente a
+confirmar; (3) factura electrónica pendiente, pero que los recibos de Pagos
+sigan la nomenclatura de la DIAN; (4) complementar política de privacidad,
+términos y FAQ con todo lo construido.
+
+**Hecho:**
+- Portal: eliminado el botón deshabilitado "Guardar tarjeta para cobro
+  automático (próximamente)" de Facturación.
+- Migración `20260923040000_recibos_numeracion_dian.sql`: `next_receipt_number()`
+  ahora devuelve **`RC` + consecutivo continuo** (prefijo ≤4 alfanumérico sin
+  símbolos, numeración que no se reinicia por año — reglas de numeración de
+  la DIAN). Contador global en `receipt_counters` fila `year = 0`, arranca
+  donde quedó el de 2026 (sin saltos ni repetidos). Los recibos ya emitidos
+  (`REC-2026-000xx`) no se renombran (pagos inmutables).
+- **Términos de uso** (15 secciones): + solicitud de inscripción que no cobra,
+  cuenta del portal (credenciales), Mis recursos (acceso a módulos cursados),
+  módulos/ciclos/paso al siguiente (completado, no se repite, sin pago →
+  cancelada), pagos (valor fijo por módulo, abonos, primer abono activa,
+  registro de transferencias, recibo consecutivo, pagador distinto, reversos,
+  congelación por mora), terceros en limitación de responsabilidad.
+- **Política de privacidad** (13 secciones): + documento de identidad, datos
+  del pagador, información académica y anotaciones de profesores, pagos,
+  datos de cuenta; almacenamiento local (idioma + sesión); quién ve tus datos
+  (tú / admin / profesor, que no ve pagos); proveedores encargados (Supabase,
+  Vercel, Wompi, Resend, Cloudflare Turnstile, Heyzine, Google Workspace) y
+  transferencia internacional; conservación de pagos hasta 10 años aunque se
+  borre la cuenta; derecho a quejarse ante la SIC; seguridad por roles y
+  registro de eventos.
+- **FAQ** (18 preguntas, antes 12): categoría nueva "Tu portal de
+  estudiante" + en Pagos: costo (valor fijo), abonos, comprobante (recibo
+  RC), otra persona paga. Inscripción aclara que el formulario es solicitud.
+- Todo en ES y EN, generado desde un único contenido; verificado que las 154
+  claves usadas en las 3 páginas existen en ambos idiomas, y revisado en local.
+
 ## Sesión 23 sep 2026 (6ª parte) — Novedades: subir imagen + vista previa + a quién le llega
 
 **Pedidos del usuario:** (1) poder SUBIR una imagen de portada (no solo

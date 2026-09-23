@@ -3,7 +3,7 @@
    El cobro en línea usa el Widget oficial de Wompi (checkout.wompi.co/widget.js);
    la firma de integridad se calcula en el Edge Function wompi-checkout (nunca en el
    navegador) y el pago se confirma por el webhook wompi-webhook, no por el resultado
-   del widget. La tarjeta guardada para cobro automático sigue para una fase futura. */
+   del widget. Guardar tarjeta / cobro automático: pendiente de confirmar, sin nada visible en el portal. */
 (function () {
   "use strict";
 
@@ -460,8 +460,7 @@
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
             '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria o usando la llave Bre-B @lefcenter, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +
-            '<button class="btn btn-blue" data-open-pay>Pagar ahora</button> ' +
-            '<button class="btn btn-ghost" disabled>Guardar tarjeta para cobro automático (próximamente)</button>' +
+            '<button class="btn btn-blue" data-open-pay>Pagar ahora</button>' +
             "</div>") +
           "</div>"
         );
