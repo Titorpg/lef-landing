@@ -105,6 +105,10 @@ input::-ms-reveal,input::-ms-clear{display:none;} /* Edge trae su propio ojito: 
   color:var(--plata);pointer-events:none;font-variant-numeric:tabular-nums;letter-spacing:0;}
 .pw-count.short{color:var(--warn);}
 .pw-count.ok{color:var(--ok);}
+.pw-wrap.pw-bad input,.pw-wrap.pw-bad input:focus{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-bg);}
+.pw-wrap.pw-good input,.pw-wrap.pw-good input:focus{border-color:var(--ok);}
+.pw-warn{display:block;margin-top:5px;font-size:12.5px;font-weight:500;line-height:1.4;color:var(--bad);}
+.pw-say.pnl-alert{margin:12px 0 0;}
 label.fld{display:block;margin-bottom:12px;}
 label.fld span{display:block;font-size:12px;font-weight:600;color:var(--carbon);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
 

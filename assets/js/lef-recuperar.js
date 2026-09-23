@@ -59,7 +59,9 @@
       err.style.display = "none";
       var p1 = root.querySelector("[data-p1]").value;
       var p2 = root.querySelector("[data-p2]").value;
-      var msg = checkPassword(p1) || (p1 !== p2 ? "Las contraseñas no coinciden." : "");
+      // Casillas en rojo + mensaje con todo lo que falta (lef-password.js).
+      var msg = window.LEFPassword ? window.LEFPassword.validate(root)
+        : (checkPassword(p1) || (p1 !== p2 ? "Las contraseñas no coinciden." : ""));
       if (msg) { err.textContent = msg; err.style.display = "block"; return; }
       btn.disabled = true; btn.textContent = "Guardando…";
       sb.auth.updateUser({ password: p1 }).then(function (r) {

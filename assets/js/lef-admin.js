@@ -2276,17 +2276,19 @@
     main.appendChild(pwBox);
     pwBox.querySelector("[data-save-pw]").onclick = function () {
       var msg = pwBox.querySelector("[data-pw-msg]");
+      var P = window.LEFPassword;
+      function say(t, kind) { if (P) P.say(msg, t, kind); else msg.textContent = t; }
       var p1 = pwBox.querySelector("[name=p1]").value, p2 = pwBox.querySelector("[name=p2]").value;
-      var pwErr = checkPassword(p1);
-      if (pwErr) { msg.textContent = pwErr; return; }
-      if (p1 !== p2) { msg.textContent = "Las contraseñas no coinciden."; return; }
-      msg.textContent = "Guardando…";
+      // Casillas en rojo + alerta roja con todo lo que falta (lef-password.js).
+      var pwErr = P ? P.validate(pwBox) : (checkPassword(p1) || (p1 !== p2 ? "Las contraseñas no coinciden." : ""));
+      if (pwErr) { say(pwErr, "err"); return; }
+      say("Guardando…");
       sb.auth.updateUser({ password: p1 }).then(function (r) {
         if (r.error) throw r.error;
         if (window.LEFPrimerIngreso) window.LEFPrimerIngreso.markChanged(sb);
         pwBox.querySelector("[name=p1]").value = pwBox.querySelector("[name=p2]").value = "";
-        msg.textContent = "Contraseña actualizada.";
-      }).catch(function (err) { msg.textContent = "No pudimos cambiar la contraseña: " + friendly(err); });
+        say("Contraseña actualizada.", "ok");
+      }).catch(function (err) { say("No pudimos cambiar la contraseña: " + friendly(err), "err"); });
     };
   }
 
