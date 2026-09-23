@@ -83,6 +83,24 @@
     for (var j = out.length - 1; j > 0; j--) { var k = rnd[j] % (j + 1); var t = out[j]; out[j] = out[k]; out[k] = t; }
     return out.join("");
   }
+  // Casilla "enviar también por correo" (manage-users → Resend). Es adicional:
+  // la contraseña se sigue mostrando para compartirla por WhatsApp.
+  function mailCheckbox() {
+    return '<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0 8px">' +
+      '<input type="checkbox" name="sm" style="width:auto" checked> Enviar también el usuario y la contraseña por correo</label>';
+  }
+  function wantsMail(box) { var c = box.querySelector("[name=sm]"); return !!(c && c.checked); }
+  // Texto para el admin según lo que respondió manage-users.
+  function mailOutcome(res) {
+    if (!res || res.email_sent == null) return "";
+    if (res.email_sent) return "Se enviaron los datos por correo.";
+    return "El correo NO se pudo enviar (" + (res.email_error === "correo_no_configurado" ? "el envío de correos no está configurado" : res.email_error || "error desconocido") +
+      "): compártelos por WhatsApp.";
+  }
+  function toastMail(base, res) {
+    var m = mailOutcome(res);
+    toast(base + (m ? " " + m : ""), res && res.email_sent === false ? "err" : "ok");
+  }
 
   function toast(msg, kind) {
     var t = h('<div class="pnl-alert ' + (kind || "ok") + '" style="position:fixed;right:20px;bottom:20px;z-index:80;max-width:360px;box-shadow:0 8px 24px rgba(0,0,0,.15)">' + esc(msg) + "</div>");
@@ -846,6 +864,7 @@
       field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
       fixedPriceField() +
       field("Contraseña temporal del portal", '<input name="pw" value="' + pwd + '">') +
+      mailCheckbox() +
       '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>), su cuenta de portal y su cobro de la mensualidad, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que entre y pague. Si quien paga no es el estudiante, corrige el pagador después desde Pagos → Editar.</p>' +
       "</div>");
     var schSel = b.querySelector("[name=sch]");
@@ -871,6 +890,7 @@
       var dn = b.querySelector("[name=dn]").value.trim();
       if (!dn) throw new Error("El número de documento es obligatorio.");
       var accountPwd = b.querySelector("[name=pw]").value;
+      var sendMail = wantsMail(b);
       var pwErr = checkPassword(accountPwd);
       if (pwErr) throw new Error(pwErr); // antes de crear nada, para no dejar el estudiante a medias
       var moduleId = b.querySelector("[name=mod]").value;
@@ -896,14 +916,16 @@
           return callFn({
             action: "create_account", role: "student",
             full_name: p.full_name, email: p.email,
-            password: accountPwd, student_id: row.student_id
-          }).then(function () {
+            password: accountPwd, student_id: row.student_id, send_email: sendMail
+          }).then(function (acc) {
             route();
+            var mailMsg = mailOutcome(acc);
             var info = h("<div>" +
               '<p class="pnl-sub" style="margin-bottom:8px">Matrícula <strong>' + esc(row.registration_number) +
               '</strong> creada — inscripción en <strong>pendiente de pago</strong>, mensualidad ' + esc(money(monthly, "COP")) + ' ya generada.</p>' +
               '<p class="pnl-sub" style="margin-bottom:8px">Usuario: <strong>' + esc(p.email) + "</strong><br>" +
               'Contraseña temporal: <code style="font-size:14px">' + esc(accountPwd) + "</code></p>" +
+              (mailMsg ? '<p class="pnl-sub" style="margin-bottom:8px"><strong>' + esc(mailMsg) + "</strong></p>" : "") +
               '<p class="pnl-sub">Compártelos con el estudiante para que entre al portal y pague. La inscripción pasa a "activo" en cuanto se complete el valor de la mensualidad (en uno o varios abonos).</p></div>');
             modal("Estudiante creado", info, function () { return Promise.resolve(); }, "Entendido");
           }).catch(function (accErr) {
@@ -1034,11 +1056,11 @@
 
   function resetStudentPwd(s, prof) {
     var np = genPassword();
-    var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
+    var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') + mailCheckbox() +
       '<p class="pnl-sub">Compártela con el estudiante. Podrá cambiarla luego.</p></div>');
     modal("Restablecer contraseña — " + s.full_name, bb, function () {
-      return callFn({ action: "reset_password", user_id: prof.user_id, password: bb.querySelector("[name=p]").value })
-        .then(function () { toast("Contraseña actualizada."); });
+      return callFn({ action: "reset_password", user_id: prof.user_id, password: bb.querySelector("[name=p]").value, send_email: wantsMail(bb) })
+        .then(function (res) { toastMail("Contraseña actualizada.", res); });
     }, "Guardar");
   }
 
@@ -1079,7 +1101,7 @@
     var body = h("<div>" +
       field("Nombre", '<input name="fn" value="' + esc(s.full_name) + '">') +
       field("Correo (usuario para entrar)", '<input name="em" type="email" value="' + esc(s.email) + '">') +
-      field("Contraseña temporal", '<input name="pw" value="' + pwd + '">') +
+      field("Contraseña temporal", '<input name="pw" value="' + pwd + '">') + mailCheckbox() +
       '<p class="pnl-sub">Comparte estos datos con el estudiante. Entra en ' + esc(window.location.host) +
       '/login y podrá cambiar la contraseña luego.</p></div>');
     modal("Crear cuenta de portal — " + s.full_name, body, function () {
@@ -1088,8 +1110,8 @@
         full_name: body.querySelector("[name=fn]").value.trim(),
         email: body.querySelector("[name=em]").value.trim(),
         password: body.querySelector("[name=pw]").value,
-        student_id: s.id
-      }).then(function () { toast("Cuenta creada."); route(); });
+        student_id: s.id, send_email: wantsMail(body)
+      }).then(function (res) { toastMail("Cuenta creada.", res); route(); });
     }, "Crear cuenta");
   }
 
@@ -2860,7 +2882,7 @@
       var b = h("<div>" +
         field("Rol", '<select name="r"><option value="teacher">Profesor</option><option value="admin">Administrador</option></select>') +
         field("Nombre", '<input name="n">') + field("Correo", '<input name="e" type="email">') +
-        field("Contraseña temporal", '<input name="p" value="' + pwd + '">') +
+        field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + mailCheckbox() +
         '<p class="pnl-sub">Si el rol es Profesor, queda enlazado automáticamente a un registro nuevo en Académico → Profesores (mismo nombre y correo) — no hace falta vincular nada aparte.</p>' +
         "</div>");
       modal("Nueva cuenta de staff", b, function () {
@@ -2868,8 +2890,8 @@
           action: "create_account", role: b.querySelector("[name=r]").value,
           full_name: b.querySelector("[name=n]").value.trim(),
           email: b.querySelector("[name=e]").value.trim(),
-          password: b.querySelector("[name=p]").value
-        }).then(function () { toast("Cuenta creada."); load(); });
+          password: b.querySelector("[name=p]").value, send_email: wantsMail(b)
+        }).then(function (res) { toastMail("Cuenta creada.", res); load(); });
       }, "Crear");
     };
 
@@ -2915,14 +2937,14 @@
               var pwd = genPassword();
               var b = h("<div>" + field("Nombre", '<input name="n" value="' + esc(r.name) + '">') +
                 field("Correo", '<input name="e" type="email" value="' + esc(r.email) + '">') +
-                field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + "</div>");
+                field("Contraseña temporal", '<input name="p" value="' + pwd + '">') + mailCheckbox() + "</div>");
               modal("Crear cuenta — " + r.name, b, function () {
                 return callFn({
                   action: "create_account", role: "teacher",
                   full_name: b.querySelector("[name=n]").value.trim(),
                   email: b.querySelector("[name=e]").value.trim(),
-                  password: b.querySelector("[name=p]").value, teacher_id: r.teacher_id
-                }).then(function () { toast("Cuenta creada."); load(); });
+                  password: b.querySelector("[name=p]").value, teacher_id: r.teacher_id, send_email: wantsMail(b)
+                }).then(function (res) { toastMail("Cuenta creada.", res); load(); });
               }, "Crear");
             }));
             t.body.appendChild(tr); return;
@@ -2942,11 +2964,11 @@
           }));
           cell.appendChild(btn("Restablecer contraseña", "btn-ghost", function () {
             var np = genPassword();
-            var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') +
+            var bb = h("<div>" + field("Nueva contraseña temporal", '<input name="p" value="' + np + '">') + mailCheckbox() +
               '<p class="pnl-sub">Compártela con ' + esc(r.name) + '. Podrá cambiarla luego.</p></div>');
             modal("Restablecer contraseña — " + r.name, bb, function () {
-              return callFn({ action: "reset_password", user_id: r.user_id, password: bb.querySelector("[name=p]").value })
-                .then(function () { toast("Contraseña actualizada."); });
+              return callFn({ action: "reset_password", user_id: r.user_id, password: bb.querySelector("[name=p]").value, send_email: wantsMail(bb) })
+                .then(function (res) { toastMail("Contraseña actualizada.", res); });
             }, "Guardar");
           }));
           cell.appendChild(btn(r.active ? "Desactivar" : "Activar", "btn-ghost", function () {

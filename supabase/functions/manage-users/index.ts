@@ -8,6 +8,12 @@
 // historial de git (commit 3d737a4), pero depende de una migración que sigue sin
 // aplicarse (ver estado.md / SEGURIDAD.md) — no desplegar esa versión todavía o se
 // rompe la creación/reseteo de cuentas.
+//
+// 23 sep 2026: envío OPCIONAL de credenciales por correo (Resend) al crear una
+// cuenta o restablecer la contraseña (payload.send_email = true). Es adicional:
+// si el correo falla, la cuenta/contraseña igual queda hecha y se responde
+// { ok: true, email_sent: false, email_error } para que el admin la comparta
+// por WhatsApp como siempre.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = {
@@ -21,6 +27,50 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...cors, "Content-Type": "application/json" },
   });
+}
+
+function escHtml(v: string) {
+  return v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+// Envía usuario + contraseña temporal. Nunca lanza: devuelve el resultado.
+async function sendCredentials(
+  kind: "new" | "reset", to: string, name: string, password: string,
+): Promise<{ email_sent: boolean; email_error?: string }> {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  const from = Deno.env.get("RESEND_FROM");
+  const loginUrl = Deno.env.get("LEF_LOGIN_URL") || "https://www.lefcenter.com/login";
+  if (!apiKey || !from) return { email_sent: false, email_error: "correo_no_configurado" };
+
+  const intro = kind === "new"
+    ? "Se creó tu cuenta en la plataforma de LEF. Estos son tus datos para entrar:"
+    : "Se restableció la contraseña de tu cuenta en la plataforma de LEF. Estos son tus nuevos datos para entrar:";
+  const subject = kind === "new" ? "Tu cuenta de LEF" : "Tu nueva contraseña de LEF";
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a;max-width:520px">
+<p>${name ? `Hola, ${escHtml(name)}:` : "Hola:"}</p>
+<p>${intro}</p>
+<table style="border-collapse:collapse;margin:12px 0">
+<tr><td style="padding:4px 12px 4px 0;color:#555">Usuario</td><td style="padding:4px 0"><strong>${escHtml(to)}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#555">Contraseña temporal</td><td style="padding:4px 0"><code style="font-size:16px;background:#f2f2f2;padding:2px 6px;border-radius:4px">${escHtml(password)}</code></td></tr>
+</table>
+<p><a href="${escHtml(loginUrl)}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:6px">Entrar a LEF</a></p>
+<p>Te recomendamos cambiar la contraseña al entrar, en <strong>Mi cuenta</strong>.</p>
+<p style="color:#777;font-size:13px">Si no esperabas este correo, comunícate con LEF. Este buzón no recibe respuestas.</p>
+</div>`;
+  const text = `${name ? `Hola, ${name}:` : "Hola:"}\n\n${intro}\n\nUsuario: ${to}\nContraseña temporal: ${password}\n\nEntra en: ${loginUrl}\n\nTe recomendamos cambiar la contraseña al entrar, en Mi cuenta.`;
+
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [to], subject, html, text }),
+    });
+    if (r.ok) return { email_sent: true };
+    const j = await r.json().catch(() => ({}));
+    return { email_sent: false, email_error: String(j?.message ?? `HTTP ${r.status}`) };
+  } catch (e) {
+    return { email_sent: false, email_error: String(e) };
+  }
 }
 
 Deno.serve(async (req) => {
@@ -94,7 +144,8 @@ Deno.serve(async (req) => {
         if (createdTeacherId) await admin.from("teachers").delete().eq("id", createdTeacherId);
         return json({ error: pErr.message }, 400);
       }
-      return json({ ok: true, user_id: created.user.id });
+      const mail = payload.send_email ? await sendCredentials("new", email, full_name, password) : {};
+      return json({ ok: true, user_id: created.user.id, ...mail });
     }
 
     if (action === "set_role") {
@@ -115,9 +166,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "reset_password") {
-      const { error } = await admin.auth.admin.updateUserById(
-        String(payload.user_id), { password: String(payload.password) });
-      return error ? json({ error: error.message }, 400) : json({ ok: true });
+      const uid = String(payload.user_id);
+      const password = String(payload.password);
+      const { data: upd, error } = await admin.auth.admin.updateUserById(uid, { password });
+      if (error) return json({ error: error.message }, 400);
+      if (!payload.send_email) return json({ ok: true });
+      const { data: prof } = await admin.from("profiles").select("full_name").eq("user_id", uid).maybeSingle();
+      const to = upd.user?.email ?? "";
+      const mail = to
+        ? await sendCredentials("reset", to, prof?.full_name ?? "", password)
+        : { email_sent: false, email_error: "sin_correo" };
+      return json({ ok: true, ...mail });
     }
 
     if (action === "delete_account") {
