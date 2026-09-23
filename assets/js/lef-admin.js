@@ -395,11 +395,42 @@
     main.innerHTML = '<h1 class="pnl-h">' + esc(title) + "</h1>" +
       (sub ? '<p class="pnl-sub">' + esc(sub) + "</p>" : "");
   }
-  function tableWrap(cols) {
-    var w = h('<div class="pnl-table-wrap"><table class="pnl"><thead><tr>' +
+  // Todas las tablas del panel. En celular (CSS .m-cards, ≤780px) cada fila se
+  // ve como TARJETA en vez de tabla deslizable: arriba el estado, luego el
+  // título, los datos con su rótulo en 2 columnas (los largos a lo ancho) y
+  // los botones abajo, 2 por fila. En PC sigue siendo tabla normal.
+  // Cada fila se marca sola al agregarse según el encabezado de su columna.
+  //   opt.title: índice de la columna que hace de título (por defecto 0).
+  var MC_STATE = { "Estado": 1, "Acceso": 1 };
+  var MC_FULL = { "Contacto": 1, "Correo": 1, "Detalle": 1, "Motivo": 1, "Descripción": 1, "Anotaciones": 1, "Pagador": 1 };
+  function tableWrap(cols, opt) {
+    opt = opt || {};
+    var titleIdx = opt.title != null ? opt.title : 0;
+    var w = h('<div class="pnl-table-wrap m-cards"><table class="pnl"><thead><tr>' +
       cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") +
       "</tr></thead><tbody></tbody></table></div>");
-    return { wrap: w, body: w.querySelector("tbody") };
+    var body = w.querySelector("tbody");
+    function mark(tr) {
+      if (!tr || tr.nodeType !== 1 || tr.tagName !== "TR" || tr.hasAttribute("data-mc")) return;
+      tr.setAttribute("data-mc", "1");
+      var col = 0;
+      Array.prototype.forEach.call(tr.children, function (td) {
+        var span = td.colSpan || 1, c = cols[col];
+        if (span > 1) td.classList.add("mc-full");
+        else if (col === titleIdx) td.classList.add("mc-title");
+        else if (MC_STATE[c]) td.classList.add("mc-state");
+        else if (c === "Acciones" || c === "") td.classList.add("mc-acts");
+        else {
+          if (c && !td.hasAttribute("data-label")) td.setAttribute("data-label", c);
+          if (MC_FULL[c]) td.classList.add("mc-wide");
+        }
+        col += span;
+      });
+    }
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, mark); });
+    }).observe(body, { childList: true });
+    return { wrap: w, body: body };
   }
   function statRow(tiles) {
     return h('<div class="stat-row">' + tiles.map(function (t) {
@@ -504,7 +535,7 @@
 
       /* --- inscripciones --- */
       main.appendChild(h('<h2 class="pnl-h" style="font-size:15px;margin:30px 0 12px">Inscripciones</h2>'));
-      var t1 = tableWrap(["Matrícula", "Estudiante", "Contacto", "Módulo", "Horario", "Profesor", "Estado", "Fecha"]);
+      var t1 = tableWrap(["Matrícula", "Estudiante", "Contacto", "Módulo", "Horario", "Profesor", "Estado", "Fecha"], { title: 1 });
       enr.forEach(function (e) {
         var sc = e.groups && e.groups.schedules;
         var tr = h("<tr>" +
@@ -838,7 +869,7 @@
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       var rows = res[0].data || [], mods = res[1];
-      var t = tableWrap(["Fecha", "Nombre", "Contacto", "Nivel (autoeval.)", "Franja preferida", "Estado", "Acciones"]);
+      var t = tableWrap(["Fecha", "Nombre", "Contacto", "Nivel (autoeval.)", "Franja preferida", "Estado", "Acciones"], { title: 1 });
       rows.forEach(function (p) {
         var tr = h("<tr><td>" + date(p.created_at) + "</td><td>" + esc(p.full_name) + "</td>" +
           '<td class="wrap">' + esc(p.whatsapp) + '<br><span class="muted" style="font-size:12px">' + esc(p.email) + "</span></td>" +
@@ -1821,13 +1852,12 @@
           : expired ? '<span class="badge neutral">vencida</span>'
           : future ? '<span class="badge warn">programada</span>'
           : '<span class="badge ok">visible</span>';
-        // data-label + clases nc-*: en celular cada fila se ve como tarjeta (CSS .news-cards).
-        var tr = h("<tr><td class=\"wrap nc-title\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
+        var tr = h("<tr><td class=\"wrap\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
           '<br><span class="muted" style="font-size:12px">' + esc((n.body || "").slice(0, 90)) + ((n.body || "").length > 90 ? "…" : "") + "</span></td>" +
-          '<td data-label="Categoría">' + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
-          '<td data-label="Para">' + esc(n.modules ? "Quienes cursan " + n.modules.level : "Todos") + "</td>" +
-          '<td data-label="Publicada">' + date(n.publish_at) + '</td><td data-label="Vence">' + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
-          '<td class="nc-state">' + st + '</td><td class="acts"></td></tr>');
+          "<td>" + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
+          "<td>" + esc(n.modules ? "Quienes cursan " + n.modules.level : "Todos") + "</td>" +
+          "<td>" + date(n.publish_at) + "</td><td>" + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
+          "<td>" + st + '</td><td class="acts"></td></tr>');
         var cell = tr.children[6];
         cell.appendChild(btn(n.pinned ? "Desfijar" : "Fijar", "btn-ghost", function () {
           q("announcements").update({ pinned: !n.pinned, updated_at: new Date().toISOString() }).eq("id", n.id)
@@ -1846,7 +1876,6 @@
         t.body.appendChild(tr);
       });
       if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Todavía no hay novedades. Crea la primera con “+ Nueva novedad”.</td></tr>'));
-      t.wrap.classList.add("news-cards");
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
@@ -2170,7 +2199,7 @@
       return res[0];
     }).then(function (rows) {
       rows = rows || [];
-      var t = tableWrap(["Fecha", "Quién", "Acción", "Motivo", "Detalle"]);
+      var t = tableWrap(["Fecha", "Quién", "Acción", "Motivo", "Detalle"], { title: 2 });
       rows.forEach(function (r) {
         var detailBtn = h('<button class="btn btn-sm btn-ghost">Ver</button>');
         var td = h("<td></td>"); td.appendChild(detailBtn);
@@ -2350,7 +2379,7 @@
       .then(function (res) {
         var counts = {};
         (res[1] || []).forEach(function (c) { counts[c.module_id] = c.count; });
-        var t = tableWrap(["#", "Nivel", "Título", "Descripción", "Inscritos", "Estado", "Acciones"]);
+        var t = tableWrap(["#", "Nivel", "Título", "Descripción", "Inscritos", "Estado", "Acciones"], { title: 2 });
         (res[0].data || []).forEach(function (m) {
           var tr = h("<tr><td>" + m.module_number + '</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:' + modColor(m.module_number) + '"></span>' + esc(m.level) +
             "</td><td>" + esc(m.title) + '</td><td class="wrap">' + esc(m.description) +

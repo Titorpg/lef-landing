@@ -432,23 +432,29 @@ td.acts .btn{margin:2px 4px 2px 0;}
 .news-audience--none{background:var(--warn-bg);color:var(--warn);}
 @media(max-width:820px){ .news-editor{grid-template-columns:1fr;} .news-editor__sticky{position:static;} }
 
-/* ---- Novedades (admin) en celular: cada novedad es una tarjeta ----
-   En PC sigue siendo tabla. Orden: estado → título/texto → datos en 2
-   columnas (con su rótulo) → botones a lo ancho, 2 por fila. */
+/* ---- Tablas del panel en celular: cada fila es una tarjeta ----
+   tableWrap() (lef-admin.js) pone .m-cards y marca cada celda según su
+   columna: .mc-state (Estado/Acceso) arriba, .mc-title, datos con
+   data-label en 2 columnas (.mc-wide a lo ancho), .mc-acts botones abajo
+   2 por fila. Solo ≤780px; en PC es tabla normal. Selectores con
+   .pnl-table-wrap.m-cards para ganarle a las reglas de tablas en modales. */
 @media(max-width:780px){
-  .news-cards{border:none;background:none;overflow:visible;}
-  .news-cards table.pnl,.news-cards tbody{display:block;}
-  .news-cards thead{display:none;}
-  .news-cards tr{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;background:#fff;
+  .pnl-table-wrap.m-cards{border:none;background:none;overflow:visible;}
+  .pnl-table-wrap.m-cards table.pnl,.pnl-table-wrap.m-cards tbody{display:block;}
+  .pnl-table-wrap.m-cards thead{display:none;}
+  .pnl-table-wrap.m-cards tr{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;background:#fff;
     border:1px solid var(--niebla);border-radius:14px;padding:16px;margin-bottom:14px;}
-  .news-cards table.pnl td{display:block;padding:0;border:none;white-space:normal;min-width:0;font-size:14px;}
-  .news-cards table.pnl td.nc-state{grid-column:1/-1;order:-2;}
-  .news-cards table.pnl td.nc-title{grid-column:1/-1;order:-1;font-size:15px;line-height:1.4;}
-  .news-cards td.nc-title .muted{display:block;margin-top:4px;font-size:13px !important;line-height:1.45;}
-  .news-cards td[data-label]::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:600;
+  .pnl-table-wrap.m-cards table.pnl td{display:block;padding:0;border:none;white-space:normal;min-width:0;font-size:14px;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-state{grid-column:1/-1;order:-2;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-title{grid-column:1/-1;order:-1;font-size:15px;font-weight:500;line-height:1.4;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-title .muted{display:block;margin-top:4px;font-weight:300;line-height:1.45;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-wide,.pnl-table-wrap.m-cards table.pnl td.mc-full{grid-column:1/-1;}
+  .pnl-table-wrap.m-cards table.pnl td[data-label]::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:600;
     letter-spacing:.08em;text-transform:uppercase;color:var(--plata);margin-bottom:2px;}
-  .news-cards table.pnl td.acts{grid-column:1/-1;order:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  .pnl-table-wrap.m-cards table.pnl td.mc-acts{grid-column:1/-1;order:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;
     border-top:1px solid var(--niebla);padding-top:12px;}
-  .news-cards td.acts .btn{margin:0;width:100%;justify-content:center;padding:9px 10px;}
-  .news-cards table.pnl td[colspan]{grid-column:1/-1;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-acts:empty{display:none;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-acts .btn{margin:0;width:100%;justify-content:center;padding:9px 10px;
+    white-space:normal;line-height:1.2;text-align:center;}
+  .pnl-table-wrap.m-cards table.pnl td.mc-acts select{grid-column:1/-1;}
 }
