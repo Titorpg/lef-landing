@@ -1444,15 +1444,18 @@
           if (!r.student_deleted) {
             cell.appendChild(btn("Registrar pago", "btn-blue", function () { registrarPago(r); }));
             cell.appendChild(btn("Editar", "btn-ghost", function () { editarSuscripcion(r, students, mods); }));
-            cell.appendChild(btn("Eliminar", "btn-danger", function () {
-              promptReason("Eliminar suscripción",
-                "Si tiene pagos registrados, bórralos primero desde “Ver pagos” (cada uno pide su propio motivo).",
-                "Eliminar", function (reason) {
-                  return rpc("admin_delete_subscription", { p_subscription_id: r.subscription_id, p_reason: reason })
-                    .then(function () { toast("Suscripción eliminada."); route(); });
-                });
-            }));
           }
+          // "Eliminar" también para cobros de estudiantes ya borrados: si no
+          // tienen pagos, no deben quedar flotando sin dueño en la lista.
+          cell.appendChild(btn("Eliminar", "btn-danger", function () {
+            promptReason("Eliminar suscripción",
+              (r.student_deleted ? "El estudiante de este cobro ya fue eliminado. " : "") +
+              "Si tiene pagos registrados, bórralos primero desde “Ver pagos” (cada uno pide su propio motivo).",
+              "Eliminar", function (reason) {
+                return rpc("admin_delete_subscription", { p_subscription_id: r.subscription_id, p_reason: reason })
+                  .then(function () { toast("Suscripción eliminada."); route(); });
+              });
+          }));
           t.body.appendChild(tr);
         });
         if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Sin pagos generados. Crea uno con “Generar pago”.</td></tr>'));
