@@ -1,5 +1,27 @@
 ﻿# Estado del proyecto — Landing LEF
 
+## Sesión 23 sep 2026 — "Matricular el siguiente curso": confirmación + precio fijo
+
+**Pedido del usuario:** (1) recuadro de confirmación antes de matricularse
+por si se da clic por error; (2) que se vea con claridad a qué módulo se
+matricula; (3) el cobro NO debe copiar lo pagado en el módulo anterior (los
+20.000 de Liam eran de prueba) sino el precio fijo de los módulos.
+
+**Hecho (commit `5ec5a97`, desplegado):**
+- Portal → "Mi curso": la tarjeta muestra un recuadro con el código del
+  módulo resaltado ("Módulo A1.2"), su título y la mensualidad; el botón dice
+  "Matricularme en el módulo A1.2" y abre una confirmación ("¿Confirmas tu
+  matrícula?" con el mismo resumen + Cancelar / Sí, matricularme).
+- Migración `20260923000000_precio_fijo_modulo.sql`: `lef_monthly_price()` =
+  **297.500 COP** (único lugar donde vive el precio en la BD);
+  `get_next_module_offer` y `self_enroll_next_module` cobran ese valor. Del
+  último cobro solo se copian los datos de quien paga.
+- Admin → Pagos → "Generar pago" ahora precarga 297.500 en la mensualidad
+  (antes salía vacía); constante `MONTHLY_PRICE` en `lef-admin.js`.
+
+**⏳ Pendiente del usuario:** aplicar la migración en el SQL Editor (sin
+ella, el portal sigue proponiendo el monto anterior).
+
 ## Sesión 22 sep 2026 (7ª parte) — Ciclo de vida de las inscripciones (sin "rebabas")
 
 **Pedido del usuario:** inscribir a un estudiante en su módulo siguiente
