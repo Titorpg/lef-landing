@@ -6,9 +6,35 @@
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3**.
 - **Talleres / Recursos interactivos / Materiales**: sin definir cómo se montan.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
-- **Resend + Cloudflare Turnstile**: el usuario YA creó las cuentas (23 sep);
-  es lo siguiente a configurar (`SEGURIDAD.md`). Las llaves NO están guardadas
-  en ningún lado (ni `.env`, ni secrets de Supabase, ni memoria) — pedirlas.
+- **Cloudflare Turnstile**: ✅ EN VIVO (23 sep) — CAPTCHA en el login, activo
+  en Supabase. Llaves en `.env` (`TURNSTILE_*`).
+- **Política de contraseñas**: ✅ activa en Supabase (12 + 4 tipos de
+  carácter, rate limits). Leaked-password: no (plan Pro), decidido así.
+- **⏳ Resend — EN ESPERA DE VERIFICACIÓN (23 sep, noche)**: dominio
+  `notificaciones.lefcenter.com` agregado en Resend; el usuario ya puso los
+  registros en el DNS de Google/Squarespace y **se comprobó que están
+  publicados** (DKIM `resend._domainkey.notificaciones` y `send.notificaciones`
+  → `send.forge.rmta.net`). Falta que Resend lo marque "Verified".
+  **Al retomar, pedir al usuario:** (1) confirmar "Verified" en Resend →
+  Domains (si no, darle "Restart verification"); (2) la **API Key** `re_…`
+  (crear en API Keys → permiso *Sending access* → dominio
+  notificaciones.lefcenter.com; solo se ve una vez); (3) remitente propuesto:
+  `LEF <no-responder@notificaciones.lefcenter.com>`.
+  **Luego, por partes y probando cada una** (el paquete completo `3d737a4`
+  se revirtió el 6 sep porque rompió el login):
+  1. `supabase secrets set RESEND_API_KEY / RESEND_FROM / LEF_LOGIN_URL` y
+     guardar la key en `.env`.
+  2. Correo de credenciales al crear cuenta / reiniciar contraseña
+     (`manage-users`). Hoy el admin copia la contraseña y la manda por
+     WhatsApp — que el correo sea adicional, no quitar esa opción.
+  3. SMTP propio en Supabase (Authentication → Emails → SMTP: host
+     `smtp.resend.com`, puerto 465, usuario `resend`, clave = API key) y
+     "¿Olvidaste tu contraseña?" (`recuperar.html` + `lef-recuperar.js`, hoy
+     huérfanos).
+  4. Cambio de contraseña obligatorio en el 1er ingreso (`must_change_password`;
+     resolver antes el choque de `audit_log` de la migración `20260906130000`,
+     que nunca se aplicó — la tabla actual es la de `20260906180000`).
+  5. MFA (2 pasos) obligatorio para admin — mantener 2+ admins antes.
 - **⏸ Guardar tarjeta / cobro automático recurrente**: PENDIENTE A CONFIRMAR
   por el cliente. Se quitó de la parte visual (botón "Guardar tarjeta…" del
   portal eliminado el 23 sep). No construir hasta que se confirme.
