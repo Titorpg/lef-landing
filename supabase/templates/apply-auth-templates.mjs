@@ -1,9 +1,11 @@
 // LEF — sube a Supabase Auth (Management API) el SMTP de Resend, la URL del
 // sitio y las plantillas de build-auth-templates.mjs. Lee de .env:
 //   SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF, RESEND_API_KEY
-// Uso (desde la raíz del repo, con el .env cargado en el entorno):
-//   node supabase/templates/apply-auth-templates.mjs [--solo-plantillas]
+// Uso (desde la raíz del repo; lee el .env solo):
+//   node --no-warnings supabase/templates/apply-auth-templates.mjs [--solo-plantillas]
 import { templates } from "./build-auth-templates.mjs";
+
+try { process.loadEnvFile(new URL("../../.env", import.meta.url)); } catch { /* ya viene en el entorno */ }
 
 const { SUPABASE_ACCESS_TOKEN: token, SUPABASE_PROJECT_REF: ref, RESEND_API_KEY: resendKey } = process.env;
 if (!token || !ref) throw new Error("Falta SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF");
