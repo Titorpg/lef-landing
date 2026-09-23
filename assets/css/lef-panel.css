@@ -309,3 +309,8 @@ td.acts .btn{margin:2px 4px 2px 0;}
   margin-top:12px;padding-top:10px;border-top:1px solid var(--azul-niebla);}
 .next-mod__price span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--grafito);font-weight:600;}
 .next-mod__price strong{font-size:20px;font-weight:600;color:var(--azul);}
+
+/* "Mi curso": módulo matriculado pero sin pago todavía */
+.pnl-alert.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #ecdcaa;}
+.course-pending{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px;}
+.course-pending span{flex:1;min-width:200px;}

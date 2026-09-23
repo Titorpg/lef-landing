@@ -427,16 +427,27 @@
         "</div>"
       : '<div class="pnl-alert ok" style="margin:0">Todavía no tienes horario asignado — LEF te contactará por WhatsApp para coordinarlo.</div>';
 
-    main.appendChild(h(
+    // Mientras no haya ningún pago, el módulo está matriculado pero no activo:
+    // el aviso lleva directo a Facturación (desaparece solo con el primer abono).
+    var pendingHtml = c.enrollment_status === "PendingPayment"
+      ? '<div class="pnl-alert warn course-pending"><span>Pendiente de pago — paga tu mensualidad para activar este módulo y sus recursos.</span>' +
+        '<button type="button" class="btn btn-blue btn-sm" data-go-billing>Ir a Facturación</button></div>'
+      : "";
+
+    var card = h(
       '<div class="course-hero">' +
       '<div class="lvl-tag">Nivel · matrícula ' + esc(c.registration_number) + "</div>" +
       "<h2>" + esc(levelOf(c.module_level)) + "</h2>" +
       '<div class="mod-name">Módulo actual: ' + esc(c.module_level) + " — " + esc(c.module_title) + "</div>" +
+      pendingHtml +
       progressBar(c.cycle_start_date, c.cycle_end_date) +
       (c.module_description ? '<p class="pnl-sub" style="margin:14px 0 16px"><strong>Contenido de este módulo:</strong> ' + esc(c.module_description) + "</p>" : "") +
       scheduleHtml +
       "</div>"
-    ));
+    );
+    var goBilling = card.querySelector("[data-go-billing]");
+    if (goBilling) goBilling.addEventListener("click", function () { location.hash = "facturacion"; });
+    main.appendChild(card);
   }
 
   // Módulo ya culminado: recuadro delgado (igual que en Facturación), con "Ver
@@ -544,12 +555,9 @@
       msg.textContent = "Matriculando…";
       sb.rpc("self_enroll_next_module").then(function (r) {
         if (r.error) throw r.error;
-        msg.textContent = "¡Listo! Quedaste matriculado en el módulo " + offer.next_module_level +
-          ". Ve a Facturación para pagar tu mensualidad y activar el curso.";
-        btn.remove();
-        var goBtn = h('<button class="btn btn-blue btn-sm" style="margin-top:8px">Ir a Facturación</button>');
-        goBtn.addEventListener("click", function () { location.hash = "facturacion"; });
-        msg.insertAdjacentElement("afterend", goBtn);
+        // Vuelve a pintar "Mi curso" en el sitio: la sugerencia desaparece y
+        // queda la tarjeta normal del módulo nuevo, sin recargar la página.
+        renderCourse(main, { justEnrolled: offer.next_module_level });
       }).catch(function (e) {
         btn.disabled = false;
         var m = (e && e.message) || String(e);
@@ -560,7 +568,10 @@
     }
   }
 
-  function renderCourse(main) {
+  // opts.justEnrolled: código del módulo recién matriculado desde la sugerencia,
+  // para mostrar el aviso de "¡Listo!" una sola vez encima de la tarjeta nueva.
+  function renderCourse(main, opts) {
+    opts = opts || {};
     // Primero cierra los ciclos vencidos (lo hace también el cron nocturno) para
     // que "Mi curso" nunca muestre un módulo corriendo en un ciclo que ya terminó.
     sb.rpc("close_ended_cycles").then(function () {}, function () {}).then(function () {
@@ -569,6 +580,10 @@
       if (r.error) throw r.error;
       var rows = r.data || [];
       main.innerHTML = '<h1 class="pnl-h">Mi curso</h1><p class="pnl-sub">El nivel y el módulo en el que estás inscrito actualmente.</p>';
+      if (opts.justEnrolled) {
+        main.appendChild(h('<div class="pnl-alert ok">¡Listo! Quedaste matriculado en el <strong>módulo ' + esc(opts.justEnrolled) +
+          "</strong>. Ya se generó tu mensualidad en Facturación.</div>"));
+      }
 
       if (!rows.length) {
         main.appendChild(h('<div class="pnl-alert ok">Aún no tienes un módulo asignado. Escríbenos por WhatsApp si crees que esto es un error.</div>'));
