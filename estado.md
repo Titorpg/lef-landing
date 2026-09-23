@@ -27,10 +27,8 @@ poner otro valor. Refuerzo en BD, migración
 ignora el monto del navegador y guarda `lef_monthly_price()`, y
 `subscriptions.monthly_amount` tiene ese precio como default.
 
-**⏳ Pendiente del usuario:** aplicar en el SQL Editor las DOS migraciones
-(`20260923000000_precio_fijo_modulo.sql` y
-`20260923010000_precio_fijo_al_generar_pago.sql`, en ese orden). Sin la
-primera, el portal sigue proponiendo el monto anterior.
+**✅ Ambas migraciones aplicadas por el usuario el 23 sep 2026** (verificado:
+lef_monthly_price() responde 297500). Sin pendientes de este frente.
 
 ## Sesión 22 sep 2026 (7ª parte) — Ciclo de vida de las inscripciones (sin "rebabas")
 
