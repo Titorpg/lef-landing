@@ -234,6 +234,7 @@
     correo_en_profesor: "Ya hay un profesor registrado con ese correo (aparece en Usuarios como “sin cuenta”). Usa el botón “Crear cuenta” de su fila, o elimínalo primero.",
     no_puedes_borrarte: "No puedes eliminar tu propia cuenta.",
     no_cambiar_tu_rol: "No puedes cambiar tu propio rol. Pídeselo a otro administrador.",
+    no_resetear_tu_mfa: "No puedes restablecer tu propia verificación en 2 pasos. Pídeselo al otro administrador.",
     rol_estudiante_fijo: "Las cuentas de estudiante no cambian de rol.",
     rol_invalido: "Ese rol no es válido.",
     cuenta_no_encontrada: "No se encontró esa cuenta (quizás ya fue eliminada).",
@@ -296,6 +297,9 @@
 
   /* ============ auth ============ */
   function boot() {
+    // El token se renueva solo (cada hora, o al verificar los 2 pasos): mantener
+    // TOKEN al día para las llamadas a las Edge Functions.
+    sb.auth.onAuthStateChange(function (ev, sess) { if (sess && sess.access_token) TOKEN = sess.access_token; });
     sb.auth.getSession().then(function (r) {
       var s = r.data.session;
       if (!s) return (window.location.replace("login.html"));
@@ -310,9 +314,19 @@
         // borra grupo → horario → ciclo). Lo hace también el cron nocturno;
         // esto es el respaldo por si el cron no corrió. Si falla, igual se abre el panel.
         function open() { return rpc("close_ended_cycles").catch(function () {}).then(renderShell); }
-        // Contraseña temporal puesta por un admin → primero crear una personal.
-        if (window.LEFPrimerIngreso) return window.LEFPrimerIngreso.check(sb, ME, app, open);
-        return open();
+        function afterMfa() {
+          // Verificar el código cambia el token (aal2): se toma el nuevo.
+          return sb.auth.getSession().then(function (r2) {
+            if (r2.data.session) TOKEN = r2.data.session.access_token;
+            // Contraseña temporal puesta por un admin → primero crear una personal.
+            if (window.LEFPrimerIngreso) return window.LEFPrimerIngreso.check(sb, ME, app, open);
+            return open();
+          });
+        }
+        // Verificación en 2 pasos (lef-mfa.js): obligatoria para administradores;
+        // va antes del cambio de contraseña porque Supabase lo exige así.
+        if (window.LEFMfa) return window.LEFMfa.gate(sb, app, ME.role === "admin", afterMfa);
+        return afterMfa();
       });
     });
   }
@@ -3037,6 +3051,22 @@
               }, toAdmin ? "Pasar a Administrador" : "Pasar a Profesor", toAdmin);
             };
             cell.appendChild(rl);
+          }
+          if (r.role === "admin") {
+            // Parte 5: si otro admin perdió/cambió el celular, se le borra la
+            // verificación en 2 pasos y al entrar la vuelve a activar.
+            cell.appendChild(btn("Restablecer 2 pasos", "btn-ghost", function () {
+              modal("Restablecer verificación en 2 pasos — " + (r.name || r.email),
+                h('<p class="pnl-sub" style="margin-bottom:4px">Úsalo si ' + esc(r.name || r.email) +
+                  " perdió o cambió su celular. Se borra su verificación en 2 pasos actual; la próxima vez que entre, " +
+                  "el sistema le pedirá activarla de nuevo con su celular nuevo.</p>"),
+                function () {
+                  return callFn({ action: "reset_mfa", user_id: r.user_id }).then(function (res) {
+                    toast(res && res.removed ? "Verificación en 2 pasos restablecida. Al entrar la activará de nuevo."
+                      : "Esa cuenta no tenía la verificación en 2 pasos activa.");
+                  });
+                }, "Restablecer");
+            }));
           }
           cell.appendChild(btn("Eliminar", "btn-danger", function () {
             confirmDelete("Eliminar cuenta", "Se elimina el acceso de " + (r.name || r.email) + ". El registro de estudiante/profesor asociado NO se borra.", function () {

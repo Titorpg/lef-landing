@@ -87,18 +87,29 @@
   var urlInfo = (location.hash || "") + "&" + (location.search || "");
   if (/error(_code)?=/.test(urlInfo)) { invalidLink(); return; }
 
+  // Cuentas con verificación en 2 pasos: Supabase exige el código (sesión
+  // aal2) antes de dejar cambiar la contraseña → primero se pide (lef-mfa.js).
+  function start() {
+    if (window.LEFMfa) {
+      window.LEFMfa.gate(sb, app, false, form,
+        { lostHelp: "Pide a un administrador de LEF que te restablezca la verificación en 2 pasos." });
+    } else {
+      form();
+    }
+  }
+
   // El canje del token puede tardar un instante tras cargar.
   var settled = false;
   sb.auth.onAuthStateChange(function (event, session) {
     if (settled) return;
-    if (session && event === "PASSWORD_RECOVERY") { settled = true; form(); }
+    if (session && event === "PASSWORD_RECOVERY") { settled = true; setTimeout(start, 0); }
   });
   setTimeout(function () {
     if (settled) return;
     sb.auth.getSession().then(function (r) {
       if (settled) return;
       settled = true;
-      if (r.data.session) form(); else invalidLink();
+      if (r.data.session) start(); else invalidLink();
     });
   }, 1500);
 })();

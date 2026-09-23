@@ -170,6 +170,23 @@ Deno.serve(async (req) => {
       return json({ ok: true, user_id: created.user.id, ...mail });
     }
 
+    if (action === "reset_mfa") {
+      // Parte 5: si un admin pierde el celular, OTRO admin le borra los factores
+      // de 2 pasos; al volver a entrar le pide activarla de nuevo.
+      const uid = String(payload.user_id ?? "");
+      if (!uid) return json({ error: "cuenta_no_encontrada" }, 400);
+      if (uid === auth.user.id) return json({ error: "no_resetear_tu_mfa" }, 400);
+      const { data: lf, error: lErr } = await admin.auth.admin.mfa.listFactors({ userId: uid });
+      if (lErr) return json({ error: lErr.message }, 400);
+      let removed = 0;
+      for (const f of lf?.factors ?? []) {
+        const { error: dErr } = await admin.auth.admin.mfa.deleteFactor({ id: f.id, userId: uid });
+        if (dErr) return json({ error: dErr.message }, 400);
+        removed++;
+      }
+      return json({ ok: true, removed });
+    }
+
     if (action === "check_email") {
       // Revisión previa (p. ej. antes de crear un estudiante desde una solicitud,
       // para no dejar matrícula y cobro creados sin cuenta).
