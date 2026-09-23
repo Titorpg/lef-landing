@@ -16,8 +16,8 @@
   **Parte 1 ✅**: secrets en Supabase `RESEND_API_KEY`,
   `RESEND_FROM="LEF <no-responder@notificaciones.lefcenter.com>"`,
   `LEF_LOGIN_URL=https://www.lefcenter.com/login`; correo de prueba enviado
-  por la API de Resend (aceptado, id `01a0cfb7…`) — falta que el usuario
-  confirme que llegó (bandeja o spam).
+  por la API de Resend (id `01a0cfb7…`) — ✅ **llegó a Recibidos** de Gmail
+  (no a spam), confirmado por el usuario.
   **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
   2. Correo de credenciales al crear cuenta / reiniciar contraseña
