@@ -489,16 +489,47 @@
   // está terminado (chulo verde) y el admin todavía no asignó el siguiente a
   // mano — get_next_module_offer() no devuelve fila en ningún otro caso, así
   // que si el admin ya lo matriculó, esta tarjeta deja de salir sola.
+  // Recuadro con el módulo bien visible (nivel + código + título) y el valor
+  // de la mensualidad; se usa en la tarjeta y en la confirmación.
+  function nextModuleSummary(offer) {
+    return '<div class="next-mod">' +
+      '<div class="next-mod__code">Módulo ' + esc(offer.next_module_level) + "</div>" +
+      '<div class="next-mod__title">' + esc(offer.next_module_title) + "</div>" +
+      '<div class="next-mod__price"><span>Mensualidad</span><strong>' + money(offer.suggested_amount, offer.suggested_currency) + "</strong></div>" +
+      "</div>";
+  }
+
+  // Confirmación antes de matricular, por si le dieron al botón por error.
+  function confirmEnrollNext(offer, onConfirm) {
+    var bg = h('<div class="pnl-modal-bg"></div>');
+    var box = h(
+      '<div class="pnl-modal">' +
+      "<h3>¿Confirmas tu matrícula?</h3>" +
+      '<p class="pnl-sub" style="margin-bottom:12px">Te vas a matricular en:</p>' +
+      nextModuleSummary(offer) +
+      '<p class="pnl-sub" style="margin:14px 0 4px">Se generará tu cobro en <strong>Facturación</strong>. El curso se activa en cuanto registres tu pago.</p>' +
+      '<div class="row"><button class="btn btn-ghost" data-x>Cancelar</button>' +
+      '<button class="btn btn-blue" data-ok>Sí, matricularme</button></div>' +
+      "</div>"
+    );
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    box.querySelector("[data-x]").addEventListener("click", close);
+    box.querySelector("[data-ok]").addEventListener("click", function () { close(); onConfirm(); });
+  }
+
   function renderNextModuleOffer(main, offer) {
     var box = h(
       '<div class="course-hero">' +
-      '<div class="lvl-tag">Siguiente módulo</div>' +
-      "<h2>" + esc(levelOf(offer.next_module_level)) + "</h2>" +
-      '<div class="mod-name">' + esc(offer.next_module_level) + " — " + esc(offer.next_module_title) + "</div>" +
+      '<div class="lvl-tag">Tu siguiente módulo</div>' +
+      "<h2>Nivel " + esc(levelOf(offer.next_module_level)) + "</h2>" +
+      nextModuleSummary(offer) +
       '<div class="course-hero__pay">' +
-      '<p class="course-hero__pay-lead">Ya completaste tu módulo actual. Matricúlate en el siguiente para continuar — se genera tu mensualidad de ' +
-      money(offer.suggested_amount, offer.suggested_currency) + ' para que la pagues desde Facturación.</p>' +
-      '<button class="btn btn-blue" data-enroll-next>Matricular el siguiente curso</button>' +
+      '<p class="course-hero__pay-lead">Ya completaste tu módulo anterior. Matricúlate en el <strong>módulo ' + esc(offer.next_module_level) +
+      "</strong> para continuar — se genera tu mensualidad para que la pagues desde Facturación.</p>" +
+      '<button class="btn btn-blue" data-enroll-next>Matricularme en el módulo ' + esc(offer.next_module_level) + "</button>" +
       "</div>" +
       '<p class="muted" data-enroll-msg style="font-size:12.5px;margin-top:10px"></p>' +
       "</div>"
@@ -507,12 +538,14 @@
 
     var btn = box.querySelector("[data-enroll-next]");
     var msg = box.querySelector("[data-enroll-msg]");
-    btn.addEventListener("click", function () {
+    btn.addEventListener("click", function () { confirmEnrollNext(offer, doEnroll); });
+    function doEnroll() {
       btn.disabled = true;
       msg.textContent = "Matriculando…";
       sb.rpc("self_enroll_next_module").then(function (r) {
         if (r.error) throw r.error;
-        msg.textContent = "¡Listo! Ya puedes ir a Facturación para pagar tu mensualidad y activar el curso.";
+        msg.textContent = "¡Listo! Quedaste matriculado en el módulo " + offer.next_module_level +
+          ". Ve a Facturación para pagar tu mensualidad y activar el curso.";
         btn.remove();
         var goBtn = h('<button class="btn btn-blue btn-sm" style="margin-top:8px">Ir a Facturación</button>');
         goBtn.addEventListener("click", function () { location.hash = "facturacion"; });
@@ -524,7 +557,7 @@
           : /LEF_NO_NEXT_MODULE/.test(m) ? "No hay un módulo siguiente disponible por ahora. Escríbenos por WhatsApp."
           : "No pudimos matricularte: " + m;
       });
-    });
+    }
   }
 
   function renderCourse(main) {

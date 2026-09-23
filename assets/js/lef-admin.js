@@ -36,6 +36,8 @@
                        "#c15b4a", "#9a5aa3", "#5f6bd0", "#7d8794", "#3aa0a0", "#33415c"];
   function modColor(n) { return MODULE_COLORS[((n || 1) - 1) % 12]; }
 
+  // Precio fijo de la mensualidad de un módulo (mismo valor que lef_monthly_price() en la BD).
+  var MONTHLY_PRICE = 297500;
   var PAYST_ES = { approved: "Aprobado", pending: "Pendiente", declined: "Rechazado", refunded: "Reversado" };
   var METHOD_ES = { cash: "Efectivo", transfer: "Transferencia", pse: "PSE", card: "Tarjeta", other: "Otro" };
   var DOC_TYPES = ["TI", "CC", "CE", "PP"];
@@ -802,7 +804,7 @@
       field("Número de documento", '<input name="dn" value="' + esc(p.doc_number || "") + '">') +
       field("Módulo", moduleSelect("mod", mods, defaultMod)) +
       field("Horario", '<select name="sch"><option value="">Cargando…</option></select>') +
-      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="297500">') +
+      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + MONTHLY_PRICE + '">') +
       field("Contraseña temporal del portal", '<input name="pw" value="' + pwd + '">') +
       '<p class="pnl-sub">Se crea el estudiante, su inscripción (con cupo, grupo y matrícula — queda como <strong>pendiente de pago</strong>), su cuenta de portal y su cobro de la mensualidad, todo en un paso. Comparte el usuario y la contraseña con el estudiante para que entre y pague. Si quien paga no es el estudiante, corrige el pagador después desde Pagos → Editar.</p>' +
       "</div>");
@@ -1568,7 +1570,7 @@
       }).join("") + "</select>")) +
       (r ? field("Módulo", moduleSelect("mod", mods, r.module_id))
          : fieldBlock("Módulo", '<div data-modpick></div>') + '<p class="pnl-sub" data-modnote style="margin:-4px 0 12px"></p>') +
-      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : "") + '">') +
+      field("Mensualidad (COP)", '<input name="amt" type="number" min="0" value="' + (r ? r.monthly_amount : MONTHLY_PRICE) + '">') +
       (r ? "" :
         field("Abono inicial (COP, opcional)", '<input name="abono" type="number" min="0" value="0">') +
         field("Método del abono", '<select name="abonoM">' + Object.keys(METHOD_ES).map(function (k) {
