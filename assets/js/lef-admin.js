@@ -1821,12 +1821,13 @@
           : expired ? '<span class="badge neutral">vencida</span>'
           : future ? '<span class="badge warn">programada</span>'
           : '<span class="badge ok">visible</span>';
-        var tr = h("<tr><td class=\"wrap\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
+        // data-label + clases nc-*: en celular cada fila se ve como tarjeta (CSS .news-cards).
+        var tr = h("<tr><td class=\"wrap nc-title\">" + (n.pinned ? "📌 " : "") + "<strong>" + esc(n.title) + "</strong>" +
           '<br><span class="muted" style="font-size:12px">' + esc((n.body || "").slice(0, 90)) + ((n.body || "").length > 90 ? "…" : "") + "</span></td>" +
-          "<td>" + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
-          "<td>" + esc(n.modules ? "Quienes cursan " + n.modules.level : "Todos") + "</td>" +
-          "<td>" + date(n.publish_at) + "</td><td>" + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
-          "<td>" + st + '</td><td class="acts"></td></tr>');
+          '<td data-label="Categoría">' + esc(NEWS_CAT_ES[n.category] || n.category) + "</td>" +
+          '<td data-label="Para">' + esc(n.modules ? "Quienes cursan " + n.modules.level : "Todos") + "</td>" +
+          '<td data-label="Publicada">' + date(n.publish_at) + '</td><td data-label="Vence">' + (n.expires_at ? date(n.expires_at) : "—") + "</td>" +
+          '<td class="nc-state">' + st + '</td><td class="acts"></td></tr>');
         var cell = tr.children[6];
         cell.appendChild(btn(n.pinned ? "Desfijar" : "Fijar", "btn-ghost", function () {
           q("announcements").update({ pinned: !n.pinned, updated_at: new Date().toISOString() }).eq("id", n.id)
@@ -1845,6 +1846,7 @@
         t.body.appendChild(tr);
       });
       if (!rows.length) t.body.appendChild(h('<tr><td colspan="7" class="muted">Todavía no hay novedades. Crea la primera con “+ Nueva novedad”.</td></tr>'));
+      t.wrap.classList.add("news-cards");
       main.appendChild(t.wrap);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
