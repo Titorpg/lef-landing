@@ -63,8 +63,8 @@
      crear/restablecer; `lef-primer-ingreso.js` muestra "Crea tu contraseña
      personal" antes del panel/portal; Mi cuenta y /recuperar quitan la marca.
      `scripts/apply-migration.mjs` sirve para migraciones desde la terminal
-     (desde el teléfono el `!` no ejecuta: usar SQL Editor). **Falta prueba
-     del usuario.** Nota vieja:
+     (desde el teléfono el `!` no ejecuta: usar SQL Editor). ✅ **Probado por el
+     usuario (23 sep)**: reset → incógnito → pantalla obligatoria → panel → 2º ingreso sin pedirla. Nota vieja:
      Cambio de contraseña obligatorio en el 1er ingreso (`must_change_password`;
      resolver antes el choque de `audit_log` de la migración `20260906130000`,
      que nunca se aplicó — la tabla actual es la de `20260906180000`).
