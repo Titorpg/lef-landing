@@ -25,6 +25,12 @@
   /* ---------- Turnstile (CAPTCHA) ---------- */
   function mountCaptcha(container) {
     if (!CAPTCHA_KEY) return;
+    // Al cambiar entre "Ingresar" y "Olvidé mi contraseña" se re-renderiza.
+    captchaToken = null;
+    if (captchaWidgetId != null && window.turnstile) {
+      try { window.turnstile.remove(captchaWidgetId); } catch (e) { /* noop */ }
+      captchaWidgetId = null;
+    }
     var tries = 0;
     (function render() {
       if (window.turnstile && window.turnstile.render) {
@@ -84,10 +90,15 @@
       '<label class="fld"><span>Contraseña</span><input type="password" name="password" autocomplete="current-password" required></label>' +
       (CAPTCHA_KEY ? '<div data-captcha style="margin:2px 0 14px;min-height:65px;display:flex;justify-content:center"></div>' : "") +
       '<button class="btn btn-dark" style="width:100%;justify-content:center" type="submit">Ingresar</button>' +
+      '<p class="back" style="margin-top:14px"><a href="#" data-forgot>¿Olvidaste tu contraseña?</a></p>' +
       '<p class="back"><a href="index.html">&larr; Volver al sitio</a></p>' +
       "</form></div>"
     );
     var form = card.querySelector("form");
+    card.querySelector("[data-forgot]").addEventListener("click", function (e) {
+      e.preventDefault();
+      renderForgot(form.email.value.trim());
+    });
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var err = form.querySelector("[data-err]"); err.style.display = "none";
@@ -120,6 +131,64 @@
           err.style.display = "block"; btn.disabled = false;
           resetCaptcha();
         });
+    });
+    app.appendChild(card);
+    var cap = card.querySelector("[data-captcha]");
+    if (cap) mountCaptcha(cap);
+  }
+
+  /* ---------- "¿Olvidaste tu contraseña?" ----------
+     Supabase envía el correo (plantilla "recovery" con diseño LEF, vía el SMTP
+     de Resend) con un enlace a /recuperar. La respuesta es la misma exista o
+     no la cuenta, para no revelar qué correos están registrados. */
+  function renderForgot(prefill) {
+    app.innerHTML = "";
+    var card = h(
+      '<div class="pnl-center"><form class="pnl-login">' +
+      '<img class="logo" src="assets/logo-horizontal.png" alt="LEF — Learn English Fluently">' +
+      '<p class="hint">Escribe el correo con el que entras a LEF y te enviaremos un enlace para crear una contraseña nueva.</p>' +
+      '<div class="pnl-alert err" data-err style="display:none"></div>' +
+      '<label class="fld"><span>Correo</span><input type="email" name="email" autocomplete="username" required value="' + esc(prefill || "") + '"></label>' +
+      (CAPTCHA_KEY ? '<div data-captcha style="margin:2px 0 14px;min-height:65px;display:flex;justify-content:center"></div>' : "") +
+      '<button class="btn btn-dark" style="width:100%;justify-content:center" type="submit">Enviarme el enlace</button>' +
+      '<p class="back" style="margin-top:14px"><a href="#" data-back>&larr; Volver a iniciar sesión</a></p>' +
+      "</form></div>"
+    );
+    var form = card.querySelector("form");
+    card.querySelector("[data-back]").addEventListener("click", function (e) { e.preventDefault(); renderLogin(); });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var err = form.querySelector("[data-err]"); err.style.display = "none";
+      var email = form.email.value.trim();
+      if (!email) return;
+      if (CAPTCHA_KEY && !captchaToken) {
+        err.textContent = "Espera a que termine la verificación de seguridad (la casilla de Cloudflare) e intenta de nuevo.";
+        err.style.display = "block";
+        return;
+      }
+      var btn = form.querySelector("button"); btn.disabled = true; btn.textContent = "Enviando…";
+      var opts = { redirectTo: window.location.origin + "/recuperar" };
+      if (CAPTCHA_KEY) opts.captchaToken = captchaToken;
+      sb.auth.resetPasswordForEmail(email, opts).then(function (r) {
+        if (r.error) throw r.error;
+        app.innerHTML = "";
+        app.appendChild(h(
+          '<div class="pnl-center"><div class="pnl-login">' +
+          '<img class="logo" src="assets/logo-horizontal.png" alt="LEF — Learn English Fluently">' +
+          '<div class="pnl-alert ok">Revisa tu correo.</div>' +
+          '<p class="hint">Si <strong>' + esc(email) + '</strong> tiene una cuenta en LEF, en unos minutos te llegará un correo con el enlace para crear tu contraseña nueva. El enlace dura 1 hora.<br><br>¿No lo ves? Revisa también la carpeta de spam o promociones.</p>' +
+          '<a class="btn btn-dark" style="width:100%;justify-content:center" href="login">Volver a iniciar sesión</a>' +
+          "</div></div>"
+        ));
+      }).catch(function (er) {
+        var m = (er && er.message) || "";
+        err.textContent = /captcha/i.test(m) ? "No pudimos completar la verificación de seguridad. Espera a que se marque la casilla e intenta de nuevo."
+          : /rate limit|security purposes|only request this after/i.test(m) ? "Ya pediste un enlace hace poco. Espera un minuto e intenta de nuevo."
+          : /invalid.*email|email.*invalid/i.test(m) ? "Revisa que el correo esté bien escrito."
+          : "No se pudo enviar el correo. Intenta de nuevo en unos minutos o escríbenos por WhatsApp.";
+        err.style.display = "block"; btn.disabled = false; btn.textContent = "Enviarme el enlace";
+        resetCaptcha();
+      });
     });
     app.appendChild(card);
     var cap = card.querySelector("[data-captcha]");
