@@ -10,20 +10,16 @@
   en Supabase. Llaves en `.env` (`TURNSTILE_*`).
 - **Política de contraseñas**: ✅ activa en Supabase (12 + 4 tipos de
   carácter, rate limits). Leaked-password: no (plan Pro), decidido así.
-- **⏳ Resend — EN ESPERA DE VERIFICACIÓN (23 sep, noche)**: dominio
-  `notificaciones.lefcenter.com` agregado en Resend; el usuario ya puso los
-  registros en el DNS de Google/Squarespace y **se comprobó que están
-  publicados** (DKIM `resend._domainkey.notificaciones` y `send.notificaciones`
-  → `send.forge.rmta.net`). Falta que Resend lo marque "Verified".
-  **Al retomar, pedir al usuario:** (1) confirmar "Verified" en Resend →
-  Domains (si no, darle "Restart verification"); (2) la **API Key** `re_…`
-  (crear en API Keys → permiso *Sending access* → dominio
-  notificaciones.lefcenter.com; solo se ve una vez); (3) remitente propuesto:
-  `LEF <no-responder@notificaciones.lefcenter.com>`.
-  **Luego, por partes y probando cada una** (el paquete completo `3d737a4`
+- **Resend — dominio VERIFICADO ✅ (23 sep)**: `notificaciones.lefcenter.com`.
+  API key (*Sending access*, solo ese dominio) en `.env` como `RESEND_API_KEY`
+  (`RESEND_FROM` va entre comillas en `.env` por el `<…>`).
+  **Parte 1 ✅**: secrets en Supabase `RESEND_API_KEY`,
+  `RESEND_FROM="LEF <no-responder@notificaciones.lefcenter.com>"`,
+  `LEF_LOGIN_URL=https://www.lefcenter.com/login`; correo de prueba enviado
+  por la API de Resend (aceptado, id `01a0cfb7…`) — falta que el usuario
+  confirme que llegó (bandeja o spam).
+  **Siguen, por partes y probando cada una** (el paquete completo `3d737a4`
   se revirtió el 6 sep porque rompió el login):
-  1. `supabase secrets set RESEND_API_KEY / RESEND_FROM / LEF_LOGIN_URL` y
-     guardar la key en `.env`.
   2. Correo de credenciales al crear cuenta / reiniciar contraseña
      (`manage-users`). Hoy el admin copia la contraseña y la manda por
      WhatsApp — que el correo sea adicional, no quitar esa opción.
