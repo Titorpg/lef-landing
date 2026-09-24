@@ -1,70 +1,86 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **Calendario del profesor = cuadrícula de mes (24 sep)**: estilo Google
-  Calendar (Lun–Dom, hoy marcado, ‹ Hoy ›, hasta 3 eventos por día + "+N más",
-  tocar el día abre detalle con Meet/Calendar; en celular, puntos de color).
-  `calendar-list` acepta timeMin/timeMax (máx 45 días), pagina, trae
-  colorId/hangoutLink. No se embebe el iframe de Google (exige sesión de
-  Google en el navegador). Verificado con Luis Manga: sep y oct 2026 OK.
-- **✅ APLICADO (24 sep) — Classroom por profesor** (`20260924000000_classroom_por_profesor.sql`;
-  verificado en el panel con Luis Manga: Nivel A1 y A2 solo con las clases de
-  LUIS CABALLERO, A1.1–A1.3 = 16 c/u, A2.1/A2.2 = 17, A2.3 = 14):
-  `classroom-list` (desplegada) devuelve solo las clases cuyo nombre contiene
-  el nombre del profesor (sin tildes/mayúsculas): Luis Caballero → "LEVEL A1 GR
-  1 - LUIS CABALLERO", "LEVEL A2 - LUIS CABALLERO"; María Rada → sus 2 clases.
-  Ya no se filtra por "PREARMADA". Columna nueva `teachers.classroom_match`
-  (override del nombre); la cuenta de PRUEBA Luis Manga = "Luis Caballero".
-  Pendiente: cuando el usuario apruebe en la prueba, cada profesor real conecta
-  SU cuenta de Google en Planificador (no hay que tocar nada más).
-- **Planificador por carpetas (24 sep)**: Classroom (solo profesores) se ve
-  como Nivel → Módulo → Días. Estructura del cliente: una clase por nivel
-  ("CLASES PREARMADAS A1", "…A2"), temas "Módulo 1/2/3" = A1.1/A1.2/A1.3, y
-  16 materiales (uno por día) en BORRADOR. `classroom-list` ahora pide
-  PUBLISHED+DRAFT, pagina, y manda description/creationTime. El nivel sale del
-  nombre de la clase (A1…C1); el módulo, del número del tema. Solo lo ven
-  profesores que sean profesores/co-profesores de esa clase en Classroom.
-  Corrección 24 sep (visto con la cuenta real director@lefcenter.com): esa
-  cuenta es profesora también de las clases reales ("LEVEL A1 GR 1 - …"),
-  que se mezclaban → ahora solo entran clases con "PREARMADA" en el nombre.
-  Temas = "MODULE n" con numeración GLOBAL (MODULE 4 = A2.1, vía
-  module_number); días = "… DAY n …"; sin tema → por "MODULE n" del título o
-  "Otros materiales".
-- **✅ APLICADO (23 sep) — nivel C1** (`20260923100000_modulos_c1.sql`; verificado: get_public_modules devuelve 15, C1.1–C1.3 = 13–15): C1.1 HIRED,
-  C1.2 CERTIFIED, C1.3 FLUENT = module_number 13–15 (checks de `modules`
-  ampliados). Tras B2.3 el portal sugiere C1.1. Web (niveles.html, bloque
-  "Módulo especial", ES/EN) ya con los textos del cliente. Portal: progreso
-  hasta C1.3 desde el módulo con el que ENTRÓ el estudiante (min module_number
-  de sus inscripciones no canceladas): entra en 8 → x / 8. Pedido del cliente.
-- **✅ APLICADO (23 sep) — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`;
-  el usuario confirmó "Success", sin duplicados previos):
-  índice único `groups_one_per_schedule` en `groups(schedule_id)` (cuenta
-  grupos desactivados). Si ya hay duplicados, aborta y dice cuáles. Panel
-  (desplegado `1ce2fc5`): "Nuevo grupo" solo lista horarios sin grupo.
-- **✅ APLICADO (23 sep) — profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`;
-  verificado: `lef_group_teacher_conflict` existe y responde 42501 a anon):
-  triggers en groups/schedules/cycles → `LEF_TEACHER_SCHEDULE_CONFLICT` si un
-  profesor queda con 2 grupos activos que comparten día + horas solapadas +
-  ciclos que coinciden en fechas (pegados 7–8 y 8–9 sí se permiten; los 30 min
-  de descanso son solo la sugerencia del panel). El SELECT final lista cruces
-  que ya existían. Panel (ya desplegado): aviso en vivo en Nuevo/Editar grupo
-  con el grupo que choca + hora sugerida + horarios libres, "Guardar"
-  bloqueado; también al activar grupo/horario y al editar horario.
-- **✅ APLICADO (23 sep) — libro solo con pago** (`20260923070000_recursos_solo_con_pago.sql`;
-  verificado: `lef_enrollment_paid` existe y responde 42501 a anon):
-  bug reportado 23 sep — Keidy Vergara (LEF-2026-00002) sin ningún pago veía
-  el libro porque su inscripción estaba en `Active` (cambiada a mano con el
-  selector de Inicio → Inscripciones; ningún RPC inserta `Active`).
-  `get_my_course()` ahora entrega `module_heyzine_url` solo si
-  `lef_enrollment_paid()` (pago aprobado > 0, no reversado) + columna
-  `module_paid`; trigger impide `Active` sin pago; corrige las `Active` sin
-  pago → `PendingPayment`. Portal: módulo sin pago sale 🔒 en Mis recursos y
-  lleva a Facturación.
+### Por hacer (abiertos)
+- **Profesores reales conectan su Google**: Luis Caballero y María Rada entran
+  a admin → **Planificador** → "Conectar con Google Classroom" con SU cuenta.
+  No hay que configurar nada más (el filtro por nombre ya está en vivo).
+- **Cuenta de prueba Luis Manga**: tiene `teachers.classroom_match =
+  'Luis Caballero'` para ver esas clases. Quitarlo (`set classroom_match =
+  null`) cuando el usuario ya no la necesite — SQL a mano.
+- **Classroom — materiales sin tema** (caen en "Otros materiales"): en A1
+  "CAN AND COULD SITUATIONS- DAY 13", en A2 "WARM UP - DAY 5". El usuario
+  les asigna su tema en Classroom y pasan solos a su módulo.
 - **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD).
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3**.
-- **Talleres / Recursos interactivos / Materiales**: sin definir cómo se montan.
+- **Talleres / Recursos interactivos / Materiales** (portal): sin definir.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
+- Ningún SQL pendiente de aplicar (todos los del 23–24 sep aplicados).
+
+### Hecho 24 sep 2026
+- **Planificador (profesores) = carpetas Nivel → Módulo → Días** sobre Google
+  Classroom. Cada profesor ve SOLO las clases cuyo nombre contiene su nombre
+  (sin tildes/mayúsculas/espacios dobles): Luis Caballero → "LEVEL A1 GR 1 -
+  LUIS CABALLERO", "LEVEL A2 - LUIS CABALLERO"; María Rada → "LEVEL A1 GR MAY
+  - MARIA RADA", "LEVEL A2 - MARIA RADA". Clases nuevas de otros niveles con
+  su nombre se suman solas. Las plantillas "CLASES PREARMADAS A1/A2"
+  ("EXCLUSIVO DOCENTE", en borrador) ya NO se muestran (el usuario cambió de
+  idea: quiere las clases de cada profesor).
+  - `classroom-list`: filtra por `coalesce(teachers.classroom_match,
+    full_name)` (migración `20260924000000_classroom_por_profesor.sql`,
+    aplicada), trae PUBLISHED + DRAFT, pagina, manda description/creationTime.
+  - Armado (lef-admin.js `buildTree`): nivel = "A1"…"C1" del nombre de la
+    clase; tema "MODULE n" = numeración GLOBAL vía `module_number` (MODULE 4
+    = A2.1; si no cuadra con el nivel, "MODULE 1–3" local); días ordenados por
+    "DAY n" del título; material sin tema → módulo por "MODULE n" del título,
+    o "Otros materiales". Días en acordeón (el contenido carga al abrir).
+  - Verificado en el panel con Luis Manga: A1.1–A1.3 = 16 c/u, A2.1/A2.2 = 17,
+    A2.3 = 14 (+1 "Otros materiales" por nivel).
+- **Calendario (profesores) = cuadrícula de mes estilo Google Calendar**
+  (Lun–Dom, hoy marcado, ‹ Hoy ›, 3 eventos por día + "+N más", tocar el día
+  abre detalle con Meet / Ver en Google Calendar; en celular, puntos de color
+  del evento). `calendar-list` recibe timeMin/timeMax (máx 45 días), pagina,
+  trae colorId/hangoutLink/organizer, y oculta cancelados e invitaciones
+  rechazadas. No se usa el iframe de Google (exige sesión de Google en el
+  navegador). Los eventos son del calendario *primary* de la cuenta conectada
+  (director@lefcenter.com en la prueba: "LEVEL A2- LUIS CABALLERO" Mar–Vie
+  7–8 p. m.; el usuario confirmó que coincide con su Google Calendar).
+
+### Hecho 23 sep 2026
+- **Nivel C1** (`20260923100000_modulos_c1.sql`, aplicado y verificado:
+  get_public_modules devuelve 15): C1.1 HIRED, C1.2 CERTIFIED, C1.3 FLUENT =
+  module_number 13–15 (checks de `modules` ampliados). Tras B2.3 el portal
+  sugiere C1.1. Web (niveles.html, bloque "Módulo especial", ES/EN) con los
+  textos del cliente. Portal: progreso hasta C1.3 desde el módulo con el que
+  ENTRÓ el estudiante (min module_number de sus inscripciones no canceladas):
+  entra en 8 → x / 8. FAQ (ES/EN) dice "desde el módulo en que empezaste
+  hasta C1.3". Pedido del cliente.
+- **Un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`,
+  aplicado, sin duplicados previos): índice único `groups_one_per_schedule`
+  en `groups(schedule_id)` (cuenta grupos desactivados). Panel: "Nuevo grupo"
+  solo lista horarios sin grupo.
+- **Profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`,
+  aplicado, sin cruces previos): triggers en groups/schedules/cycles →
+  `LEF_TEACHER_SCHEDULE_CONFLICT` si un profesor queda con 2 grupos activos
+  que comparten día + horas solapadas + ciclos que coinciden en fechas
+  (pegados 7–8 y 8–9 sí se permiten; los 30 min de descanso son solo la
+  sugerencia del panel). Panel: aviso en vivo en Nuevo/Editar grupo con el
+  grupo que choca + hora sugerida + horarios libres, "Guardar" bloqueado;
+  también al activar grupo/horario y al editar horario.
+- **Libro y recursos solo con pago** (`20260923070000_recursos_solo_con_pago.sql`,
+  aplicado): bug — Keidy Vergara (LEF-2026-00002) sin pago veía el libro
+  porque su inscripción estaba en `Active` (cambiada a mano con el selector
+  de Inicio → Inscripciones). `get_my_course()` entrega `module_heyzine_url`
+  solo si `lef_enrollment_paid()` (pago aprobado > 0, no reversado) +
+  columna `module_paid`; trigger impide `Active` sin pago; corrigió las
+  `Active` sin pago → `PendingPayment`. Portal: módulo sin pago sale 🔒 en
+  Mis recursos y lleva a Facturación.
+- **Facturación (portal), pago parcial**: texto amable — "Ya abonaste X y tu
+  curso ya está activo… Tu saldo pendiente es de Y; recuerda completarlo
+  antes de que termine tu ciclo." (con un abono el curso se activa).
+
+### Estado de servicios (sin cambios pendientes)
 - **Cloudflare Turnstile**: ✅ EN VIVO (23 sep) — CAPTCHA en el login, activo
   en Supabase. Llaves en `.env` (`TURNSTILE_*`).
 - **Política de contraseñas**: ✅ activa en Supabase (12 + 4 tipos de
