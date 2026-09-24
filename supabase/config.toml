@@ -1,0 +1,29 @@
+# LEF — ajustes de las Edge Functions al desplegarlas con `npx supabase functions deploy`.
+#
+# verify_jwt = true: Supabase rechaza la llamada si no trae una sesión válida de
+# LEF antes de ejecutar la función (el "portero"). Solo se apaga donde quien
+# llama NO puede traer esa sesión:
+#   - classroom-oauth-callback: Google redirige ahí el navegador del profesor.
+#   - wompi-webhook: lo llama Wompi (valida la firma de Wompi por su cuenta).
+# Sin este archivo, el CLI conserva el ajuste que la función tuviera antes
+# (así quedó abierta classroom-oauth-start el 24 sep 2026 por error).
+
+project_id = "cemrxcatbxbcipxmsnjf"
+
+[functions.classroom-oauth-start]
+verify_jwt = true
+
+[functions.classroom-list]
+verify_jwt = true
+
+[functions.manage-users]
+verify_jwt = true
+
+[functions.wompi-checkout]
+verify_jwt = true
+
+[functions.classroom-oauth-callback]
+verify_jwt = false
+
+[functions.wompi-webhook]
+verify_jwt = false

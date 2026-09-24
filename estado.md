@@ -19,11 +19,9 @@
 - **SQL pendiente: `20260924010000_calendario_propio.sql`** (calendario propio).
   El usuario lo aplica a mano en el SQL Editor; DESPUÉS se despliega Vercel
   (sin la función `get_my_calendar` la pestaña Calendario muestra error).
-- **`classroom-oauth-start` redesplegada con `--no-verify-jwt`** (24 sep, al
-  quitarle el scope de Calendar): confirmar con el usuario si antes estaba así;
-  si no, redesplegar sin esa bandera.
-- **Borrar la Edge Function `calendar-list` desplegada** (el código ya se quitó
-  del repo; ya nadie la llama).
+- **Probar "Conectar con Google Classroom"** (Planificador) tras encender la
+  verificación de sesión de `classroom-oauth-start` (24 sep). Si falla, volver a
+  apagarla en `supabase/config.toml` y redesplegar.
 
 ### Hecho 24 sep 2026
 - **Calendario propio de LEF (adiós Google Calendar)** — `assets/js/lef-calendar.js`,
@@ -42,7 +40,11 @@
     tabla: solo por la función).
   - Vistas Mes y Agenda (en celular arranca en Agenda), leyenda que filtra por
     tipo. Probado con PGlite (permisos) y capturas con datos de ejemplo.
-  - `calendar-list` y el scope `calendar.readonly` quitados.
+  - `calendar-list` y el scope `calendar.readonly` quitados; `calendar-list`
+    borrada también del servidor.
+  - `supabase/config.toml` nuevo: fija verify_jwt por función (el CLI conserva el
+    ajuste anterior si no). Solo apagada en classroom-oauth-callback y wompi-webhook.
+    classroom-oauth-start quedó ENCENDIDA (sin sesión → 401, verificado).
 - **Planificador — enlaces que "rechazan la conexión"**: muchos sitios
   prohíben mostrarse en iframe (X-Frame-Options/CSP). `classroom-list` ahora
   revisa cada enlace una vez por carga: Wordwall → su API oEmbed da
