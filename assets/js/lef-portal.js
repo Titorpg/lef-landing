@@ -895,9 +895,10 @@
   function renderResources(main) {
     sb.rpc("get_my_course").then(function (r) {
       if (r.error) throw r.error;
-      var rows = (r.data || []).filter(function (c) {
-        return c.enrollment_status === "Active" || c.enrollment_status === "Completed";
-      });
+      // El acceso lo decide el pago (module_paid, calculado en la base de datos),
+      // no la etiqueta de estado: sin pago, el módulo sale bloqueado y lleva a
+      // Facturación — la base de datos tampoco entrega el enlace del libro.
+      var rows = (r.data || []);
       main.innerHTML = '<h1 class="pnl-h">Mis recursos</h1><p class="pnl-sub">Material de estudio de los cursos que has tomado o estás tomando.</p>';
 
       if (!rows.length) {
@@ -906,15 +907,21 @@
       }
 
       rows.forEach(function (c) {
-        var tag = c.enrollment_status === "Completed" ? " · culminado" : "";
+        var locked = !c.module_paid;
+        var tag = locked ? " · pendiente de pago" : c.enrollment_status === "Completed" ? " · culminado" : "";
         var row = h(
-          '<div class="resource-row" tabindex="0" role="button">' +
+          '<div class="resource-row' + (locked ? " resource-row--locked" : "") + '" tabindex="0" role="button">' +
           '<div><div class="lvl-tag" style="margin-bottom:2px">' + esc(c.module_level) + "</div>" +
-          '<span style="font-size:13.5px;color:var(--grafito)">' + esc(c.module_title + tag) + "</span></div>" +
-          '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span>' +
+          '<span style="font-size:13.5px;color:var(--grafito)">' + esc(c.module_title + tag) + "</span>" +
+          (locked ? '<div class="muted" style="font-size:12.5px;margin-top:2px">El libro y los recursos se activan cuando pagues tu mensualidad.</div>' : "") +
+          "</div>" +
+          '<span class="resource-row__chevron" aria-hidden="true">' + (locked ? "🔒" : "&rsaquo;") + "</span>" +
           "</div>"
         );
-        row.addEventListener("click", function () { renderResourceModule(main, c); });
+        row.addEventListener("click", function () {
+          if (locked) location.hash = "facturacion";
+          else renderResourceModule(main, c);
+        });
         row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
         main.appendChild(row);
       });

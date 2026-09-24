@@ -225,7 +225,8 @@
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
     LEF_MODULE_ALREADY_COMPLETED: "Ese estudiante ya completó ese módulo — no se puede volver a matricular. Elige otro.",
     LEF_ENROLLMENT_NOT_ACTIVE: "Ese módulo todavía no se ha pagado, así que no se puede marcar como completado. Usa “cancelar la inscripción”.",
-    LEF_CYCLE_NOT_FOUND: "No se encontró el ciclo (quizás ya se cerró).",
+    LEF_ENROLLMENT_NEEDS_PAYMENT: "Esa inscripción no tiene ningún pago registrado, así que no puede quedar “Activo”. Se activa sola al registrar el primer pago (en Pagos).",
+    LEF_CYCLE_NOT_FOUND:"No se encontró el ciclo (quizás ya se cerró).",
     no_autenticado: "Tu sesión expiró. Vuelve a iniciar sesión.",
     url_invalida: "Esa imagen no es válida.",
     ultimo_admin: "No puedes quitar el rol, desactivar ni eliminar al último administrador activo. Crea o activa otro admin primero.",
@@ -553,8 +554,8 @@
           }).join("") + "</select>");
           sel.onchange = function () {
             q("enrollments").update({ status: sel.value }).eq("id", e.id).then(function (u) {
-              toast(u.error ? u.error.message : "Estado actualizado.", u.error ? "err" : "ok");
-              if (!u.error) route();
+              toast(u.error ? friendly(u.error) : "Estado actualizado.", u.error ? "err" : "ok");
+              route(); // si falló, el selector vuelve a mostrar el estado real
             });
           };
           cell.appendChild(sel);

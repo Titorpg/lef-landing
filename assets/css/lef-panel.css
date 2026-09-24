@@ -266,6 +266,8 @@ td.acts .btn{margin:2px 4px 2px 0;}
 .resource-row:hover,.resource-row:focus-visible{border-color:var(--azul);
   box-shadow:0 4px 14px -8px rgba(0,0,0,.18);}
 .resource-row__chevron{flex:none;color:var(--plata);font-size:22px;line-height:1;}
+.resource-row--locked{background:#fafafa;}
+.resource-row--locked .resource-row__chevron{font-size:17px;}
 .resource-back{all:unset;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
   color:var(--azul);font-weight:600;font-size:13.5px;margin-bottom:16px;}
 .resource-back:hover{text-decoration:underline;}
