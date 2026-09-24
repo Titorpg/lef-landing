@@ -1264,11 +1264,21 @@
           box.appendChild(h('<div class="pnl-alert ok">No encontramos cursos activos en tu cuenta de Classroom.</div>'));
           return;
         }
-        // Títulos de los módulos de LEF (A1.1 → "Hello, World") para las carpetas.
-        q("modules").select("level,title").then(function (r) {
-          var titles = {};
-          (r.data || []).forEach(function (m) { titles[m.level] = m.title; });
-          var tree = buildTree(courses, titles);
+        // Solo las clases plantilla ("CLASES PREARMADAS A1", "…A2"…). La misma
+        // cuenta suele ser profesora de las clases reales de cada grupo
+        // ("LEVEL A1 GR 1 - …"), que tienen los mismos temas: si entraran, sus
+        // materiales se mezclarían dentro de cada módulo.
+        var prearmadas = courses.filter(function (c) { return /prearmad/i.test(c.name || ""); });
+        if (!prearmadas.length) {
+          box.appendChild(h('<div class="pnl-alert ok">No encontramos las clases “CLASES PREARMADAS” en tu cuenta de Classroom. ' +
+            "Pide que te agreguen como profesor(a) de esas clases en Google Classroom.</div>"));
+          return;
+        }
+        // Módulos de LEF: número global (MODULE 4) → código (A2.1) y título.
+        q("modules").select("level,title,module_number").then(function (r) {
+          var mods = { titles: {}, byNumber: {} };
+          (r.data || []).forEach(function (m) { mods.titles[m.level] = m.title; mods.byNumber[m.module_number] = m.level; });
+          var tree = buildTree(prearmadas, mods);
           var nav = h("<div></div>");
           box.appendChild(nav);
           showLevels(nav, tree);
@@ -1314,16 +1324,31 @@
 
     /* --- Carpetas: Nivel → Módulo → Días ---
        Classroom no tiene carpetas dentro de carpetas (solo clase → temas →
-       materiales), así que se arman aquí leyendo los nombres:
-         - la clase lleva el nivel en el nombre ("CLASES PREARMADAS A1" → A1);
-         - cada tema es un módulo: "Módulo 2" → A1.2 (o el código tal cual si
-           el tema ya dice "A1.2");
-         - cada material del tema es un día de clase, en orden por su número
-           ("Día 3", "Tema 3"…) y si no tiene número, por fecha de creación.
-       Una clase sin nivel en el nombre queda como carpeta propia al final. */
+       materiales), así que se arman aquí leyendo los nombres, tal como los
+       usa LEF en Classroom:
+         - la clase lleva el nivel en el nombre ("CLASES PREARMADAS A2" → A2);
+         - cada tema es un módulo con su número GLOBAL: "MODULE 4" → A2.1
+           (según module_number de LEF); también sirve "A2.1" escrito tal cual;
+         - cada material es un día: "LEVEL A2 MODULE 4 DAY 12 …" → día 12, en
+           ese orden (sin número de día, por fecha de creación);
+         - un material sin tema cae en su módulo si el título dice "MODULE n";
+           si no, en "Otros materiales" al final del nivel. */
     var LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1"];
-    function firstNum(t) { var m = /(\d+)/.exec(t || ""); return m ? +m[1] : null; }
-    function buildTree(courses, titles) {
+    var OTHERS = "Otros materiales";
+    function dayNum(t) { var m = /\b(?:DAY|D[IÍ]A)\s*(\d+)/i.exec(t || ""); return m ? +m[1] : null; }
+    // Nombre de tema o título → código de módulo de LEF (o null).
+    function moduleCode(text, levelCode, mods) {
+      var cm = /\b([ABC][12]\.[1-3])\b/i.exec(text || "");
+      if (cm) return cm[1].toUpperCase();
+      var nm = /\bMODUL[OE]\s*(\d+)/i.exec(text || "");
+      if (!nm) return null;
+      var n = +nm[1], byNum = mods.byNumber[n];
+      if (byNum && (!levelCode || byNum.indexOf(levelCode) === 0)) return byNum;
+      // Numeración local dentro del nivel ("MODULE 2" en la clase de A2 → A2.2).
+      if (levelCode && n >= 1 && n <= 3) return levelCode + "." + n;
+      return byNum || null;
+    }
+    function buildTree(courses, mods) {
       var levels = {};
       courses.forEach(function (c) {
         var lm = /\b([ABC][12])\b/i.exec(c.name || "");
@@ -1332,13 +1357,10 @@
         var lv = levels[key] = levels[key] || { key: key, code: code, label: code ? "Nivel " + code : c.name, links: [], modules: {} };
         lv.links.push({ name: c.name, url: c.alternateLink });
         var topicMod = {};
-        (c.topics || []).forEach(function (t) {
-          var cm = /\b([ABC][12]\.[1-3])\b/i.exec(t.name || ""), n = firstNum(t.name);
-          topicMod[t.id] = cm ? cm[1].toUpperCase() : (code && n ? code + "." + n : t.name);
-        });
+        (c.topics || []).forEach(function (t) { topicMod[t.id] = moduleCode(t.name, code, mods) || t.name; });
         (c.materials || []).forEach(function (m) {
-          var mk = m.topicId && topicMod[m.topicId] ? topicMod[m.topicId] : "Sin módulo";
-          var mod = lv.modules[mk] = lv.modules[mk] || { key: mk, title: titles[mk] || "", items: [] };
+          var mk = (m.topicId && topicMod[m.topicId]) || moduleCode(m.title, code, mods) || OTHERS;
+          var mod = lv.modules[mk] = lv.modules[mk] || { key: mk, title: mods.titles[mk] || "", items: [] };
           mod.items.push(m);
         });
       });
@@ -1350,14 +1372,16 @@
       list.forEach(function (lv) {
         lv.moduleList = Object.keys(lv.modules).map(function (k) { return lv.modules[k]; })
           .sort(function (a, b) {
-            if (a.key === "Sin módulo") return 1;
-            if (b.key === "Sin módulo") return -1;
+            if (a.key === OTHERS) return 1;
+            if (b.key === OTHERS) return -1;
             return a.key.localeCompare(b.key, "es", { numeric: true });
           });
         lv.moduleList.forEach(function (mod) {
           mod.items.sort(function (a, b) {
-            var na = firstNum(a.title), nb = firstNum(b.title);
+            var na = dayNum(a.title), nb = dayNum(b.title);
             if (na !== null && nb !== null && na !== nb) return na - nb;
+            if (na !== null && nb === null) return -1;
+            if (na === null && nb !== null) return 1;
             return String(a.creationTime || "").localeCompare(String(b.creationTime || ""));
           });
         });
