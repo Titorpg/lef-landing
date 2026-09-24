@@ -2,6 +2,12 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **Calendario del profesor = cuadrícula de mes (24 sep)**: estilo Google
+  Calendar (Lun–Dom, hoy marcado, ‹ Hoy ›, hasta 3 eventos por día + "+N más",
+  tocar el día abre detalle con Meet/Calendar; en celular, puntos de color).
+  `calendar-list` acepta timeMin/timeMax (máx 45 días), pagina, trae
+  colorId/hangoutLink. No se embebe el iframe de Google (exige sesión de
+  Google en el navegador). Verificado con Luis Manga: sep y oct 2026 OK.
 - **✅ APLICADO (24 sep) — Classroom por profesor** (`20260924000000_classroom_por_profesor.sql`;
   verificado en el panel con Luis Manga: Nivel A1 y A2 solo con las clases de
   LUIS CABALLERO, A1.1–A1.3 = 16 c/u, A2.1/A2.2 = 17, A2.3 = 14):
