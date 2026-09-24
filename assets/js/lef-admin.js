@@ -111,7 +111,7 @@
     var bg = h('<div class="pnl-modal-bg"></div>');
     var box = h('<div class="pnl-modal' + (wide ? " wide" : "") + '"><h3>' + esc(title) + "</h3></div>");
     box.appendChild(bodyNode);
-    var err = h('<div class="pnl-alert err" style="display:none"></div>');
+    var err = h('<div class="pnl-alert err" style="display:none;white-space:pre-line"></div>');
     box.appendChild(err);
     var row = h('<div class="row"><button class="btn btn-ghost" data-x>Cancelar</button>' +
       '<button class="btn ' + (danger ? "btn-danger" : "btn-dark") + '" data-s>' + esc(saveLabel || "Guardar") + "</button></div>");
@@ -225,6 +225,7 @@
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
     LEF_MODULE_ALREADY_COMPLETED: "Ese estudiante ya completó ese módulo — no se puede volver a matricular. Elige otro.",
     LEF_ENROLLMENT_NOT_ACTIVE: "Ese módulo todavía no se ha pagado, así que no se puede marcar como completado. Usa “cancelar la inscripción”.",
+    LEF_TEACHER_SCHEDULE_CONFLICT: "Ese profesor ya tiene otro grupo que se cruza con ese horario (mismos días y horas, en ciclos que coinciden). Cambia el horario o el profesor.",
     LEF_ENROLLMENT_NEEDS_PAYMENT: "Esa inscripción no tiene ningún pago registrado, así que no puede quedar “Activo”. Se activa sola al registrar el primer pago (en Pagos).",
     LEF_CYCLE_NOT_FOUND:"No se encontró el ciclo (quizás ya se cerró).",
     no_autenticado: "Tu sesión expiró. Vuelve a iniciar sesión.",
@@ -2602,14 +2603,95 @@
   }
 
   var DOW = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  /* --- Cruces de horario de un profesor ---
+     Mismo criterio que la regla de la base de datos (migración
+     20260923080000): dos grupos activos del mismo profesor se cruzan si
+     comparten un día, las horas se solapan y sus ciclos coinciden en fechas.
+     `groups` son filas con schedules(days,start_time,end_time,active,cycles(...));
+     `sched` es { days, start_time, end_time, cycles: { start_date, end_date } }. */
+  var GROUP_CONFLICT_SELECT = "id,teacher_id,active,schedule_id,modules(level),teachers(full_name)," +
+    "schedules(days,start_time,end_time,active,cycles(name,start_date,end_date))";
+  function toMin(t) { var p = String(t || "0:0").split(":"); return (+p[0]) * 60 + (+p[1]); }
+  function fromMin(m) { return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
+  function cyclesOverlap(a, b) { return !a || !b || (a.start_date <= b.end_date && b.start_date <= a.end_date); }
+  // Grupos activos del profesor que comparten algún día y ciclo con `sched`.
+  function teacherSameDays(groups, teacherId, sched, excludeId) {
+    return groups.filter(function (g) {
+      var s = g.schedules;
+      return g.teacher_id === teacherId && g.id !== excludeId && g.active && s && s.active !== false &&
+        (s.days || []).some(function (d) { return (sched.days || []).indexOf(d) !== -1; }) &&
+        cyclesOverlap(sched.cycles, s.cycles);
+    });
+  }
+  function teacherConflicts(groups, teacherId, sched, excludeId) {
+    return teacherSameDays(groups, teacherId, sched, excludeId).filter(function (g) {
+      return toMin(sched.start_time) < toMin(g.schedules.end_time) && toMin(g.schedules.start_time) < toMin(sched.end_time);
+    });
+  }
+  // Hora libre más cercana a la pedida, mismos días y misma duración, con al
+  // menos 30 min de descanso antes y después de sus otras clases (6am–10pm).
+  function suggestSlot(groups, teacherId, sched, excludeId) {
+    var busy = teacherSameDays(groups, teacherId, sched, excludeId).map(function (g) {
+      return [toMin(g.schedules.start_time), toMin(g.schedules.end_time)];
+    });
+    var start = toMin(sched.start_time), dur = toMin(sched.end_time) - start, best = null;
+    for (var c = 6 * 60; c + dur <= 22 * 60; c += 15) {
+      var free = busy.every(function (x) { return c + dur + 30 <= x[0] || c >= x[1] + 30; });
+      // "<=": a igual distancia gana la hora más tarde (después de su clase).
+      if (free && (best === null || Math.abs(c - start) <= Math.abs(best - start))) best = c;
+    }
+    return best === null ? null : { start_time: fromMin(best), end_time: fromMin(best + dur) };
+  }
+  function groupDesc(g) {
+    var s = g.schedules;
+    return (g.modules ? g.modules.level : "Grupo") + " · " + days(s.days) + " " + time(s.start_time) + "–" + time(s.end_time) +
+      (s.cycles && s.cycles.name ? " (ciclo " + s.cycles.name + ")" : "");
+  }
+  // Aviso en líneas de texto (sirve para el recuadro del modal y para errores).
+  // extra: líneas propias de cada pantalla (qué hacer para seguir).
+  function conflictLines(teacherName, conflicts, sched, suggestion, extra) {
+    var lines = [(teacherName || "Este profesor") + " ya tiene " + (conflicts.length > 1 ? "grupos" : "un grupo") +
+      " que coincide" + (conflicts.length > 1 ? "n" : "") + " con esa programación:"];
+    conflicts.forEach(function (g) { lines.push("• " + groupDesc(g)); });
+    lines.push(suggestion
+      ? "Sugerencia: " + days(sched.days) + " de " + time(suggestion.start_time) + " a " + time(suggestion.end_time) +
+        " — le deja al menos 30 minutos de descanso entre clase y clase."
+      : "No hay un espacio libre esos días para este profesor (dejando 30 minutos entre clases); prueba con otros días u otro profesor.");
+    return lines.concat(extra || []);
+  }
+  function conflictAlertHtml(lines) {
+    return '<div class="pnl-alert err" style="margin:4px 0 0">' + lines.map(function (l, i) {
+      return i === 0 ? "<strong>" + esc(l) + "</strong>" : esc(l);
+    }).join("<br>") + "</div>";
+  }
+
   function acHorarios(box) {
     box.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
       q("schedules").select("*,cycles(name,status),modules(level,title,active)").order("created_at", { ascending: false }),
-      q("cycles").select("id,name,status"), activeModules()
+      q("cycles").select("id,name,status,start_date,end_date"), activeModules(),
+      q("groups").select(GROUP_CONFLICT_SELECT)
     ]).then(function (res) {
       box.innerHTML = "";
-      var cycles = res[1].data || [], modules = res[2];
+      var cycles = res[1].data || [], modules = res[2], allGroups = res[3].data || [];
+      var cycleById = {}; cycles.forEach(function (c) { cycleById[c.id] = c; });
+      // Cambiar días/horas/ciclo de un horario (o activarlo) mueve a todos sus
+      // grupos: ninguno de sus profesores puede quedar cruzado. Devuelve el
+      // aviso en texto, o "" si no hay cruce.
+      function scheduleClash(scheduleId, sched) {
+        var msg = "";
+        allGroups.forEach(function (g) {
+          if (msg || g.schedule_id !== scheduleId || !g.active) return;
+          var clash = teacherConflicts(allGroups, g.teacher_id, sched, g.id);
+          if (clash.length) {
+            msg = conflictLines(g.teachers && g.teachers.full_name, clash, sched,
+              suggestSlot(allGroups, g.teacher_id, sched, g.id),
+              ["Este horario lo usa su grupo " + (g.modules ? g.modules.level : "") + ", así que no se puede guardar así. Elige otra hora o días."]).join("\n");
+          }
+        });
+        return msg;
+      }
       var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Horario</button></div>');
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
@@ -2638,6 +2720,10 @@
           '</td><td class="acts"></td></tr>');
         var cell = tr.children[5];
         cell.appendChild(btn(s.active ? "Desactivar" : "Activar", "btn-ghost", function () {
+          if (!s.active) {
+            var clashMsg = scheduleClash(s.id, { days: s.days, start_time: s.start_time, end_time: s.end_time, cycles: cycleById[s.cycle_id] });
+            if (clashMsg) { toast(clashMsg.replace(/\n/g, " "), "err"); return; }
+          }
           q("schedules").update({ active: !s.active, deactivated_by_module: false }).eq("id", s.id)
             .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acHorarios(box); });
         }));
@@ -2650,6 +2736,11 @@
           modal("Editar horario", b, function () {
             var dsel = Array.prototype.slice.call(b.querySelectorAll("input[type=checkbox]:checked")).map(function (x) { return x.value; });
             if (!dsel.length) throw new Error("Elige al menos un día.");
+            var clashMsg = s.active && scheduleClash(s.id, {
+              days: dsel, start_time: b.querySelector("[name=s]").value, end_time: b.querySelector("[name=e]").value,
+              cycles: cycleById[b.querySelector("[name=c]").value]
+            });
+            if (clashMsg) throw new Error(clashMsg);
             return q("schedules").update({
               cycle_id: b.querySelector("[name=c]").value, module_id: b.querySelector("[name=m]").value,
               days: dsel, start_time: b.querySelector("[name=s]").value, end_time: b.querySelector("[name=e]").value
@@ -2670,14 +2761,17 @@
   function acGrupos(box) {
     box.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
-      q("groups").select("*,modules(level,title),teachers(full_name),schedules(days,start_time,end_time,cycles(name))").order("created_at", { ascending: false }),
-      q("schedules").select("id,days,start_time,end_time,module_id,modules(level,title,active)").eq("active", true),
+      q("groups").select("*,modules(level,title),teachers(full_name),schedules(days,start_time,end_time,active,cycles(name,start_date,end_date))").order("created_at", { ascending: false }),
+      q("schedules").select("id,days,start_time,end_time,module_id,modules(level,title,active),cycles(name,start_date,end_date)").eq("active", true),
       q("teachers").select("id,full_name").eq("active", true),
       rpc("group_enrollment_counts")
     ]).then(function (res) {
       box.innerHTML = "";
+      var allGroups = res[0].data || [];
       var scheds = (res[1].data || []).filter(function (s) { return s.modules && s.modules.active; });
+      var schedById = {}; scheds.forEach(function (s) { schedById[s.id] = s; });
       var teachers = res[2].data || [];
+      var teacherName = {}; teachers.forEach(function (t) { teacherName[t.id] = t.full_name; });
       var counts = {};
       (res[3] || []).forEach(function (c) { counts[c.group_id] = c.count; });
       var add = h('<div class="pnl-toolbar"><button class="btn btn-sm btn-dark">+ Grupo</button></div>');
@@ -2689,8 +2783,15 @@
             return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time)) + "</option>";
           }).join("") + "</select>") +
           field("Profesor", '<select name="t">' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
-          field("Cupo", '<input name="c" type="number" min="1" max="8" value="8">') + "</div>");
+          field("Cupo", '<input name="c" type="number" min="1" max="8" value="8">') +
+          '<div data-conflict></div>' + "</div>");
+        var sSel = b.querySelector("[name=s]"), tSel = b.querySelector("[name=t]");
+        // El profesor no puede quedar con dos grupos cruzados: el aviso sale
+        // apenas se elige la combinación y "Guardar" no se deja usar hasta
+        // cambiar el horario (o el profesor).
+        function conflictsNow() { return teacherConflicts(allGroups, tSel.value, schedById[sSel.value], null); }
         modal("Nuevo grupo", b, function () {
+          if (conflictsNow().length) throw new Error("Ese profesor ya tiene un grupo en ese horario. Elige un horario disponible.");
           var opt = b.querySelector("[name=s]").selectedOptions[0];
           return q("groups").insert({
             schedule_id: b.querySelector("[name=s]").value, module_id: opt.dataset.mod,
@@ -2702,6 +2803,27 @@
             gestionarGrupoEstudiantes(i.data);
           });
         });
+        var saveBtn = b.parentNode.querySelector("[data-s]");
+        function checkConflict() {
+          var sc = schedById[sSel.value], conflicts = conflictsNow();
+          var slot = b.querySelector("[data-conflict]");
+          saveBtn.disabled = conflicts.length > 0;
+          if (!conflicts.length) { slot.innerHTML = ""; return; }
+          var sug = suggestSlot(allGroups, tSel.value, sc, null);
+          // Horarios ya creados del mismo módulo que este profesor sí tiene libres.
+          var free = scheds.filter(function (o) {
+            return o.id !== sc.id && o.module_id === sc.module_id && !teacherConflicts(allGroups, tSel.value, o, null).length;
+          });
+          slot.innerHTML = conflictAlertHtml(conflictLines(teacherName[tSel.value], conflicts, sc, sug, [
+            free.length
+              ? "Horarios ya creados de este módulo que tiene libres: " + free.map(function (o) { return days(o.days) + " " + time(o.start_time) + "–" + time(o.end_time); }).join("; ") + "."
+              : "Si el horario sugerido no aparece en la lista, créalo primero en la pestaña Horarios.",
+            "Cambia el horario (o el profesor) para poder guardar."
+          ]));
+        }
+        sSel.addEventListener("change", checkConflict);
+        tSel.addEventListener("change", checkConflict);
+        checkConflict();
       };
       var t = tableWrap(["Módulo", "Ciclo", "Horario", "Profesor", "Cupo", "Inscritos", "Estado", "Acciones"]);
       (res[0].data || []).forEach(function (g) {
@@ -2715,6 +2837,14 @@
         var cell = tr.children[7];
         cell.appendChild(btn("Estudiantes", "btn-blue", function () { gestionarGrupoEstudiantes(g); }));
         cell.appendChild(btn(g.active ? "Desactivar" : "Activar", "btn-ghost", function () {
+          if (!g.active && g.schedules) {
+            var clash = teacherConflicts(allGroups, g.teacher_id, g.schedules, g.id);
+            if (clash.length) {
+              toast(conflictLines(teacherName[g.teacher_id] || (g.teachers && g.teachers.full_name), clash, g.schedules,
+                suggestSlot(allGroups, g.teacher_id, g.schedules, g.id), ["Por eso no se puede activar este grupo."]).join(" "), "err");
+              return;
+            }
+          }
           q("groups").update({ active: !g.active, deactivated_by_module: false }).eq("id", g.id)
             .then(function (u) { if (u.error) toast(friendly(u.error), "err"); else acGrupos(box); });
         }));
@@ -2723,13 +2853,34 @@
             field("Profesor", '<select name="t">' + teachers.map(function (tt) {
               return '<option value="' + tt.id + '"' + (tt.id === g.teacher_id ? " selected" : "") + ">" + esc(tt.full_name) + "</option>";
             }).join("") + "</select>") +
-            field("Cupo (máx. 8)", '<input name="c" type="number" min="1" max="8" value="' + g.capacity + '">') + "</div>");
+            field("Cupo (máx. 8)", '<input name="c" type="number" min="1" max="8" value="' + g.capacity + '">') +
+            '<div data-conflict></div>' + "</div>");
+          var tSel = b.querySelector("[name=t]");
+          function conflictsNow() {
+            // Solo al cambiar de profesor (editar el cupo no debe trabarse).
+            return g.active && g.schedules && tSel.value !== g.teacher_id
+              ? teacherConflicts(allGroups, tSel.value, g.schedules, g.id) : [];
+          }
           modal("Editar grupo", b, function () {
+            if (conflictsNow().length) throw new Error("Ese profesor ya tiene un grupo en ese horario. Elige otro profesor.");
             return q("groups").update({
               teacher_id: b.querySelector("[name=t]").value,
               capacity: +b.querySelector("[name=c]").value || g.capacity
             }).eq("id", g.id).then(function (u) { if (u.error) throw u.error; toast("Grupo actualizado."); acGrupos(box); });
           });
+          // Aquí el horario del grupo es fijo: el cruce solo se arregla con otro
+          // profesor (o creando el grupo en otro horario).
+          var saveBtn = b.parentNode.querySelector("[data-s]");
+          function checkConflict() {
+            var conflicts = conflictsNow(), slot = b.querySelector("[data-conflict]");
+            saveBtn.disabled = conflicts.length > 0;
+            if (!conflicts.length) { slot.innerHTML = ""; return; }
+            slot.innerHTML = conflictAlertHtml(conflictLines(teacherName[tSel.value], conflicts, g.schedules,
+              suggestSlot(allGroups, tSel.value, g.schedules, g.id),
+              ["El horario de un grupo ya creado no se cambia aquí: elige otro profesor, o crea un grupo nuevo en el horario sugerido."]));
+          }
+          tSel.addEventListener("change", checkConflict);
+          checkConflict();
         }));
         cell.appendChild(btn("Eliminar", "btn-danger", function () {
           var activos = counts[g.id] || 0;

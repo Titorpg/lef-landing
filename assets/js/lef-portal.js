@@ -478,8 +478,11 @@
           "<h2>" + money(s.monthly_amount, s.currency) + "<span style=\"font-family:inherit;font-size:14px;color:var(--grafito);font-weight:400\"> / mes</span></h2>" +
           '<div class="mod-name">' + badge + "</div>" +
           (s.description ? '<p class="pnl-sub" style="margin:-8px 0 18px">' + esc(s.description) + "</p>" : "") +
-          (partial ? '<p class="pnl-sub" style="margin:-8px 0 18px">Ya abonaste <strong>' + money(paid, s.currency) + "</strong> — falta <strong>" +
-            money(s.monthly_amount - paid, s.currency) + "</strong> para completar tu mensualidad y activar el curso.</p>" : "") +
+          // Con un abono el curso ya queda activo (acuerdo con LEF): el mensaje
+          // solo recuerda el saldo, sin condicionar el acceso.
+          (partial ? '<p class="pnl-sub" style="margin:-8px 0 18px">Ya abonaste <strong>' + money(paid, s.currency) +
+            "</strong> y tu curso ya está activo: puedes entrar a tus clases y recursos cuando quieras. Tu saldo pendiente es de <strong>" +
+            money(s.monthly_amount - paid, s.currency) + "</strong>; recuerda completarlo antes de que termine tu ciclo.</p>" : "") +
           (s.status === "cancelled" ? "" :
             '<div class="course-hero__pay">' +
             '<p class="course-hero__pay-lead">Puedes pagar tu mensualidad de dos formas: por transferencia directa escaneando un QR desde tu app bancaria o usando la llave Bre-B @lefcenter, o con tarjeta débito/crédito a través de Wompi. Elige la que prefieras en el siguiente paso.</p>' +

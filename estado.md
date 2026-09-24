@@ -2,6 +2,14 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **⚠️ SQL POR APLICAR — profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`):
+  triggers en groups/schedules/cycles → `LEF_TEACHER_SCHEDULE_CONFLICT` si un
+  profesor queda con 2 grupos activos que comparten día + horas solapadas +
+  ciclos que coinciden en fechas (pegados 7–8 y 8–9 sí se permiten; los 30 min
+  de descanso son solo la sugerencia del panel). El SELECT final lista cruces
+  que ya existían. Panel (ya desplegado): aviso en vivo en Nuevo/Editar grupo
+  con el grupo que choca + hora sugerida + horarios libres, "Guardar"
+  bloqueado; también al activar grupo/horario y al editar horario.
 - **✅ APLICADO (23 sep) — libro solo con pago** (`20260923070000_recursos_solo_con_pago.sql`;
   verificado: `lef_enrollment_paid` existe y responde 42501 a anon):
   bug reportado 23 sep — Keidy Vergara (LEF-2026-00002) sin ningún pago veía
