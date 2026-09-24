@@ -56,12 +56,22 @@ Deno.serve(async (req) => {
       pageToken = data.nextPageToken || "";
     } while (pageToken && items.length < 1000);
 
+    // Respuesta del propio profesor a la invitación (si es invitado).
+    const selfResponse = (e: Record<string, unknown>) =>
+      ((e.attendees as Record<string, unknown>[] | undefined) || []).find((a) => a.self)?.responseStatus as string | undefined;
+
     const events = items
-      .filter((e) => e.status !== "cancelled")
+      // Igual que Google Calendar: no se muestran los cancelados ni las
+      // invitaciones que el profesor rechazó.
+      .filter((e) => e.status !== "cancelled" && selfResponse(e) !== "declined")
       .map((e) => {
         const start = e.start as Record<string, unknown> | undefined;
         const end = e.end as Record<string, unknown> | undefined;
+        const organizer = e.organizer as Record<string, unknown> | undefined;
         return {
+          organizer: organizer?.email || null,
+          response: selfResponse(e) || null,
+          eventType: e.eventType || null,
           id: e.id,
           summary: e.summary || "(Sin título)",
           location: e.location || null,
