@@ -2,6 +2,10 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **⚠️ SQL POR APLICAR — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`):
+  índice único `groups_one_per_schedule` en `groups(schedule_id)` (cuenta
+  grupos desactivados). Si ya hay duplicados, aborta y dice cuáles. Panel
+  (desplegado `1ce2fc5`): "Nuevo grupo" solo lista horarios sin grupo.
 - **✅ APLICADO (23 sep) — profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`;
   verificado: `lef_group_teacher_conflict` existe y responde 42501 a anon):
   triggers en groups/schedules/cycles → `LEF_TEACHER_SCHEDULE_CONFLICT` si un

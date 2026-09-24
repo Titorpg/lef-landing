@@ -225,6 +225,7 @@
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
     LEF_MODULE_ALREADY_COMPLETED: "Ese estudiante ya completó ese módulo — no se puede volver a matricular. Elige otro.",
     LEF_ENROLLMENT_NOT_ACTIVE: "Ese módulo todavía no se ha pagado, así que no se puede marcar como completado. Usa “cancelar la inscripción”.",
+    groups_one_per_schedule: "Ese horario ya tiene un grupo con profesor asignado. Elige otro horario, o crea uno nuevo en la pestaña Horarios.",
     LEF_TEACHER_SCHEDULE_CONFLICT: "Ese profesor ya tiene otro grupo que se cruza con ese horario (mismos días y horas, en ciclos que coinciden). Cambia el horario o el profesor.",
     LEF_ENROLLMENT_NEEDS_PAYMENT: "Esa inscripción no tiene ningún pago registrado, así que no puede quedar “Activo”. Se activa sola al registrar el primer pago (en Pagos).",
     LEF_CYCLE_NOT_FOUND:"No se encontró el ciclo (quizás ya se cerró).",
