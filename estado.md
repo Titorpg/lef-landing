@@ -2,7 +2,8 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **⚠️ SQL POR APLICAR — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`):
+- **✅ APLICADO (23 sep) — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`;
+  el usuario confirmó "Success", sin duplicados previos):
   índice único `groups_one_per_schedule` en `groups(schedule_id)` (cuenta
   grupos desactivados). Si ya hay duplicados, aborta y dice cuáles. Panel
   (desplegado `1ce2fc5`): "Nuevo grupo" solo lista horarios sin grupo.
