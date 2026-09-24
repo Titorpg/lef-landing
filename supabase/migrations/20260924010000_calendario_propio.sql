@@ -136,12 +136,16 @@ create policy "profesor borra de su calendario" on public.calendar_events
 -- ============================================================================
 -- 4. Lo que ve cada quien en un rango de fechas (clases + eventos)
 -- ============================================================================
+-- cycle_name y student_count (cuántos estudiantes tiene el grupo; al estudiante
+-- no se le manda) los usa el diseño del calendario en el detalle de cada clase.
+drop function if exists public.get_my_calendar(date, date);
 create or replace function public.get_my_calendar(p_from date, p_to date)
   returns table(
     item_type text, id uuid, title text, details text, category text,
     starts_on date, ends_on date, start_time time, end_time time,
     link_url text, audience text, group_id uuid, group_label text,
-    module_number integer, author text, can_edit boolean, cancelled boolean)
+    module_number integer, author text, can_edit boolean, cancelled boolean,
+    cycle_name text, student_count integer)
   language plpgsql stable security definer set search_path = public as $$
 #variable_conflict use_column
 declare
@@ -188,7 +192,11 @@ begin
            select 1 from public.calendar_events x
            where x.category = 'sin_clase'
              and d::date between x.starts_on and x.ends_on
-             and (x.audience in ('students', 'all') or (x.audience = 'group' and x.group_id = g.id)))
+             and (x.audience in ('students', 'all') or (x.audience = 'group' and x.group_id = g.id))),
+         c.name::text,
+         case when v_role <> 'student' then (
+           select count(*)::int from public.enrollments e
+           where e.group_id = g.id and e.status in ('PendingPayment', 'Active')) end
   from public.groups g
   join public.schedules sch on sch.id = g.schedule_id
   join public.cycles c      on c.id = sch.cycle_id
@@ -211,7 +219,9 @@ begin
          case when v_role = 'admin' then true
               when v_role = 'teacher' then x.created_by = v_uid
               else false end,
-         false
+         false,
+         null::text,
+         null::int
   from public.calendar_events x
   left join public.groups g    on g.id = x.group_id
   left join public.modules m   on m.id = g.module_id
