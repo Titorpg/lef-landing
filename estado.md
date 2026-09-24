@@ -6,7 +6,7 @@
   C1.2 CERTIFIED, C1.3 FLUENT = module_number 13–15 (checks de `modules`
   ampliados). Tras B2.3 el portal sugiere C1.1. Web (niveles.html, bloque
   "Módulo especial", ES/EN) ya con los textos del cliente. Portal: progreso
-  sigue /12 (A1.1→B2.3) + línea aparte "N módulos del nivel C1".
+  sobre 15 (A1.1→C1.3), pedido del cliente para animar a tomar C1; FAQ dice 15.
 - **✅ APLICADO (23 sep) — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`;
   el usuario confirmó "Success", sin duplicados previos):
   índice único `groups_one_per_schedule` en `groups(schedule_id)` (cuenta
