@@ -1408,7 +1408,7 @@
     function showLevels(nav, tree) {
       nav.innerHTML = "";
       tree.forEach(function (lv) {
-        var n = lv.moduleList.length;
+        var n = lv.moduleList.filter(function (m) { return m.key !== OTHERS; }).length;
         nav.appendChild(folderRow(lv.label, n + (n === 1 ? " módulo" : " módulos") + " · " + lv.links.map(function (l) { return l.name; }).join(", "),
           function () { showModules(nav, tree, lv); }));
       });
