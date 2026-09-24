@@ -179,6 +179,8 @@
     pagos: { label: "Pagos", cls: "cat-pagos" },
     importante: { label: "Importante", cls: "cat-importante" }
   };
+  // Ruta principal A1.1 → B2.3 (módulos 1–12). El nivel C1 (13–15) es
+  // opcional: se cuenta aparte en la tarjeta de progreso.
   var TOTAL_MODULES = 12;
 
   function go(tab) { location.hash = tab; }
@@ -287,10 +289,13 @@
         : owing.length ? '<div class="home-card__big home-card__big--warn">' + money(balance, "COP") + '</div><div class="home-card__line">Saldo pendiente</div>'
         : '<div class="home-card__big home-card__big--ok">Al día</div><div class="home-card__line">No tienes saldos pendientes</div>';
       if (pays[0]) payBody += '<div class="home-card__line muted">Último pago: ' + money(pays[0].amount, pays[0].currency) + " · " + esc(date(pays[0].paid_at)) + "</div>";
-      var pct = Math.round(doneCount / TOTAL_MODULES * 100);
-      var progBody = '<div class="home-card__big">' + doneCount + '<span class="home-card__of"> / ' + TOTAL_MODULES + "</span></div>" +
+      var c1Done = courses.filter(function (c) { return isCourseDone(c) && c.module_number > TOTAL_MODULES; }).length;
+      var coreDone = doneCount - c1Done;
+      var pct = Math.round(coreDone / TOTAL_MODULES * 100);
+      var progBody = '<div class="home-card__big">' + coreDone + '<span class="home-card__of"> / ' + TOTAL_MODULES + "</span></div>" +
         '<div class="home-card__line">módulos completados (A1.1 → B2.3)</div>' +
-        '<div class="home-card__bar"><div style="width:' + pct + '%"></div></div>';
+        '<div class="home-card__bar"><div style="width:' + pct + '%"></div></div>' +
+        (c1Done ? '<div class="home-card__line">+ ' + c1Done + (c1Done === 1 ? " módulo" : " módulos") + " del nivel C1</div>" : "");
 
       var cards = h('<div class="home-cards"></div>');
       [["Mi curso", courseBody, "Ver mi curso", "curso"],

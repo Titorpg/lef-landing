@@ -31,10 +31,11 @@
   var MONTHS_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   function ymd(y, m0, d) { return y + "-" + String(m0 + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0"); }
 
-  // Un color fijo por módulo (module_number 1..12). A1.1 = azul de marca.
+  // Un color fijo por módulo (module_number 1..15; 13–15 = nivel C1). A1.1 = azul de marca.
   var MODULE_COLORS = ["#2e4e9e", "#4a86c5", "#5bb1a9", "#6f9d4a", "#b3a133", "#cf8b3b",
-                       "#c15b4a", "#9a5aa3", "#5f6bd0", "#7d8794", "#3aa0a0", "#33415c"];
-  function modColor(n) { return MODULE_COLORS[((n || 1) - 1) % 12]; }
+                       "#c15b4a", "#9a5aa3", "#5f6bd0", "#7d8794", "#3aa0a0", "#33415c",
+                       "#b5476b", "#2c7a5a", "#8a6d3b"];
+  function modColor(n) { return MODULE_COLORS[((n || 1) - 1) % MODULE_COLORS.length]; }
 
   // Precio fijo de la mensualidad de un módulo (mismo valor que lef_monthly_price() en la BD).
   var MONTHLY_PRICE = 297500;

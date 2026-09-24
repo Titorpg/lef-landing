@@ -2,6 +2,11 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **⚠️ SQL POR APLICAR — nivel C1** (`20260923100000_modulos_c1.sql`): C1.1 HIRED,
+  C1.2 CERTIFIED, C1.3 FLUENT = module_number 13–15 (checks de `modules`
+  ampliados). Tras B2.3 el portal sugiere C1.1. Web (niveles.html, bloque
+  "Módulo especial", ES/EN) ya con los textos del cliente. Portal: progreso
+  sigue /12 (A1.1→B2.3) + línea aparte "N módulos del nivel C1".
 - **✅ APLICADO (23 sep) — un grupo por horario** (`20260923090000_un_grupo_por_horario.sql`;
   el usuario confirmó "Success", sin duplicados previos):
   índice único `groups_one_per_schedule` en `groups(schedule_id)` (cuenta
@@ -27,7 +32,7 @@
   pago → `PendingPayment`. Portal: módulo sin pago sale 🔒 en Mis recursos y
   lleva a Facturación.
 - **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD).
-  Faltan **B1.2, B1.3, B2.1, B2.2, B2.3**.
+  Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3**.
 - **Talleres / Recursos interactivos / Materiales**: sin definir cómo se montan.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
 - **Cloudflare Turnstile**: ✅ EN VIVO (23 sep) — CAPTCHA en el login, activo
