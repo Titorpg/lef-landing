@@ -2,7 +2,7 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **⚠️ SQL POR APLICAR — nivel C1** (`20260923100000_modulos_c1.sql`): C1.1 HIRED,
+- **✅ APLICADO (23 sep) — nivel C1** (`20260923100000_modulos_c1.sql`; verificado: get_public_modules devuelve 15, C1.1–C1.3 = 13–15): C1.1 HIRED,
   C1.2 CERTIFIED, C1.3 FLUENT = module_number 13–15 (checks de `modules`
   ampliados). Tras B2.3 el portal sugiere C1.1. Web (niveles.html, bloque
   "Módulo especial", ES/EN) ya con los textos del cliente. Portal: progreso
