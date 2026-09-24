@@ -1,6 +1,7 @@
 // LEF — trae cursos, temas y materiales (solo lectura) del profesor
 // autenticado desde Google Classroom, usando su token guardado. Los tokens
 // nunca llegan al navegador: todo el llamado a Google pasa por aquí.
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getAllowedOrigins, corsFor, getTeacherAccessToken } from "../_shared/google-auth.ts";
 
 function json(req: Request, body: unknown, status = 200) {
@@ -55,6 +56,25 @@ async function classroomList(accessToken: string, path: string, key: string) {
   return out;
 }
 
+// "Luis  Caballero" → "LUIS CABALLERO" (sin tildes, mayúsculas, espacios simples)
+function norm(s: string) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+}
+
+// Nombre con el que se buscan las clases del profesor en Classroom: su
+// classroom_match si el admin lo puso (p. ej. la cuenta de prueba), si no su
+// nombre completo. Si la columna todavía no existe, cae al nombre.
+async function teacherMatchName(teacherId: string) {
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const withMatch = await admin.from("teachers").select("full_name, classroom_match").eq("id", teacherId).maybeSingle();
+  if (!withMatch.error) {
+    const row = withMatch.data as { full_name?: string; classroom_match?: string | null } | null;
+    return (row?.classroom_match || row?.full_name || "").trim();
+  }
+  const plain = await admin.from("teachers").select("full_name").eq("id", teacherId).maybeSingle();
+  return ((plain.data as { full_name?: string } | null)?.full_name || "").trim();
+}
+
 Deno.serve(async (req) => {
   const allowed = getAllowedOrigins();
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsFor(req, allowed) });
@@ -69,7 +89,13 @@ Deno.serve(async (req) => {
 
   try {
     const coursesRes = await classroomGet(accessToken, "courses?teacherId=me&courseStates=ACTIVE&pageSize=100");
-    const courses = coursesRes.courses || [];
+    // Cada profesor ve solo las clases que llevan SU nombre ("LEVEL A2 - LUIS
+    // CABALLERO"): así las clases nuevas de otros niveles se le suman solas, y
+    // no se mezclan las de otros profesores ni las plantillas.
+    const matchName = await teacherMatchName(auth.teacherId);
+    const needle = norm(matchName);
+    const courses = ((coursesRes.courses || []) as Record<string, unknown>[])
+      .filter((c) => needle && norm(String(c.name || "")).includes(needle));
 
     const shaped = await Promise.all(courses.map(async (c: Record<string, unknown>) => {
       let topics: Record<string, unknown>[] = [];
@@ -103,7 +129,7 @@ Deno.serve(async (req) => {
       };
     }));
 
-    return json(req, { connected: true, google_email: auth.googleEmail, courses: shaped });
+    return json(req, { connected: true, google_email: auth.googleEmail, match_name: matchName, courses: shaped });
   } catch {
     return json(req, { connected: true, error: "classroom_api_error" }, 502);
   }

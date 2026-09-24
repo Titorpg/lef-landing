@@ -2,6 +2,14 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **⚠️ SQL POR APLICAR — Classroom por profesor** (`20260924000000_classroom_por_profesor.sql`):
+  `classroom-list` (desplegada) devuelve solo las clases cuyo nombre contiene
+  el nombre del profesor (sin tildes/mayúsculas): Luis Caballero → "LEVEL A1 GR
+  1 - LUIS CABALLERO", "LEVEL A2 - LUIS CABALLERO"; María Rada → sus 2 clases.
+  Ya no se filtra por "PREARMADA". Columna nueva `teachers.classroom_match`
+  (override del nombre); la cuenta de PRUEBA Luis Manga = "Luis Caballero".
+  Pendiente: cuando el usuario apruebe en la prueba, cada profesor real conecta
+  SU cuenta de Google en Planificador (no hay que tocar nada más).
 - **Planificador por carpetas (24 sep)**: Classroom (solo profesores) se ve
   como Nivel → Módulo → Días. Estructura del cliente: una clase por nivel
   ("CLASES PREARMADAS A1", "…A2"), temas "Módulo 1/2/3" = A1.1/A1.2/A1.3, y

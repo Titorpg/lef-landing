@@ -1189,7 +1189,7 @@
   // materiales, con un enlace para abrir cada uno en Classroom (no se
   // embebe ni se pide acceso a Drive, no hace falta).
   function secClassroom(main) {
-    head(main, "Planificador", "Tus clases prearmadas de Google Classroom, organizadas por nivel y módulo.");
+    head(main, "Planificador", "Tus clases de Google Classroom, organizadas por nivel y módulo.");
 
     var qs = new URLSearchParams(location.search);
     var googleStatus = qs.get("google");
@@ -1259,26 +1259,21 @@
           box.appendChild(h('<div class="pnl-alert err">Tu conexión con Google expiró — desconéctate y vuelve a conectarte.</div>'));
           return;
         }
+        // classroom-list ya devuelve solo las clases que llevan el nombre del
+        // profesor ("LEVEL A2 - LUIS CABALLERO"), para que no se mezclen las de
+        // otros profesores ni las plantillas (tienen los mismos temas).
         var courses = d.courses || [];
         if (!courses.length) {
-          box.appendChild(h('<div class="pnl-alert ok">No encontramos cursos activos en tu cuenta de Classroom.</div>'));
-          return;
-        }
-        // Solo las clases plantilla ("CLASES PREARMADAS A1", "…A2"…). La misma
-        // cuenta suele ser profesora de las clases reales de cada grupo
-        // ("LEVEL A1 GR 1 - …"), que tienen los mismos temas: si entraran, sus
-        // materiales se mezclarían dentro de cada módulo.
-        var prearmadas = courses.filter(function (c) { return /prearmad/i.test(c.name || ""); });
-        if (!prearmadas.length) {
-          box.appendChild(h('<div class="pnl-alert ok">No encontramos las clases “CLASES PREARMADAS” en tu cuenta de Classroom. ' +
-            "Pide que te agreguen como profesor(a) de esas clases en Google Classroom.</div>"));
+          box.appendChild(h('<div class="pnl-alert ok">No encontramos clases con tu nombre' +
+            (d.match_name ? " (“" + esc(d.match_name) + "”)" : "") + " en tu cuenta de Classroom. " +
+            "Las clases deben llevar tu nombre, por ejemplo “LEVEL A1 - " + esc(d.match_name || "TU NOMBRE") + "”.</div>"));
           return;
         }
         // Módulos de LEF: número global (MODULE 4) → código (A2.1) y título.
         q("modules").select("level,title,module_number").then(function (r) {
           var mods = { titles: {}, byNumber: {} };
           (r.data || []).forEach(function (m) { mods.titles[m.level] = m.title; mods.byNumber[m.module_number] = m.level; });
-          var tree = buildTree(prearmadas, mods);
+          var tree = buildTree(courses, mods);
           var nav = h("<div></div>");
           box.appendChild(nav);
           showLevels(nav, tree);
@@ -1326,7 +1321,7 @@
        Classroom no tiene carpetas dentro de carpetas (solo clase → temas →
        materiales), así que se arman aquí leyendo los nombres, tal como los
        usa LEF en Classroom:
-         - la clase lleva el nivel en el nombre ("CLASES PREARMADAS A2" → A2);
+         - la clase lleva el nivel en el nombre ("LEVEL A2 - LUIS CABALLERO" → A2);
          - cada tema es un módulo con su número GLOBAL: "MODULE 4" → A2.1
            (según module_number de LEF); también sirve "A2.1" escrito tal cual;
          - cada material es un día: "LEVEL A2 MODULE 4 DAY 12 …" → día 12, en
