@@ -26,9 +26,9 @@
   \`?embedded=true\`; el resto → lee los encabezados del sitio. Si no se deja
   (Kahoot 14, Blooket 5, Baamboozle 6, Gimkit 2, test-english, englisch-hilfen,
   o http://), el panel muestra tarjeta con "Abrir en una pestaña nueva".
-  Carga total ~3 s. Pendiente: que el usuario confirme que el juego de
-  Wordwall se ve (en la captura de Claude el área salía negra, con el pie
-  "Con tecnología de Wordwall" visible — ya no hay error de conexión).
+  Carga total ~3 s. El usuario confirmó que el juego de Wordwall se ve y
+  funciona dentro del panel (en las capturas de Claude sale negro: es la
+  captura, no el juego).
 - **Planificador (profesores) = carpetas Nivel → Módulo → Días** sobre Google
   Classroom. Cada profesor ve SOLO las clases cuyo nombre contiene su nombre
   (sin tildes/mayúsculas/espacios dobles): Luis Caballero → "LEVEL A1 GR 1 -
