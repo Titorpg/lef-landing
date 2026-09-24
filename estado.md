@@ -2,7 +2,8 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **⚠️ SQL POR APLICAR — profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`):
+- **✅ APLICADO (23 sep) — profesor sin cruce de horarios** (`20260923080000_profesor_sin_cruce_horarios.sql`;
+  verificado: `lef_group_teacher_conflict` existe y responde 42501 a anon):
   triggers en groups/schedules/cycles → `LEF_TEACHER_SCHEDULE_CONFLICT` si un
   profesor queda con 2 grupos activos que comparten día + horas solapadas +
   ciclos que coinciden en fechas (pegados 7–8 y 8–9 sí se permiten; los 30 min
