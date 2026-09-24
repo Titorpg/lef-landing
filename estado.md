@@ -2,6 +2,14 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+- **Planificador por carpetas (24 sep)**: Classroom (solo profesores) se ve
+  como Nivel → Módulo → Días. Estructura del cliente: una clase por nivel
+  ("CLASES PREARMADAS A1", "…A2"), temas "Módulo 1/2/3" = A1.1/A1.2/A1.3, y
+  16 materiales (uno por día) en BORRADOR. `classroom-list` ahora pide
+  PUBLISHED+DRAFT, pagina, y manda description/creationTime. El nivel sale del
+  nombre de la clase (A1…C1); el módulo, del número del tema. Solo lo ven
+  profesores que sean profesores/co-profesores de esa clase en Classroom.
+  **Sin probar con la cuenta real** (requiere login de profesor conectado).
 - **✅ APLICADO (23 sep) — nivel C1** (`20260923100000_modulos_c1.sql`; verificado: get_public_modules devuelve 15, C1.1–C1.3 = 13–15): C1.1 HIRED,
   C1.2 CERTIFIED, C1.3 FLUENT = module_number 13–15 (checks de `modules`
   ampliados). Tras B2.3 el portal sugiere C1.1. Web (niveles.html, bloque

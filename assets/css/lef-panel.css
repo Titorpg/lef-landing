@@ -283,6 +283,15 @@ td.acts .btn{margin:2px 4px 2px 0;}
 /* ---- Google Classroom (panel, solo profesor): cada material embebido
    directo en la página (Drive/YouTube tienen URL de vista previa pensada
    para esto) en vez de un link que manda a otra pestaña. ---- */
+/* Planificador: cada día es un acordeón (fila + contenido pegado debajo). */
+.cls-day{margin-bottom:12px;}
+.cls-day .resource-row{margin-bottom:0;}
+.cls-day .resource-row__chevron{transition:transform .15s ease;}
+.cls-day.is-open .resource-row{border-color:var(--azul);border-radius:12px 12px 0 0;}
+.cls-day.is-open .resource-row__chevron{transform:rotate(90deg);}
+.cls-day__body{border:1px solid var(--azul);border-top:0;border-radius:0 0 12px 12px;
+  background:#fff;padding:14px 18px;}
+.cls-day__body .cls-post{margin-top:0;padding-top:0;border-top:none;}
 .cls-post{margin-top:16px;padding-top:14px;border-top:1px solid var(--niebla);}
 .cls-post:first-child{margin-top:8px;padding-top:0;border-top:none;}
 .cls-post__title{font-weight:600;font-size:13.5px;margin-bottom:8px;}

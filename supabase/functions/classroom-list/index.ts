@@ -42,6 +42,19 @@ async function classroomGet(accessToken: string, path: string) {
   return res.json();
 }
 
+// Recorre todas las páginas de un listado (key = campo con la lista).
+async function classroomList(accessToken: string, path: string, key: string) {
+  const out: Record<string, unknown>[] = [];
+  let pageToken = "";
+  do {
+    const sep = path.includes("?") ? "&" : "?";
+    const res = await classroomGet(accessToken, path + (pageToken ? `${sep}pageToken=${encodeURIComponent(pageToken)}` : ""));
+    out.push(...((res[key] as Record<string, unknown>[]) || []));
+    pageToken = (res.nextPageToken as string) || "";
+  } while (pageToken);
+  return out;
+}
+
 Deno.serve(async (req) => {
   const allowed = getAllowedOrigins();
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsFor(req, allowed) });
@@ -62,16 +75,19 @@ Deno.serve(async (req) => {
       let topics: Record<string, unknown>[] = [];
       let materials: Record<string, unknown>[] = [];
       try {
-        const topicsRes = await classroomGet(accessToken, `courses/${c.id}/topics?pageSize=200`);
-        topics = topicsRes.topic || [];
+        topics = await classroomList(accessToken, `courses/${c.id}/topics?pageSize=200`, "topic");
       } catch {
         // Curso sin temas creados todavía.
       }
       try {
-        const matRes = await classroomGet(accessToken, `courses/${c.id}/courseWorkMaterials?pageSize=200`);
-        materials = matRes.courseWorkMaterial || [];
+        // Publicados Y borradores: LEF guarda las clases prearmadas como
+        // borrador en Classroom (los estudiantes no las ven allá); los
+        // profesores del curso sí pueden leerlas.
+        materials = await classroomList(accessToken,
+          `courses/${c.id}/courseWorkMaterials?pageSize=200&courseWorkMaterialStates=PUBLISHED&courseWorkMaterialStates=DRAFT`,
+          "courseWorkMaterial");
       } catch {
-        // Curso sin materiales publicados todavía.
+        // Curso sin materiales todavía.
       }
       return {
         id: c.id,
@@ -80,7 +96,8 @@ Deno.serve(async (req) => {
         alternateLink: c.alternateLink,
         topics: topics.map((t) => ({ id: t.topicId, name: t.name })),
         materials: materials.map((m) => ({
-          id: m.id, title: m.title, topicId: m.topicId || null, alternateLink: m.alternateLink,
+          id: m.id, title: m.title, description: m.description || null, topicId: m.topicId || null,
+          alternateLink: m.alternateLink, state: m.state, creationTime: m.creationTime,
           attachments: ((m.materials as Record<string, unknown>[]) || []).map(shapeAttachment),
         })),
       };

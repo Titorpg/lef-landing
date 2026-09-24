@@ -1189,7 +1189,7 @@
   // materiales, con un enlace para abrir cada uno en Classroom (no se
   // embebe ni se pide acceso a Drive, no hace falta).
   function secClassroom(main) {
-    head(main, "Planificador", "Tus cursos y materiales de Google Classroom, organizados igual que allá.");
+    head(main, "Planificador", "Tus clases prearmadas de Google Classroom, organizadas por nivel y módulo.");
 
     var qs = new URLSearchParams(location.search);
     var googleStatus = qs.get("google");
@@ -1264,7 +1264,15 @@
           box.appendChild(h('<div class="pnl-alert ok">No encontramos cursos activos en tu cuenta de Classroom.</div>'));
           return;
         }
-        courses.forEach(function (c) { box.appendChild(courseCard(c)); });
+        // Títulos de los módulos de LEF (A1.1 → "Hello, World") para las carpetas.
+        q("modules").select("level,title").then(function (r) {
+          var titles = {};
+          (r.data || []).forEach(function (m) { titles[m.level] = m.title; });
+          var tree = buildTree(courses, titles);
+          var nav = h("<div></div>");
+          box.appendChild(nav);
+          showLevels(nav, tree);
+        });
       }).catch(function (e) {
         loading.remove();
         box.appendChild(h('<div class="pnl-alert err">No pudimos cargar Classroom: ' + esc((e && e.message) || e) + "</div>"));
@@ -1298,36 +1306,129 @@
     function postBlock(m) {
       var attachments = m.attachments || [];
       var embedsHtml = attachments.map(attachmentEmbed).join("");
-      return '<div class="cls-post"><p class="cls-post__title">' + esc(m.title) + "</p>" +
+      return '<div class="cls-post">' +
+        (m.description ? '<p class="pnl-sub" style="white-space:pre-line;margin-bottom:10px">' + esc(m.description) + "</p>" : "") +
         (embedsHtml || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>') +
         "</div>";
     }
 
-    function courseCard(c) {
-      var byTopic = {};
-      var loose = [];
-      (c.materials || []).forEach(function (m) {
-        if (m.topicId) { (byTopic[m.topicId] = byTopic[m.topicId] || []).push(m); }
-        else loose.push(m);
+    /* --- Carpetas: Nivel → Módulo → Días ---
+       Classroom no tiene carpetas dentro de carpetas (solo clase → temas →
+       materiales), así que se arman aquí leyendo los nombres:
+         - la clase lleva el nivel en el nombre ("CLASES PREARMADAS A1" → A1);
+         - cada tema es un módulo: "Módulo 2" → A1.2 (o el código tal cual si
+           el tema ya dice "A1.2");
+         - cada material del tema es un día de clase, en orden por su número
+           ("Día 3", "Tema 3"…) y si no tiene número, por fecha de creación.
+       Una clase sin nivel en el nombre queda como carpeta propia al final. */
+    var LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1"];
+    function firstNum(t) { var m = /(\d+)/.exec(t || ""); return m ? +m[1] : null; }
+    function buildTree(courses, titles) {
+      var levels = {};
+      courses.forEach(function (c) {
+        var lm = /\b([ABC][12])\b/i.exec(c.name || "");
+        var code = lm ? lm[1].toUpperCase() : null;
+        var key = code || ("curso:" + c.id);
+        var lv = levels[key] = levels[key] || { key: key, code: code, label: code ? "Nivel " + code : c.name, links: [], modules: {} };
+        lv.links.push({ name: c.name, url: c.alternateLink });
+        var topicMod = {};
+        (c.topics || []).forEach(function (t) {
+          var cm = /\b([ABC][12]\.[1-3])\b/i.exec(t.name || ""), n = firstNum(t.name);
+          topicMod[t.id] = cm ? cm[1].toUpperCase() : (code && n ? code + "." + n : t.name);
+        });
+        (c.materials || []).forEach(function (m) {
+          var mk = m.topicId && topicMod[m.topicId] ? topicMod[m.topicId] : "Sin módulo";
+          var mod = lv.modules[mk] = lv.modules[mk] || { key: mk, title: titles[mk] || "", items: [] };
+          mod.items.push(m);
+        });
       });
-      var groupsHtml = (c.topics || []).map(function (t) {
-        var items = byTopic[t.id] || [];
-        if (!items.length) return "";
-        return '<div style="margin-top:18px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">' +
-          esc(t.name) + "</p>" + items.map(postBlock).join("") + "</div>";
-      }).join("");
-      var looseHtml = loose.length
-        ? '<div style="margin-top:18px"><p style="font-weight:600;font-size:13.5px;margin-bottom:4px">Sin tema</p>' + loose.map(postBlock).join("") + "</div>"
-        : "";
-      var hasContent = groupsHtml || looseHtml;
+      var list = Object.keys(levels).map(function (k) { return levels[k]; });
+      list.sort(function (a, b) {
+        var ia = a.code ? LEVEL_ORDER.indexOf(a.code) : 99, ib = b.code ? LEVEL_ORDER.indexOf(b.code) : 99;
+        return ia - ib || a.label.localeCompare(b.label);
+      });
+      list.forEach(function (lv) {
+        lv.moduleList = Object.keys(lv.modules).map(function (k) { return lv.modules[k]; })
+          .sort(function (a, b) {
+            if (a.key === "Sin módulo") return 1;
+            if (b.key === "Sin módulo") return -1;
+            return a.key.localeCompare(b.key, "es", { numeric: true });
+          });
+        lv.moduleList.forEach(function (mod) {
+          mod.items.sort(function (a, b) {
+            var na = firstNum(a.title), nb = firstNum(b.title);
+            if (na !== null && nb !== null && na !== nb) return na - nb;
+            return String(a.creationTime || "").localeCompare(String(b.creationTime || ""));
+          });
+        });
+      });
+      return list;
+    }
 
-      return h(
-        '<div class="pnl-table-wrap" style="padding:20px;margin-bottom:16px">' +
-        '<p style="font-weight:700;font-size:15px">' + esc(c.name) + (c.section ? " · " + esc(c.section) : "") + "</p>" +
-        '<a href="' + esc(c.alternateLink) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir curso en Classroom ↗</a>' +
-        (hasContent ? groupsHtml + looseHtml : '<p class="muted" style="margin-top:10px;font-size:13px">Todavía no hay materiales publicados en este curso.</p>') +
-        "</div>"
-      );
+    function folderRow(title, sub, onOpen) {
+      var row = h('<div class="resource-row" tabindex="0" role="button">' +
+        '<div><div style="font-weight:600">' + esc(title) + "</div>" +
+        (sub ? '<span style="font-size:13px;color:var(--grafito)">' + esc(sub) + "</span>" : "") + "</div>" +
+        '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
+      row.addEventListener("click", onOpen);
+      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } });
+      return row;
+    }
+    function backBtn(label, onBack) {
+      var b = h('<button type="button" class="resource-back">&larr; ' + esc(label) + "</button>");
+      b.addEventListener("click", onBack);
+      return b;
+    }
+    function modLabel(mod) { return mod.key + (mod.title ? " — " + mod.title : ""); }
+
+    function showLevels(nav, tree) {
+      nav.innerHTML = "";
+      tree.forEach(function (lv) {
+        var n = lv.moduleList.length;
+        nav.appendChild(folderRow(lv.label, n + (n === 1 ? " módulo" : " módulos") + " · " + lv.links.map(function (l) { return l.name; }).join(", "),
+          function () { showModules(nav, tree, lv); }));
+      });
+    }
+
+    function showModules(nav, tree, lv) {
+      nav.innerHTML = "";
+      nav.appendChild(backBtn("Planificador", function () { showLevels(nav, tree); }));
+      nav.appendChild(h('<h2 class="pnl-h" style="font-size:18px;margin-bottom:2px">' + esc(lv.label) + "</h2>"));
+      nav.appendChild(h('<p style="margin-bottom:14px">' + lv.links.map(function (l) {
+        return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir “' + esc(l.name) + "” en Classroom ↗</a>";
+      }).join(" · ") + "</p>"));
+      if (!lv.moduleList.length) nav.appendChild(h('<div class="pnl-alert ok">Esta clase todavía no tiene materiales.</div>'));
+      lv.moduleList.forEach(function (mod) {
+        var n = mod.items.length;
+        nav.appendChild(folderRow(modLabel(mod), n + (n === 1 ? " clase" : " clases"), function () { showDays(nav, tree, lv, mod); }));
+      });
+    }
+
+    // Días como acordeón: el contenido (archivos embebidos) solo se carga al
+    // abrir cada día, para no traer 16 visores de una vez.
+    function showDays(nav, tree, lv, mod) {
+      nav.innerHTML = "";
+      nav.appendChild(backBtn(lv.label, function () { showModules(nav, tree, lv); }));
+      nav.appendChild(h('<h2 class="pnl-h" style="font-size:18px;margin-bottom:14px">' + esc(modLabel(mod)) + "</h2>"));
+      mod.items.forEach(function (m) {
+        var wrap = h('<div class="cls-day"></div>');
+        var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
+          '<div style="font-weight:600">' + esc(m.title || "Sin título") + "</div>" +
+          '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
+        var panel = h('<div class="cls-day__body" hidden></div>');
+        function toggle() {
+          var open = panel.hidden;
+          panel.hidden = !open;
+          row.setAttribute("aria-expanded", open ? "true" : "false");
+          wrap.classList.toggle("is-open", open);
+          if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = postBlock(m); }
+        }
+        row.addEventListener("click", toggle);
+        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+        wrap.appendChild(row);
+        wrap.appendChild(panel);
+        nav.appendChild(wrap);
+      });
     }
   }
 
