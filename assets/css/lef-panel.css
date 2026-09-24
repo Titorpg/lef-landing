@@ -292,6 +292,9 @@ td.acts .btn{margin:2px 4px 2px 0;}
 .cls-day__body{border:1px solid var(--azul);border-top:0;border-radius:0 0 12px 12px;
   background:#fff;padding:14px 18px;}
 .cls-day__body .cls-post{margin-top:0;padding-top:0;border-top:none;}
+.cls-linkcard{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  border:1px solid var(--niebla);border-radius:10px;background:var(--papel);padding:14px 16px;margin-bottom:10px;}
+.cls-linkcard__title{font-weight:600;font-size:14px;overflow-wrap:anywhere;}
 .cls-post{margin-top:16px;padding-top:14px;border-top:1px solid var(--niebla);}
 .cls-post:first-child{margin-top:8px;padding-top:0;border-top:none;}
 .cls-post__title{font-weight:600;font-size:13.5px;margin-bottom:8px;}

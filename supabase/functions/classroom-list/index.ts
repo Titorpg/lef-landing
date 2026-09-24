@@ -35,6 +35,66 @@ function shapeAttachment(att: Record<string, unknown>) {
   return { type: "unknown" };
 }
 
+// --- ¿Se puede mostrar el enlace DENTRO de LEF? ---
+// Muchos sitios (Kahoot, Blooket, Baamboozle, Gimkit…) prohíben que otra
+// página los muestre en un iframe (X-Frame-Options / CSP frame-ancestors) y el
+// navegador enseña "…rechazó la conexión". Aquí se revisa cada enlace una vez:
+//   - Wordwall: su página normal no se deja incrustar, pero su API oEmbed da la
+//     dirección /embed/<guid> que sí (la misma del botón "Incrustar").
+//   - Google Forms: la versión ?embedded=true sí se deja incrustar.
+//   - Resto: se piden los encabezados del sitio; si lo prohíbe, el panel
+//     muestra una tarjeta con "Abrir en una pestaña nueva" en vez del error.
+type Embed = { embedUrl: string | null; embeddable: boolean };
+
+function withTimeout(ms: number) {
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
+}
+
+async function wordwallEmbed(url: string): Promise<Embed> {
+  try {
+    const res = await fetch(`https://wordwall.net/api/oembed?url=${encodeURIComponent(url)}&format=json`, { signal: withTimeout(5000) });
+    if (!res.ok) return { embedUrl: null, embeddable: false };
+    const data = await res.json();
+    const src = /src="([^"]+)"/.exec(String(data.html || ""));
+    return src ? { embedUrl: src[1].replace(/&amp;/g, "&"), embeddable: true } : { embedUrl: null, embeddable: false };
+  } catch {
+    return { embedUrl: null, embeddable: false };
+  }
+}
+
+async function frameCheck(url: string): Promise<Embed> {
+  // http:// dentro de una página https lo bloquea el navegador de todos modos.
+  if (!/^https:\/\//i.test(url)) return { embedUrl: null, embeddable: false };
+  try {
+    const res = await fetch(url, { redirect: "follow", signal: withTimeout(4000), headers: { "User-Agent": "Mozilla/5.0 (LEF embed check)" } });
+    res.body?.cancel();
+    const xfo = (res.headers.get("x-frame-options") || "").toLowerCase();
+    if (xfo.includes("deny") || xfo.includes("sameorigin")) return { embedUrl: null, embeddable: false };
+    const fa = /frame-ancestors([^;]*)/i.exec(res.headers.get("content-security-policy") || "");
+    if (fa) {
+      const v = fa[1].toLowerCase();
+      if (!v.includes("*") && !v.includes("lefcenter.com")) return { embedUrl: null, embeddable: false };
+    }
+    return { embedUrl: url, embeddable: true };
+  } catch {
+    // Sin respuesta a tiempo: se intenta mostrar (queda el enlace de respaldo).
+    return { embedUrl: url, embeddable: true };
+  }
+}
+
+async function resolveEmbed(url: string): Promise<Embed> {
+  if (/^https?:\/\/(www\.)?wordwall\.net\/([a-z]{2}\/)?resource\/\d+/i.test(url)) return wordwallEmbed(url);
+  if (/^https:\/\/docs\.google\.com\/forms\//i.test(url)) {
+    const u = new URL(url);
+    u.searchParams.delete("usp");
+    u.searchParams.set("embedded", "true");
+    return { embedUrl: u.toString(), embeddable: true };
+  }
+  return frameCheck(url);
+}
+
 async function classroomGet(accessToken: string, path: string) {
   const res = await fetch(`https://classroom.googleapis.com/v1/${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -128,6 +188,18 @@ Deno.serve(async (req) => {
         })),
       };
     }));
+
+    // Una revisión por dirección distinta (se repiten mucho entre clases).
+    const urls = new Set<string>();
+    shaped.forEach((c) => c.materials.forEach((m) => m.attachments.forEach((a: Record<string, unknown>) => {
+      if ((a.type === "link" || a.type === "form") && a.url) urls.add(String(a.url));
+    })));
+    const embeds = new Map<string, Embed>();
+    await Promise.all([...urls].map(async (u) => { embeds.set(u, await resolveEmbed(u)); }));
+    shaped.forEach((c) => c.materials.forEach((m) => m.attachments.forEach((a: Record<string, unknown>) => {
+      const e = a.url ? embeds.get(String(a.url)) : undefined;
+      if (e) Object.assign(a, e);
+    })));
 
     return json(req, { connected: true, google_email: auth.googleEmail, match_name: matchName, courses: shaped });
   } catch {

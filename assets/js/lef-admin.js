@@ -1289,6 +1289,16 @@
     // esto (no hace falta pedir acceso a Drive). Un enlace externo o un Form
     // pueden no dejarse embeber (lo decide el sitio destino, no LEF) — por
     // eso siempre queda debajo el enlace de respaldo para abrirlo aparte.
+    function linkCard(att) {
+      var host = "";
+      try { host = new URL(att.url).hostname.replace(/^www\./, ""); } catch (e) { host = ""; }
+      return '<div class="cls-linkcard">' +
+        '<div style="min-width:0"><p class="cls-linkcard__title">' + esc(att.title || host || "Enlace") + "</p>" +
+        '<p class="muted" style="font-size:12.5px">' + esc(host) + " no permite mostrarse dentro de otra página.</p></div>" +
+        '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="btn btn-blue btn-sm">Abrir en una pestaña nueva ↗</a>' +
+        "</div>";
+    }
+
     function attachmentEmbed(att) {
       if (att.type === "drive") {
         return '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
@@ -1297,13 +1307,13 @@
       if (att.type === "youtube") {
         return '<div class="cls-embed cls-embed--16-9"><iframe src="https://www.youtube.com/embed/' + esc(att.id) + '" allowfullscreen loading="lazy"></iframe></div>';
       }
-      if (att.type === "link" && att.url) {
-        return '<div class="cls-embed"><iframe src="' + esc(att.url) + '" loading="lazy"></iframe></div>' +
-          '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir enlace en una pestaña nueva ↗</a>';
-      }
-      if (att.type === "form" && att.url) {
-        return '<div class="cls-embed"><iframe src="' + esc(att.url) + '" loading="lazy"></iframe></div>' +
-          '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir formulario en una pestaña nueva ↗</a>';
+      if ((att.type === "link" || att.type === "form") && att.url) {
+        // classroom-list ya revisó si el sitio se deja mostrar aquí (Wordwall
+        // y Forms vienen con su dirección para incrustar). Si no se deja
+        // (Kahoot, Blooket…), tarjeta con botón en vez del "rechazó la conexión".
+        if (att.embeddable === false) return linkCard(att);
+        return '<div class="cls-embed"><iframe src="' + esc(att.embedUrl || att.url) + '" loading="lazy" allowfullscreen></iframe></div>' +
+          '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir en una pestaña nueva ↗</a>';
       }
       return "";
     }
