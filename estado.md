@@ -20,10 +20,10 @@
 
 ### Hecho 24 sep 2026
 - **Planificador — enlaces que "rechazan la conexión"**: muchos sitios
-  prohíben mostrarse en iframe (X-Frame-Options/CSP). \`classroom-list\` ahora
+  prohíben mostrarse en iframe (X-Frame-Options/CSP). `classroom-list` ahora
   revisa cada enlace una vez por carga: Wordwall → su API oEmbed da
-  \`/embed/<guid>\` (sí se deja; 48/48 resueltos); Google Forms →
-  \`?embedded=true\`; el resto → lee los encabezados del sitio. Si no se deja
+  `/embed/<guid>` (sí se deja; 48/48 resueltos); Google Forms →
+  `?embedded=true`; el resto → lee los encabezados del sitio. Si no se deja
   (Kahoot 14, Blooket 5, Baamboozle 6, Gimkit 2, test-english, englisch-hilfen,
   o http://), el panel muestra tarjeta con "Abrir en una pestaña nueva".
   Carga total ~3 s. El usuario confirmó que el juego de Wordwall se ve y
