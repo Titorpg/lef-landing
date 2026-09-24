@@ -180,7 +180,9 @@
     importante: { label: "Importante", cls: "cat-importante" }
   };
   // Programa completo A1.1 → C1.3 (módulos 1–15): contar también el nivel C1
-  // anima a matricularse en los últimos módulos (pedido del cliente).
+  // anima a matricularse en los últimos módulos (pedido del cliente). El
+  // progreso de cada estudiante cuenta desde el módulo con el que ENTRÓ (no
+  // todos empiezan en A1.1): quien entra en el 8 tiene una ruta de 8 módulos.
   var TOTAL_MODULES = 15;
 
   function go(tab) { location.hash = tab; }
@@ -289,9 +291,11 @@
         : owing.length ? '<div class="home-card__big home-card__big--warn">' + money(balance, "COP") + '</div><div class="home-card__line">Saldo pendiente</div>'
         : '<div class="home-card__big home-card__big--ok">Al día</div><div class="home-card__line">No tienes saldos pendientes</div>';
       if (pays[0]) payBody += '<div class="home-card__line muted">Último pago: ' + money(pays[0].amount, pays[0].currency) + " · " + esc(date(pays[0].paid_at)) + "</div>";
-      var pct = Math.round(doneCount / TOTAL_MODULES * 100);
-      var progBody = '<div class="home-card__big">' + doneCount + '<span class="home-card__of"> / ' + TOTAL_MODULES + "</span></div>" +
-        '<div class="home-card__line">módulos completados (A1.1 → C1.3)</div>' +
+      var first = courses.reduce(function (a, c) { return !a || c.module_number < a.module_number ? c : a; }, null);
+      var routeTotal = first ? TOTAL_MODULES - first.module_number + 1 : TOTAL_MODULES;
+      var pct = Math.min(100, Math.round(doneCount / routeTotal * 100));
+      var progBody = '<div class="home-card__big">' + doneCount + '<span class="home-card__of"> / ' + routeTotal + "</span></div>" +
+        '<div class="home-card__line">módulos completados (' + esc(first ? first.module_level : "A1.1") + " → C1.3)</div>" +
         '<div class="home-card__bar"><div style="width:' + pct + '%"></div></div>';
 
       var cards = h('<div class="home-cards"></div>');
