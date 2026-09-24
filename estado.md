@@ -2,7 +2,9 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **⚠️ SQL POR APLICAR — Classroom por profesor** (`20260924000000_classroom_por_profesor.sql`):
+- **✅ APLICADO (24 sep) — Classroom por profesor** (`20260924000000_classroom_por_profesor.sql`;
+  verificado en el panel con Luis Manga: Nivel A1 y A2 solo con las clases de
+  LUIS CABALLERO, A1.1–A1.3 = 16 c/u, A2.1/A2.2 = 17, A2.3 = 14):
   `classroom-list` (desplegada) devuelve solo las clases cuyo nombre contiene
   el nombre del profesor (sin tildes/mayúsculas): Luis Caballero → "LEVEL A1 GR
   1 - LUIS CABALLERO", "LEVEL A2 - LUIS CABALLERO"; María Rada → sus 2 clases.
