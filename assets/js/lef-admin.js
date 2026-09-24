@@ -2778,9 +2778,18 @@
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
         if (!scheds.length) { toast("No hay horarios activos con módulo activo.", "err"); return; }
+        // Solo horarios que todavía no tienen grupo (= profesor asignado): así
+        // un mismo horario y módulo no termina repartido entre dos profesores.
+        // Cuenta también los grupos desactivados, que siguen ocupando su horario.
+        var taken = {}; allGroups.forEach(function (g) { taken[g.schedule_id] = true; });
+        var openScheds = scheds.filter(function (s) { return !taken[s.id]; });
+        if (!openScheds.length) {
+          toast("Todos los horarios activos ya tienen un profesor asignado. Crea un horario nuevo en la pestaña Horarios.", "err");
+          return;
+        }
         var b = h("<div>" +
-          field("Horario", '<select name="s">' + scheds.map(function (s) {
-            return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time)) + "</option>";
+          field("Horario", '<select name="s">' + openScheds.map(function (s) {
+            return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time) + "–" + time(s.end_time)) + "</option>";
           }).join("") + "</select>") +
           field("Profesor", '<select name="t">' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
           field("Cupo", '<input name="c" type="number" min="1" max="8" value="8">') +
@@ -2811,12 +2820,12 @@
           if (!conflicts.length) { slot.innerHTML = ""; return; }
           var sug = suggestSlot(allGroups, tSel.value, sc, null);
           // Horarios ya creados del mismo módulo que este profesor sí tiene libres.
-          var free = scheds.filter(function (o) {
+          var free = openScheds.filter(function (o) {
             return o.id !== sc.id && o.module_id === sc.module_id && !teacherConflicts(allGroups, tSel.value, o, null).length;
           });
           slot.innerHTML = conflictAlertHtml(conflictLines(teacherName[tSel.value], conflicts, sc, sug, [
             free.length
-              ? "Horarios ya creados de este módulo que tiene libres: " + free.map(function (o) { return days(o.days) + " " + time(o.start_time) + "–" + time(o.end_time); }).join("; ") + "."
+              ? "Horarios sin asignar de este módulo que tiene libres: " + free.map(function (o) { return days(o.days) + " " + time(o.start_time) + "–" + time(o.end_time); }).join("; ") + "."
               : "Si el horario sugerido no aparece en la lista, créalo primero en la pestaña Horarios.",
             "Cambia el horario (o el profesor) para poder guardar."
           ]));
