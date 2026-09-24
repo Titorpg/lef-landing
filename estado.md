@@ -3,6 +3,12 @@
 ## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
 ### Por hacer (abiertos)
+- **"Mi clase" del estudiante (Classroom + Clase de hoy)**: funciones `student-classroom`
+  y `classroom-list` (refactor a `_shared/classroom.ts`) YA desplegadas; el portal
+  (Mi curso → tarjeta + pestaña oculta `#clase-hoy`) está en git pero NO publicado:
+  espera aprobación de capturas. Después: probar con un estudiante real que pagó
+  (código, botón Unirme con `?cjc=`, agenda del día) y que un Gmail personal
+  pueda entrar a la clase.
 - **Profesores reales conectan su Google**: Luis Caballero y María Rada entran
   a admin → **Planificador** → "Conectar con Google Classroom" con SU cuenta.
   No hay que configurar nada más (el filtro por nombre ya está en vivo).
@@ -24,6 +30,13 @@
   apagarla en `supabase/config.toml` y redesplegar.
 
 ### Hecho 24 sep 2026
+- **Mi clase en Classroom + "Clase de hoy"** (portal). Clase = la del profesor del
+  grupo cuyo nombre lleva su nombre y el nivel ("LEVEL A2 - LUIS CABALLERO": una por
+  profesor y nivel, compartida por sus grupos). Agenda de hoy = material PUBLICADO del
+  tema del módulo con `scheduledTime||updateTime` = hoy (Bogotá); el profesor tiene los
+  "DAY n" en borrador y publica el del día. Nunca devuelve borradores. Requiere pago
+  (`lef_enrollment_paid`). Estados: sin_grupo, sin_pago, profesor_sin_conexion,
+  sin_clase_classroom. Unirse: `alternateLink?cjc=<enrollmentCode>`.
 - **Diseño de tarjetas flotantes en todo el panel y el portal** (aprobado por el
   usuario con capturas antes/después): cada fila de tabla es una tarjeta con
   sombra y franja del color de su estado (`tr:has(.badge.ok|warn|bad)`), en PC y

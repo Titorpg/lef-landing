@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.wompi-webhook]
 verify_jwt = false
+
+[functions.student-classroom]
+verify_jwt = true

@@ -129,6 +129,7 @@
     { id: "facturacion", label: "Facturación", render: renderBilling },
     { id: "curso", label: "Mi curso", render: renderCourse },
     { id: "calendario", label: "Calendario", render: renderCalendar },
+    { id: "clase-hoy", label: "Clase de hoy", render: renderClassToday, hidden: true, parent: "curso" },
     { id: "recursos", label: "Mis recursos", render: renderResources },
     { id: "cuenta", label: "Mi cuenta", render: renderAccount }
   ];
@@ -146,7 +147,7 @@
     ));
     var wrap = h('<div class="pnl-wrap"><nav class="pnl-nav"></nav><main class="pnl-main"></main></div>');
     var nav = wrap.querySelector(".pnl-nav");
-    TABS.forEach(function (t) { nav.appendChild(h('<a href="#' + t.id + '">' + esc(t.label) + "</a>")); });
+    TABS.forEach(function (t) { if (!t.hidden) nav.appendChild(h('<a href="#' + t.id + '">' + esc(t.label) + "</a>")); });
     app.appendChild(wrap);
     app.querySelector("[data-logout]").onclick = function () { sb.auth.signOut().then(boot); };
 
@@ -160,7 +161,7 @@
     var id = location.hash.slice(1);
     var tab = TABS.filter(function (t) { return t.id === id; })[0] || TABS[0];
     document.querySelectorAll(".pnl-nav a").forEach(function (a) {
-      a.classList.toggle("active", a.getAttribute("href") === "#" + tab.id);
+      a.classList.toggle("active", a.getAttribute("href") === "#" + (tab.parent || tab.id));
     });
     var main = document.querySelector(".pnl-main");
     if (!main) return;
@@ -846,6 +847,8 @@
       var done = rows.filter(isCourseDone);
 
       current.forEach(function (c) { renderCourseHero(main, c); });
+      var withGroup = current.filter(function (c) { return c.schedule_days && c.schedule_days.length; })[0];
+      if (withGroup) renderMyClassCard(main, withGroup);
 
       var offerPromise = current.length
         ? Promise.resolve(null)
@@ -861,6 +864,239 @@
       });
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu curso: ' + esc(e.message) + "</div>";
+    });
+  }
+
+  /* ---------- Mi clase en Google Classroom + "Clase de hoy" ---------- */
+  // Pedido del usuario (24 sep 2026): desde Mi curso el estudiante entra a la
+  // clase de Classroom de su profesor (botón + código) y abre "Clase de hoy",
+  // donde ve la agenda que el profesor publicó hoy (en Classroom las agendas
+  // "DAY n" están en borrador y el profesor publica la del día). Todo sale de
+  // la función student-classroom, que lee Classroom con la conexión del
+  // profesor y SOLO lo publicado. Requiere la mensualidad pagada.
+  function classFn(action) {
+    // Token fresco en cada llamada (la sesión se renueva sola cada hora).
+    return sb.auth.getSession().then(function (r) {
+      var tok = (r.data && r.data.session) ? r.data.session.access_token : TOKEN;
+      return fetch(window.LEF_SUPABASE.url + "/functions/v1/student-classroom", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: action })
+      }).then(function (res) {
+        return res.json().then(function (j) {
+          if (!res.ok && !j.status) throw new Error(j.error || "Error");
+          return j;
+        });
+      });
+    });
+  }
+
+  var MC_ICONS = {
+    board: '<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/><circle cx="12" cy="10" r="2.5"/><path d="M7.5 15.5c.8-1.6 2.5-2.5 4.5-2.5s3.7.9 4.5 2.5"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    calx: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m14 14-4 4m0-4 4 4"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
+    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/>'
+  };
+  function mcIc(name) {
+    return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (MC_ICONS[name] || "") + "</svg>";
+  }
+
+  var CLASS_MSG = {
+    sin_pago: ["lock", "Tu clase se activa con el pago", "El acceso a tu clase de Classroom y a la agenda diaria se activa cuando pagues tu mensualidad."],
+    profesor_sin_conexion: ["alert", "Tu profesor aún no ha conectado Classroom", "Mientras tanto, pídele directamente el código de la clase. Aquí aparecerá en cuanto lo conecte."],
+    sin_clase_classroom: ["alert", "Tu clase aún no está en Classroom", "Tu profesor todavía no ha creado la clase de tu nivel. Aparecerá aquí apenas la cree."],
+    sin_grupo: ["clock", "Aún no tienes grupo asignado", "Cuando LEF te asigne un grupo, aquí aparecerá tu clase."],
+    error: ["alert", "No pudimos consultar Classroom", "Intenta de nuevo en unos minutos."]
+  };
+
+  function copyText(btn, text) {
+    var label = btn.querySelector("span") || btn;
+    var original = label.textContent;
+    function done(ok) { label.textContent = ok ? "¡Copiado!" : "No se pudo copiar"; setTimeout(function () { label.textContent = original; }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    else done(false);
+  }
+
+  function codeBlock(course) {
+    if (!course || !course.enrollment_code) return "";
+    return '<div class="myclass__code"><div><span class="myclass__code-k">Código de la clase</span>' +
+      '<strong class="myclass__code-v">' + esc(course.enrollment_code) + "</strong></div>" +
+      '<button type="button" class="myclass__copy" data-copy>' + mcIc("copy") + "<span>Copiar</span></button></div>";
+  }
+
+  function renderMyClassCard(main, c) {
+    var card = h('<div class="myclass">' +
+      '<div class="myclass__head"><span class="myclass__ic">' + mcIc("board") + "</span>" +
+      '<div style="min-width:0"><p class="myclass__k">Tu clase en Google Classroom</p>' +
+      '<h3 class="myclass__t" data-name>' + esc(c.module_level + " — " + c.module_title) + "</h3>" +
+      '<p class="myclass__m">' + esc([c.teacher_full_name, fmtDays(c.schedule_days), fmtTime(c.schedule_start_time)].filter(Boolean).join(" · ")) + "</p></div></div>" +
+      '<div data-body><p class="muted" style="font-size:13.5px">Buscando tu clase…</p></div>' +
+      '<div class="myclass__acts">' +
+      '<a class="btn btn-blue" data-join target="_blank" rel="noopener" hidden>' + mcIc("ext") + "<span>Unirme a la clase</span></a>" +
+      '<button type="button" class="btn btn-dark" data-today>' + mcIc("sun") + "<span>Clase de hoy</span></button></div></div>");
+    var body = card.querySelector("[data-body]"), join = card.querySelector("[data-join]");
+    card.querySelector("[data-today]").addEventListener("click", function () { go("clase-hoy"); });
+    main.appendChild(card);
+    if (!c.module_paid) {
+      body.innerHTML = '<p class="myclass__hint">' + esc(CLASS_MSG.sin_pago[2]) + "</p>";
+      return;
+    }
+    classFn("info").then(function (d) {
+      if (d.status !== "ok") {
+        var m = CLASS_MSG[d.status] || CLASS_MSG.error;
+        body.innerHTML = '<p class="myclass__hint">' + esc(m[2]) + "</p>";
+        return;
+      }
+      card.querySelector("[data-name]").textContent = d.course.name;
+      body.innerHTML = codeBlock(d.course) +
+        '<p class="myclass__hint">Entra con tu cuenta de Google (tu correo personal) y toca <strong>Unirme a la clase</strong>. ' +
+        "Si Classroom te pide el código, cópialo de aquí.</p>";
+      var cp = body.querySelector("[data-copy]");
+      if (cp) cp.addEventListener("click", function () { copyText(cp, d.course.enrollment_code); });
+      join.href = d.course.join_url; join.hidden = false;
+    }).catch(function () {
+      body.innerHTML = '<p class="myclass__hint">' + esc(CLASS_MSG.error[2]) + "</p>";
+    });
+  }
+
+  // Adjuntos embebidos (misma lógica que el Planificador del profesor).
+  function mcLinkCard(att) {
+    var host = "";
+    try { host = new URL(att.url).hostname.replace(/^www\./, ""); } catch (e) { host = ""; }
+    return '<div class="cls-linkcard"><div style="min-width:0"><p class="cls-linkcard__title">' + esc(att.title || host || "Enlace") + "</p>" +
+      '<p class="muted" style="font-size:12.5px">' + esc(host) + " se abre en una pestaña aparte.</p></div>" +
+      '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="btn btn-blue btn-sm">Abrir ↗</a></div>';
+  }
+  function mcAttachment(att) {
+    if (att.type === "drive") {
+      return '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
+        (att.alternateLink ? '<a href="' + esc(att.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Ábrelo en Google Drive ↗</a>' : "");
+    }
+    if (att.type === "youtube") {
+      return '<div class="cls-embed cls-embed--16-9"><iframe src="https://www.youtube.com/embed/' + esc(att.id) + '" allowfullscreen loading="lazy"></iframe></div>';
+    }
+    if ((att.type === "link" || att.type === "form") && att.url) {
+      if (att.embeddable === false) return mcLinkCard(att);
+      return '<div class="cls-embed"><iframe src="' + esc(att.embedUrl || att.url) + '" loading="lazy" allowfullscreen></iframe></div>' +
+        '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Abrir en una pestaña nueva ↗</a>';
+    }
+    return "";
+  }
+  function mcPost(m) {
+    var html = (m.attachments || []).map(mcAttachment).join("");
+    return (m.description ? '<p class="agenda__desc">' + esc(m.description) + "</p>" : "") +
+      (html || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>');
+  }
+  function shortDate(ymd) {
+    var d = new Date(ymd + "T12:00:00");
+    return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
+  }
+
+  function renderClassToday(main) {
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Mi curso</button>');
+    back.addEventListener("click", function () { go("curso"); });
+    main.appendChild(back);
+    var box = h('<div class="today"><div class="today-hero is-loading"><div class="today-hero__date"><span class="today-hero__k">Clase de hoy</span>' +
+      '<span class="today-hero__num">' + new Date().getDate() + "</span></div>" +
+      '<div class="today-hero__info"><p class="today-hero__mod">Buscando la agenda de hoy…</p></div></div></div>');
+    main.appendChild(box);
+
+    classFn("today").then(function (d) {
+      box.innerHTML = "";
+      var g = d.group || {}, todayD = d.today ? new Date(d.today + "T12:00:00") : new Date();
+      var agendas = d.today_agendas || [];
+      var state = d.status !== "ok" ? "off" : agendas.length ? "ok" : d.is_class_day ? "wait" : "off";
+      var pill = d.status !== "ok" ? "" : agendas.length ? "Agenda publicada" : d.is_class_day ? "Pendiente de publicar" : "Hoy no tienes clase";
+      box.appendChild(h('<div class="today-hero">' +
+        '<div class="today-hero__date"><span class="today-hero__k">Clase de hoy</span>' +
+        '<span class="today-hero__num">' + todayD.getDate() + "</span>" +
+        '<span class="today-hero__dm">' + esc(todayD.toLocaleDateString("es-CO", { weekday: "long" })) + " · " +
+        esc(todayD.toLocaleDateString("es-CO", { month: "long" })) + "</span></div>" +
+        '<div class="today-hero__info">' +
+        (g.module_level ? '<p class="today-hero__mod">' + esc(g.module_level + " — " + g.module_title) + "</p>" : "") +
+        (g.start_time ? '<p class="today-hero__meta">' + mcIc("clock") + esc(fmtTime(g.start_time) + (g.end_time ? " – " + fmtTime(g.end_time) : "")) +
+          (g.teacher ? " · " + esc(g.teacher) : "") + "</p>" : "") +
+        (pill ? '<span class="today-pill is-' + state + '"><i></i>' + esc(pill) + "</span>" : "") +
+        "</div></div>"));
+
+      if (d.status !== "ok") {
+        var m = CLASS_MSG[d.status] || CLASS_MSG.error;
+        var st = h('<div class="today-empty"><span class="today-empty__ic">' + mcIc(m[0]) + "</span><h2>" + esc(m[1]) + "</h2><p>" + esc(m[2]) + "</p>" +
+          (d.status === "sin_pago" ? '<button type="button" class="btn btn-blue">Ir a Facturación</button>' : "") + "</div>");
+        var fb = st.querySelector("button"); if (fb) fb.addEventListener("click", function () { go("facturacion"); });
+        box.appendChild(st);
+        return;
+      }
+
+      if (agendas.length) {
+        agendas.forEach(function (a) {
+          var art = h('<article class="agenda">' +
+            '<header class="agenda__head"><span class="agenda__day"><small>Day</small>' + esc(a.day != null ? String(a.day) : "·") + "</span>" +
+            '<div class="agenda__titles"><h2>' + esc(a.title || "Agenda de hoy") + "</h2><p>Publicada hoy por " + esc(g.teacher || "tu profesor") + "</p></div>" +
+            '<a class="btn btn-ghost btn-sm" href="' + esc(a.alternateLink) + '" target="_blank" rel="noopener">' + mcIc("ext") + "<span>Classroom</span></a></header>" +
+            '<div class="agenda__body">' + mcPost(a) + "</div></article>");
+          box.appendChild(art);
+        });
+      } else if (d.is_class_day) {
+        var w = h('<div class="today-empty is-wait"><span class="today-empty__ic">' + mcIc("clock") + "</span>" +
+          "<h2>Tu profesor publicará la agenda de hoy en breve</h2>" +
+          "<p>" + (g.start_time ? "Tu clase de hoy empieza a las " + esc(fmtTime(g.start_time)) + " Vuelve" : "Vuelve") + " a revisar un poco antes de empezar.</p>" +
+          '<button type="button" class="btn btn-dark">' + mcIc("refresh") + "<span>Actualizar</span></button></div>");
+        w.querySelector("button").addEventListener("click", function () { renderClassToday(main); });
+        box.appendChild(w);
+      } else {
+        var nx = d.next_class ? new Date(d.next_class + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" }) : "";
+        box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("calx") + "</span>" +
+          "<h2>Hoy no tienes clase</h2>" +
+          "<p>" + (nx ? "Tu próxima clase es el <strong>" + esc(nx) + (g.start_time ? " a las " + esc(fmtTime(g.start_time)) : "") + "</strong>" : "Revisa tu horario en Mi curso") +
+          " — mientras tanto, puedes repasar las agendas anteriores.</p></div>"));
+      }
+
+      // Recordatorio para unirse a la clase de Classroom.
+      if (d.course) {
+        var jn = h('<div class="today-join"><span class="today-join__ic">' + mcIc("board") + "</span>" +
+          '<div class="today-join__t"><strong>¿Todavía no estás en la clase de Classroom?</strong>' +
+          "<span>" + esc(d.course.name) + (d.course.enrollment_code ? " · código <b>" + esc(d.course.enrollment_code) + "</b>" : "") + "</span></div>" +
+          '<a class="btn btn-blue btn-sm" href="' + esc(d.course.join_url) + '" target="_blank" rel="noopener">Unirme ↗</a></div>');
+        box.appendChild(jn);
+      }
+
+      var prev = d.previous_agendas || [];
+      if (prev.length) {
+        box.appendChild(h('<h2 class="today-sec">Agendas anteriores</h2>'));
+        prev.forEach(function (a) {
+          var wrap = h('<div class="cls-day"></div>');
+          var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
+            '<div style="min-width:0"><div style="font-weight:600">' + esc(a.title || "Agenda") + "</div>" +
+            '<span style="font-size:12.5px;color:var(--grafito)">Publicada el ' + esc(a.published_on ? shortDate(a.published_on) : "—") + "</span></div>" +
+            '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
+          var panel = h('<div class="cls-day__body" hidden></div>');
+          function toggle() {
+            var open = panel.hidden;
+            panel.hidden = !open;
+            row.setAttribute("aria-expanded", open ? "true" : "false");
+            wrap.classList.toggle("is-open", open);
+            if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = '<div class="cls-post">' + mcPost(a) + "</div>"; }
+          }
+          row.addEventListener("click", toggle);
+          row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+          wrap.appendChild(row); wrap.appendChild(panel);
+          box.appendChild(wrap);
+        });
+      }
+    }).catch(function () {
+      box.innerHTML = "";
+      box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>" + esc(CLASS_MSG.error[1]) +
+        "</h2><p>" + esc(CLASS_MSG.error[2]) + "</p></div>"));
     });
   }
 

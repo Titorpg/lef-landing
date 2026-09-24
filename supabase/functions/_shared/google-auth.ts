@@ -1,5 +1,5 @@
 // LEF — helpers compartidos por las Edge Functions que llaman APIs de Google
-// a nombre de un profesor (classroom-list): valida su JWT de
+// a nombre de un profesor (classroom-list, student-classroom): valida su JWT de
 // Supabase, busca su token de Google guardado y lo refresca si hace falta.
 // Los tokens nunca salen de aquí hacia el navegador.
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -61,8 +61,16 @@ export async function getTeacherAccessToken(req: Request): Promise<TeacherTokenR
     return { ok: false, status: 403, error: "requiere_profesor" };
   }
 
+  return await accessTokenForTeacher(admin, profile.teacher_id);
+}
+
+// Token de Google de un profesor por su id (lo usa student-classroom: el
+// estudiante ve la clase de SU profesor con la conexión del profesor). Mismo
+// criterio que arriba: "no_conectado"/"reconectar" no son fallos del llamador.
+// deno-lint-ignore no-explicit-any
+export async function accessTokenForTeacher(admin: any, teacherId: string): Promise<TeacherTokenResult> {
   const { data: tok } = await admin
-    .from("teacher_google_tokens").select("*").eq("teacher_id", profile.teacher_id).maybeSingle();
+    .from("teacher_google_tokens").select("*").eq("teacher_id", teacherId).maybeSingle();
   if (!tok) return { ok: false, status: 200, error: "no_conectado" };
 
   let accessToken = tok.access_token as string;
@@ -77,11 +85,11 @@ export async function getTeacherAccessToken(req: Request): Promise<TeacherTokenR
         access_token: accessToken,
         access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
         updated_at: new Date().toISOString(),
-      }).eq("teacher_id", profile.teacher_id);
+      }).eq("teacher_id", teacherId);
     } catch {
       return { ok: false, status: 200, error: "reconectar" };
     }
   }
 
-  return { ok: true, accessToken, googleEmail: tok.google_email, teacherId: profile.teacher_id };
+  return { ok: true, accessToken, googleEmail: tok.google_email, teacherId };
 }
