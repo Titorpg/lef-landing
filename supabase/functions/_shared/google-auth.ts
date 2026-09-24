@@ -1,5 +1,5 @@
 // LEF — helpers compartidos por las Edge Functions que llaman APIs de Google
-// a nombre de un profesor (classroom-list, calendar-list): valida su JWT de
+// a nombre de un profesor (classroom-list): valida su JWT de
 // Supabase, busca su token de Google guardado y lo refresca si hace falta.
 // Los tokens nunca salen de aquí hacia el navegador.
 import { createClient } from "jsr:@supabase/supabase-js@2";

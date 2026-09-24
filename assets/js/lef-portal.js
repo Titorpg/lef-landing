@@ -128,6 +128,7 @@
     { id: "inicio", label: "Inicio", render: renderHome },
     { id: "facturacion", label: "Facturación", render: renderBilling },
     { id: "curso", label: "Mi curso", render: renderCourse },
+    { id: "calendario", label: "Calendario", render: renderCalendar },
     { id: "recursos", label: "Mis recursos", render: renderResources },
     { id: "cuenta", label: "Mi cuenta", render: renderAccount }
   ];
@@ -809,6 +810,18 @@
 
   // opts.justEnrolled: código del módulo recién matriculado desde la sugerencia,
   // para mostrar el aviso de "¡Listo!" una sola vez encima de la tarjeta nueva.
+  /* ---------- Calendario (solo lectura) ---------- */
+  // Mismo calendario del panel (lef-calendar.js), sin editar: las clases de su
+  // grupo (salen solas de su matrícula), lo que su profesor programe para el
+  // grupo y lo que LEF publique para los estudiantes.
+  function renderCalendar(main) {
+    main.innerHTML = '<h1 class="pnl-h">Calendario</h1>' +
+      '<p class="pnl-sub">Tus clases y lo que tu profesor y LEF programen para ti.</p>';
+    var box = h("<div></div>");
+    main.appendChild(box);
+    window.LEFCalendar.mount(box, { sb: sb, role: "student" });
+  }
+
   function renderCourse(main, opts) {
     opts = opts || {};
     // Primero cierra los ciclos vencidos (lo hace también el cron nocturno) para

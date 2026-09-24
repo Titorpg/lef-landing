@@ -16,9 +16,33 @@
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3**.
 - **Talleres / Recursos interactivos / Materiales** (portal): sin definir.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
-- Ningún SQL pendiente de aplicar (todos los del 23–24 sep aplicados).
+- **SQL pendiente: `20260924010000_calendario_propio.sql`** (calendario propio).
+  El usuario lo aplica a mano en el SQL Editor; DESPUÉS se despliega Vercel
+  (sin la función `get_my_calendar` la pestaña Calendario muestra error).
+- **`classroom-oauth-start` redesplegada con `--no-verify-jwt`** (24 sep, al
+  quitarle el scope de Calendar): confirmar con el usuario si antes estaba así;
+  si no, redesplegar sin esa bandera.
+- **Borrar la Edge Function `calendar-list` desplegada** (el código ya se quitó
+  del repo; ya nadie la llama).
 
 ### Hecho 24 sep 2026
+- **Calendario propio de LEF (adiós Google Calendar)** — `assets/js/lef-calendar.js`,
+  compartido por panel y portal. Tabla `calendar_events` + `get_my_calendar(desde,
+  hasta)` (máx. 62 días). Las **clases no se guardan**: salen de groups →
+  schedules (días/hora) → cycles (fechas); matricular a un estudiante en un grupo
+  ya le pone sus clases. Tipos: actividad, evaluación, evento, aviso, sin_clase
+  ("sin clase" dirigido a estudiantes/todos o al grupo tacha esas clases).
+  - Profesor: ve sus clases + lo suyo + lo de profesores/todos + "sin clase" de
+    estudiantes; publica solo para él o para UNO de sus grupos (RLS lo exige;
+    autor lo pone un trigger).
+  - Admin: pestaña nueva Calendario; ve todas las clases y todo menos notas
+    personales ajenas; publica a todos / solo estudiantes / solo profesores /
+    un grupo / solo él.
+  - Estudiante: pestaña Calendario en el portal, solo lectura (sin acceso a la
+    tabla: solo por la función).
+  - Vistas Mes y Agenda (en celular arranca en Agenda), leyenda que filtra por
+    tipo. Probado con PGlite (permisos) y capturas con datos de ejemplo.
+  - `calendar-list` y el scope `calendar.readonly` quitados.
 - **Planificador — enlaces que "rechazan la conexión"**: muchos sitios
   prohíben mostrarse en iframe (X-Frame-Options/CSP). `classroom-list` ahora
   revisa cada enlace una vez por carga: Wordwall → su API oEmbed da

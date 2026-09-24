@@ -37,13 +37,12 @@ async function hmacHex(secret: string, text: string): Promise<string> {
 }
 
 // Solo lectura de estructura — nada de tareas calificadas ni entregas.
-// calendar.readonly se pide en la misma pantalla de consentimiento para que
-// la pestaña Calendario use el mismo token, sin un botón "Conectar" aparte.
+// (Ya no se pide Google Calendar: desde el 24 sep 2026 el calendario es propio
+// de LEF — tabla calendar_events.)
 const SCOPES = [
   "https://www.googleapis.com/auth/classroom.courses.readonly",
   "https://www.googleapis.com/auth/classroom.topics.readonly",
   "https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly",
-  "https://www.googleapis.com/auth/calendar.readonly",
   "openid",
   "email",
 ].join(" ");
