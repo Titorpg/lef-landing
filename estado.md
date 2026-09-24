@@ -2,7 +2,8 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 23 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-- **⚠️ SQL POR APLICAR — libro solo con pago** (`20260923070000_recursos_solo_con_pago.sql`):
+- **✅ APLICADO (23 sep) — libro solo con pago** (`20260923070000_recursos_solo_con_pago.sql`;
+  verificado: `lef_enrollment_paid` existe y responde 42501 a anon):
   bug reportado 23 sep — Keidy Vergara (LEF-2026-00002) sin ningún pago veía
   el libro porque su inscripción estaba en `Active` (cambiada a mano con el
   selector de Inicio → Inscripciones; ningún RPC inserta `Active`).
@@ -10,7 +11,7 @@
   `lef_enrollment_paid()` (pago aprobado > 0, no reversado) + columna
   `module_paid`; trigger impide `Active` sin pago; corrige las `Active` sin
   pago → `PendingPayment`. Portal: módulo sin pago sale 🔒 en Mis recursos y
-  lleva a Facturación. **Hasta aplicarlo, el libro sigue expuesto.**
+  lleva a Facturación.
 - **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD).
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3**.
 - **Talleres / Recursos interactivos / Materiales**: sin definir cómo se montan.
