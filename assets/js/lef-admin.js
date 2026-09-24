@@ -1565,9 +1565,16 @@
   /* ============ CALENDARIO (solo profesor) ============ */
   // Usa la misma conexión de Google que Planificador (mismo token, se pidió
   // el scope de Calendar en la misma pantalla de consentimiento) — no hay un
-  // botón "Conectar" aparte aquí.
+  // botón "Conectar" aparte aquí. Se pinta como cuadrícula de mes (igual que
+  // Google Calendar) con los eventos que trae calendar-list; no se embebe el
+  // calendario de Google porque ese solo funciona si el navegador tiene
+  // abierta la sesión de Google del profesor.
+  var GCAL_COLORS = { "1": "#7986cb", "2": "#33b679", "3": "#8e24aa", "4": "#e67c73", "5": "#f6bf26", "6": "#f4511e",
+    "7": "#039be5", "8": "#616161", "9": "#3f51b5", "10": "#0b8043", "11": "#d50000" };
+  var CAL_DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
   function secCalendario(main) {
-    head(main, "Calendario", "Tus próximos eventos de Google Calendar.");
+    head(main, "Calendario", "Tu Google Calendar, mes a mes.");
     var body = h("<div></div>");
     main.appendChild(body);
     body.innerHTML = '<p class="muted">Cargando…</p>';
@@ -1585,61 +1592,122 @@
         card.querySelector("[data-go]").addEventListener("click", function () { location.hash = "classroom"; });
         return;
       }
-      loadAgenda();
+      var now = new Date();
+      showMonth(now.getFullYear(), now.getMonth());
     }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
 
-    function loadAgenda() {
-      var loading = h('<p class="muted">Cargando tu calendario…</p>');
-      body.appendChild(loading);
-      callEdgeFn("calendar-list").then(function (d) {
-        loading.remove();
-        if (!d || d.connected === false) {
-          body.appendChild(h('<div class="pnl-alert err">Tu conexión con Google expiró — desconéctate y vuelve a conectarte desde Planificador.</div>'));
-          return;
-        }
-        var events = d.events || [];
-        if (!events.length) {
-          body.appendChild(h('<div class="pnl-alert ok">No tienes eventos próximos en tu calendario.</div>'));
-          return;
-        }
-        renderAgenda(events);
-      }).catch(function (e) {
-        loading.remove();
-        body.appendChild(h('<div class="pnl-alert err">No pudimos cargar tu calendario: ' + esc((e && e.message) || e) + "</div>"));
-      });
-    }
-
-    function dayLabel(dayKey) {
-      var d = new Date(dayKey + "T00:00:00");
-      var label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-      return label.charAt(0).toUpperCase() + label.slice(1);
-    }
+    function keyOf(d) { return ymd(d.getFullYear(), d.getMonth(), d.getDate()); }
+    function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
     function fmtEventTime(iso) {
       if (!iso || iso.length <= 10) return "";
       return new Date(iso).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" });
     }
+    function evColor(ev) { return GCAL_COLORS[ev.colorId] || "var(--azul)"; }
 
-    function renderAgenda(events) {
-      var byDay = {}, order = [];
-      events.forEach(function (ev) {
-        var dayKey = (ev.start || "").slice(0, 10);
-        if (!byDay[dayKey]) { byDay[dayKey] = []; order.push(dayKey); }
-        byDay[dayKey].push(ev);
-      });
-      order.forEach(function (dayKey) {
-        body.appendChild(h('<p style="font-weight:700;font-size:13.5px;margin:18px 0 8px">' + esc(dayLabel(dayKey)) + "</p>"));
-        byDay[dayKey].forEach(function (ev) {
-          var timeLabel = ev.allDay ? "Todo el día" : fmtEventTime(ev.start) + (ev.end ? " – " + fmtEventTime(ev.end) : "");
-          body.appendChild(h(
-            '<div class="pnl-table-wrap" style="padding:14px 18px;margin-bottom:10px">' +
-            '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
-            "<div><p style=\"font-weight:600;font-size:14px\">" + esc(ev.summary) + "</p>" +
-            '<p class="muted" style="font-size:12.5px">' + esc(timeLabel) + (ev.location ? " · " + esc(ev.location) : "") + "</p></div>" +
-            (ev.htmlLink ? '<a href="' + esc(ev.htmlLink) + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--azul);text-decoration:none;white-space:nowrap">Ver en Calendar ↗</a>' : "") +
-            "</div></div>"
-          ));
+    // Días (yyyy-mm-dd) que ocupa un evento. Todo el día: el "end" de Google
+    // es exclusivo. Con hora: desde el día de inicio hasta el de fin.
+    function eventDays(ev) {
+      var start = ev.allDay ? new Date(ev.start + "T00:00:00") : new Date(ev.start);
+      var end = ev.allDay ? addDays(new Date(ev.end + "T00:00:00"), -1) : new Date(ev.end || ev.start);
+      var out = [], d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      var last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      for (var i = 0; d <= last && i < 62; i++) { out.push(keyOf(d)); d = addDays(d, 1); }
+      return out.length ? out : [keyOf(start)];
+    }
+
+    function showMonth(year, month) {
+      body.innerHTML = "";
+      var first = new Date(year, month, 1);
+      var gridStart = addDays(first, -((first.getDay() + 6) % 7)); // lunes anterior
+      var lastOfMonth = new Date(year, month + 1, 0);
+      var gridEnd = addDays(lastOfMonth, 6 - ((lastOfMonth.getDay() + 6) % 7)); // domingo siguiente
+      var monthName = first.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+
+      var bar = h(
+        '<div class="cal-bar">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-today>Hoy</button>' +
+        '<button type="button" class="cal-nav" data-prev aria-label="Mes anterior">&lsaquo;</button>' +
+        '<button type="button" class="cal-nav" data-next aria-label="Mes siguiente">&rsaquo;</button>' +
+        '<h2 class="cal-title">' + esc(monthName.charAt(0).toUpperCase() + monthName.slice(1)) + "</h2>" +
+        '<span class="muted cal-status" data-status>Cargando eventos…</span>' +
+        "</div>"
+      );
+      body.appendChild(bar);
+      bar.querySelector("[data-today]").onclick = function () { var n = new Date(); showMonth(n.getFullYear(), n.getMonth()); };
+      bar.querySelector("[data-prev]").onclick = function () { showMonth(month === 0 ? year - 1 : year, (month + 11) % 12); };
+      bar.querySelector("[data-next]").onclick = function () { showMonth(month === 11 ? year + 1 : year, (month + 1) % 12); };
+
+      var grid = h('<div class="cal-grid"></div>');
+      CAL_DOW.forEach(function (d) { grid.appendChild(h('<div class="cal-dow">' + d + "</div>")); });
+      var cells = {}, todayKey = keyOf(new Date());
+      for (var d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
+        var k = keyOf(d);
+        var cell = h('<div class="cal-cell' + (d.getMonth() !== month ? " is-out" : "") + (k === todayKey ? " is-today" : "") + '">' +
+          '<span class="cal-num">' + d.getDate() + "</span><div class=\"cal-evs\"></div></div>");
+        cells[k] = { el: cell, events: [], date: new Date(d) };
+        grid.appendChild(cell);
+      }
+      body.appendChild(grid);
+
+      callEdgeFn("calendar-list", {
+        timeMin: gridStart.toISOString(),
+        timeMax: addDays(gridEnd, 1).toISOString()
+      }).then(function (res) {
+        var status = bar.querySelector("[data-status]");
+        if (!res || res.connected === false) {
+          status.textContent = "";
+          body.appendChild(h('<div class="pnl-alert err" style="margin-top:12px">Tu conexión con Google expiró — desconéctate y vuelve a conectarte desde Planificador.</div>'));
+          return;
+        }
+        var events = res.events || [];
+        status.textContent = events.length ? "" : "Sin eventos este mes";
+        events.forEach(function (ev) {
+          eventDays(ev).forEach(function (k) { if (cells[k]) cells[k].events.push(ev); });
         });
+        Object.keys(cells).forEach(function (k) { fillCell(cells[k]); });
+      }).catch(function (e) {
+        bar.querySelector("[data-status]").textContent = "";
+        body.appendChild(h('<div class="pnl-alert err" style="margin-top:12px">No pudimos cargar tu calendario: ' + esc((e && e.message) || e) + "</div>"));
       });
+    }
+
+    // Hasta 3 eventos por día en la celda; el resto en "+N más". Tocar el día
+    // abre el detalle con todos sus eventos.
+    function fillCell(c) {
+      if (!c.events.length) return;
+      c.events.sort(function (a, b) {
+        if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+        return String(a.start).localeCompare(String(b.start));
+      });
+      var box = c.el.querySelector(".cal-evs");
+      c.events.slice(0, 3).forEach(function (ev) {
+        box.appendChild(h(ev.allDay
+          ? '<div class="cal-ev cal-ev--allday" style="background:' + evColor(ev) + '">' + esc(ev.summary) + "</div>"
+          : '<div class="cal-ev" style="--c:' + evColor(ev) + '"><span class="cal-dot" style="background:' + evColor(ev) + '"></span>' +
+            '<span class="cal-ev__time">' + esc(fmtEventTime(ev.start)) + "</span> " + esc(ev.summary) + "</div>"));
+      });
+      if (c.events.length > 3) box.appendChild(h('<div class="cal-more">+' + (c.events.length - 3) + " más</div>"));
+      c.el.classList.add("has-events");
+      c.el.addEventListener("click", function () { dayDetail(c); });
+    }
+
+    function dayDetail(c) {
+      var label = c.date.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+      var list = h("<div></div>");
+      c.events.forEach(function (ev) {
+        var when = ev.allDay ? "Todo el día" : fmtEventTime(ev.start) + (ev.end ? " – " + fmtEventTime(ev.end) : "");
+        list.appendChild(h(
+          '<div class="cal-detail">' +
+          '<span class="cal-dot" style="background:' + evColor(ev) + ';margin-top:6px"></span>' +
+          '<div style="flex:1;min-width:0"><p style="font-weight:600;font-size:14px">' + esc(ev.summary) + "</p>" +
+          '<p class="muted" style="font-size:12.5px">' + esc(when) + (ev.location ? " · " + esc(ev.location) : "") + "</p>" +
+          '<p style="font-size:12.5px;margin-top:2px">' +
+          (ev.hangoutLink ? '<a href="' + esc(ev.hangoutLink) + '" target="_blank" rel="noopener" style="color:var(--azul);text-decoration:none;margin-right:12px">Unirse a Meet ↗</a>' : "") +
+          (ev.htmlLink ? '<a href="' + esc(ev.htmlLink) + '" target="_blank" rel="noopener" style="color:var(--azul);text-decoration:none">Ver en Google Calendar ↗</a>' : "") +
+          "</p></div></div>"
+        ));
+      });
+      modal(label.charAt(0).toUpperCase() + label.slice(1), list, null, "Cerrar", false);
     }
   }
 

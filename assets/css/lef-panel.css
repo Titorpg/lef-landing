@@ -469,3 +469,42 @@ td.acts .btn{margin:2px 4px 2px 0;}
     white-space:normal;line-height:1.2;text-align:center;}
   .pnl-table-wrap.m-cards table.pnl td.mc-acts select{grid-column:1/-1;}
 }
+
+/* ---------- Calendario del profesor: cuadrícula de mes (estilo Google Calendar) ---------- */
+.cal-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.cal-nav{all:unset;cursor:pointer;width:32px;height:32px;border-radius:50%;display:inline-flex;
+  align-items:center;justify-content:center;font-size:22px;color:var(--carbon);}
+.cal-nav:hover,.cal-nav:focus-visible{background:var(--niebla);}
+.cal-title{font-size:18px;font-weight:600;margin:0 8px 0 4px;}
+.cal-status{font-size:12.5px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fff;
+  border:1px solid var(--niebla);border-radius:12px;overflow:hidden;}
+.cal-dow{padding:8px 0 6px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--plata);border-bottom:1px solid var(--niebla);}
+.cal-cell{min-height:108px;padding:4px 4px 6px;border-right:1px solid var(--niebla);
+  border-bottom:1px solid var(--niebla);min-width:0;}
+.cal-cell:nth-child(7n){border-right:none;}
+.cal-cell.is-out{background:var(--papel);}
+.cal-cell.is-out .cal-num{color:var(--plata);}
+.cal-cell.has-events{cursor:pointer;}
+.cal-cell.has-events:hover{background:#f5f7fc;}
+.cal-num{display:flex;width:24px;height:24px;margin:0 auto 2px;align-items:center;justify-content:center;
+  border-radius:50%;font-size:12px;font-weight:500;color:var(--carbon);}
+.cal-cell.is-today .cal-num{background:var(--azul);color:#fff;}
+.cal-evs{display:flex;flex-direction:column;gap:2px;}
+.cal-ev{font-size:11.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--carbon);padding:1px 4px;border-radius:4px;}
+.cal-ev--allday{color:#fff;font-weight:500;}
+.cal-ev__time{color:var(--grafito);}
+.cal-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:1px;}
+.cal-more{font-size:11px;font-weight:600;color:var(--grafito);padding:0 4px;}
+.cal-detail{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--niebla);}
+.cal-detail:first-child{border-top:none;padding-top:0;}
+/* Celular: sin títulos en la celda, solo un punto por evento; el detalle al tocar el día. */
+@media (max-width:640px){
+  .cal-cell{min-height:58px;padding:3px 2px;}
+  .cal-evs{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:3px;}
+  .cal-ev{width:7px;height:7px;padding:0;border-radius:50%;font-size:0;background:var(--c,var(--azul));}
+  .cal-ev .cal-dot,.cal-ev__time{display:none;}
+  .cal-more{font-size:10px;width:100%;text-align:center;padding:0;}
+}
