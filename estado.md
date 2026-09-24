@@ -16,14 +16,19 @@
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3**.
 - **Talleres / Recursos interactivos / Materiales** (portal): sin definir.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
-- **SQL pendiente: `20260924010000_calendario_propio.sql`** (calendario propio).
-  El usuario lo aplica a mano en el SQL Editor; DESPUÉS se despliega Vercel
-  (sin la función `get_my_calendar` la pestaña Calendario muestra error).
+- **Probar el calendario con cuentas reales** (admin, profesor, estudiante):
+  crear un evento para un grupo y verlo desde el portal del estudiante.
+- Ningún SQL pendiente (`calendario_propio` aplicado el 24 sep, sin errores).
 - **Probar "Conectar con Google Classroom"** (Planificador) tras encender la
   verificación de sesión de `classroom-oauth-start` (24 sep). Si falla, volver a
   apagarla en `supabase/config.toml` y redesplegar.
 
 ### Hecho 24 sep 2026
+- **Diseño de tarjetas flotantes en todo el panel y el portal** (aprobado por el
+  usuario con capturas antes/después): cada fila de tabla es una tarjeta con
+  sombra y franja del color de su estado (`tr:has(.badge.ok|warn|bad)`), en PC y
+  celular; indicadores con línea superior, pestañas tipo selector, estados con
+  punto. Al final de `lef-panel.css`. Corrige montos que se partían ("$ 297.50 / 0").
 - **Calendario propio de LEF (adiós Google Calendar)** — `assets/js/lef-calendar.js`,
   compartido por panel y portal. Tabla `calendar_events` + `get_my_calendar(desde,
   hasta)` (máx. 62 días). Las **clases no se guardan**: salen de groups →
