@@ -976,9 +976,19 @@
       '<a href="' + esc(att.url) + '" target="_blank" rel="noopener" class="btn btn-blue btn-sm">Abrir ↗</a></div>';
   }
   function mcAttachment(att) {
+    // Drive: el archivo lo abre Google con la sesión de Google del NAVEGADOR del
+    // estudiante (debe haberse unido a la clase con ese correo; Classroom lo
+    // comparte con la clase al publicar). En iPhone/Safari el visor dentro de
+    // LEF no recibe esa sesión: por eso el botón "Abrir en Google Drive" va
+    // visible arriba (abre la app o una pestaña, donde sí funciona).
     if (att.type === "drive") {
-      return '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
-        (att.alternateLink ? '<a href="' + esc(att.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">¿No carga? Ábrelo en Google Drive ↗</a>' : "");
+      var open = att.alternateLink || ("https://drive.google.com/file/d/" + encodeURIComponent(att.id) + "/view");
+      return '<div class="drive-att">' +
+        '<div class="drive-att__bar"><span class="drive-att__name">' + mcIc("book") + "<span>" + esc(att.title || "Archivo de Google Drive") + "</span></span>" +
+        '<a href="' + esc(open) + '" target="_blank" rel="noopener" class="btn btn-blue btn-sm">' + mcIc("ext") + "<span>Abrir en Google Drive</span></a></div>" +
+        '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
+        '<p class="drive-att__note">¿Dice que no tienes acceso? Únete a la clase de Classroom y entra a Google con el mismo correo con el que te uniste. ' +
+        "En iPhone, usa “Abrir en Google Drive”.</p></div>";
     }
     if (att.type === "youtube") {
       return '<div class="cls-embed cls-embed--16-9"><iframe src="https://www.youtube.com/embed/' + esc(att.id) + '" allowfullscreen loading="lazy"></iframe></div>';

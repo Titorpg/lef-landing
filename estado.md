@@ -3,12 +3,12 @@
 ## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
 ### Por hacer (abiertos)
-- **"Mi clase" del estudiante (Classroom + Clase de hoy)**: funciones `student-classroom`
-  y `classroom-list` (refactor a `_shared/classroom.ts`) YA desplegadas; el portal
-  (Mi curso → tarjeta + pestaña oculta `#clase-hoy`) está en git pero NO publicado:
-  espera aprobación de capturas. Después: probar con un estudiante real que pagó
+- **"Mi clase" del estudiante (Classroom + Clase de hoy)**: PUBLICADO 24 sep. Probar con un estudiante real que pagó
   (código, botón Unirme con `?cjc=`, agenda del día) y que un Gmail personal
-  pueda entrar a la clase.
+  pueda entrar a la clase. Probar en iPhone un archivo de Drive privado: Safari no
+  pasa la sesión de Google al visor incrustado → debería bastar el botón "Abrir en
+  Google Drive" (visible arriba de cada archivo, con nota). Drive se ve solo si el
+  estudiante se UNIÓ a la clase con ese correo (Classroom comparte al publicar).
 - **Profesores reales conectan su Google**: Luis Caballero y María Rada entran
   a admin → **Planificador** → "Conectar con Google Classroom" con SU cuenta.
   No hay que configurar nada más (el filtro por nombre ya está en vivo).
