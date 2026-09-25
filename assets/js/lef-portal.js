@@ -1018,10 +1018,11 @@
     return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
   }
 
-  // "Clase de hoy" por horario (pedido del usuario, 24 sep 2026): la clase
-  // n.º N del ciclo (solo días del horario) muestra la agenda DAY N; se abre
-  // 10 min antes de la hora de la clase y el botón de Meet a la hora exacta;
-  // todo se cierra al terminar. Un día "Sin clase" muestra el motivo. La
+  // "Clase de hoy" por horario (pedido del usuario, 24–25 sep 2026): la clase
+  // n.º N del ciclo (solo días del horario) muestra la agenda DAY N. Agenda y
+  // botón de Meet se abren 10 min antes de la hora de la clase; el Meet se
+  // quita a la hora de fin y la agenda sigue hasta medianoche (luego pasa a
+  // "Agendas anteriores"). Un día "Sin clase" muestra el motivo. La
   // función student-classroom decide y NO entrega agenda ni Meet fuera de hora;
   // aquí solo se pinta y se vuelve a consultar sola cuando cambia el estado.
   var todayTimers = [];
@@ -1064,8 +1065,9 @@
       else if (d.before_cycle) { state = "off"; pill = "Tu ciclo aún no empieza"; }
       else if (d.cancel && !cur) { state = "off"; pill = "Hoy no hay clase"; }
       else if (cur) {
-        state = cur.phase === "en_curso" ? "live" : cur.phase === "abierta" ? "ok" : cur.phase === "antes" ? "wait" : "off";
-        pill = cur.phase === "en_curso" ? "Clase en curso" : cur.phase === "abierta" ? "Agenda abierta" : cur.phase === "antes" ? "Hoy tienes clase" : "Clase terminada";
+        var started = nowMin() >= hmToMin(cur.start);
+        state = cur.phase === "en_curso" ? (started ? "live" : "ok") : cur.phase === "antes" ? "wait" : "off";
+        pill = cur.phase === "en_curso" ? (started ? "Clase en curso" : "Tu clase está por empezar") : cur.phase === "antes" ? "Hoy tienes clase" : "Clase terminada";
       } else { pill = "Hoy no tienes clase"; }
       var timeTxt = cur ? t12(cur.start) + " – " + t12(cur.end) : (g.start_time ? fmtTime(g.start_time) + (g.end_time ? " – " + fmtTime(g.end_time) : "") : "");
       box.appendChild(h('<div class="today-hero">' +
@@ -1124,7 +1126,7 @@
         if (s.phase === "antes") {
           var w = h('<div class="today-empty is-wait"><span class="today-empty__ic">' + mcIc("clock") + "</span>" +
             "<h2>" + (s.kind === "reposicion" ? "Hoy tienes la reposición de tu clase" : "Hoy tienes clase") + "</h2>" +
-            "<p>Tendrás acceso a tu agenda a las <strong>" + esc(t12(s.opens_at)) + "</strong> y a la reunión a las <strong>" + esc(t12(s.start)) + "</strong>" +
+            "<p>Tu agenda y el botón para unirte a la reunión se habilitan a las <strong>" + esc(t12(s.opens_at)) + "</strong>, 10 minutos antes de tu clase" +
             ' <span class="today-count" data-count></span>.</p><span class="today-tag">' + esc(label) + "</span></div>");
           var cnt = w.querySelector("[data-count]");
           var paint = function () { cnt.textContent = "(" + inLabel(hmToMin(s.opens_at) - nowMin()) + ")"; };
@@ -1132,11 +1134,8 @@
           wrap.appendChild(w);
           return wrap;
         }
-        if (s.phase === "terminada") {
-          wrap.appendChild(empty("calx", "Tu clase de hoy terminó", "La agenda quedó guardada abajo, en Agendas anteriores, para que la repases."));
-          return wrap;
-        }
-        // Abierta o en curso: la agenda del día + el botón de la reunión.
+        // En curso (desde 10 min antes) o terminada: la agenda del día sigue
+        // visible hasta medianoche; el botón de la reunión solo en curso.
         if (!s.agenda.length) {
           wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está en Classroom", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
         }
@@ -1149,18 +1148,16 @@
         });
         var meet;
         if (s.phase === "en_curso" && s.meet_url) {
+          var sub = nowMin() < hmToMin(s.start) ? "Tu clase empieza a las " + t12(s.start) : "Tu clase está en curso · termina a las " + t12(s.end);
           meet = h('<a class="today-meet is-on" href="' + esc(s.meet_url) + '" target="_blank" rel="noopener">' +
             '<span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Únete a la reunión</strong>' +
-            "<small>Tu clase está en curso · termina a las " + esc(t12(s.end)) + "</small></span>" + mcIc("arrow") + "</a>");
+            "<small>" + esc(sub) + "</small></span>" + mcIc("arrow") + "</a>");
         } else if (s.phase === "en_curso") {
           meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Reunión no disponible</strong>' +
             "<small>Tu profesor aún no ha configurado el enlace de la reunión. Escríbele o espera un momento.</small></span></div>");
         } else {
-          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Únete a la reunión</strong>' +
-            "<small>Se habilita a las " + esc(t12(s.start)) + ' <span data-count></span></small></span></div>');
-          var c2 = meet.querySelector("[data-count]");
-          var paint2 = function () { c2.textContent = "(" + inLabel(hmToMin(s.start) - nowMin()) + ")"; };
-          paint2(); todayTimers.push(setInterval(paint2, 30000));
+          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>La reunión terminó</strong>' +
+            "<small>La clase terminó a las " + esc(t12(s.end)) + " Tu agenda sigue disponible aquí hasta el final del día; mañana la encontrarás en Agendas anteriores.</small></span></div>");
         }
         wrap.appendChild(meet);
         return wrap;

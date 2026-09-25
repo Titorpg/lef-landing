@@ -186,13 +186,13 @@ export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime
 <p style="margin:0;font-family:${FONT};font-size:18px;font-weight:700;color:${INK}">${escHtml(c.makeupDate)}</p>
 <p style="margin:4px 0 0;font-family:${FONT};font-size:15px;color:${GRAFITO}">${escHtml(c.makeupTime)}${c.teacher ? ` · con ${escHtml(c.teacher)}` : ""}</p>
 </td></tr></table>
-<p style="margin:0">Ese día entra a tu portal, en <strong style="color:${INK};font-weight:600">Mi curso → Clase de hoy</strong>: la agenda se habilitará 10 minutos antes y el botón para unirte a la reunión, a la hora exacta de la clase.</p>`;
+<p style="margin:0">Ese día entra a tu portal, en <strong style="color:${INK};font-weight:600">Mi curso → Clase de hoy</strong>: la agenda y el botón para unirte a la reunión se habilitan 10 minutos antes de la hora de la clase.</p>`;
   const html = lefEmail({
     preheader: `Tu clase del ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}.`,
     eyebrow: "Reposición de clase", heading, bodyHtml, cta: { label: "Ir a Clase de hoy", url: portalUrl + "#clase-hoy" },
   });
   const text = `${hi}\n\nLa clase de ${c.module} que no se realizó el ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}` +
-    `${c.teacher ? ` con ${c.teacher}` : ""}.\n\nEse día entra a tu portal, en Mi curso → Clase de hoy: la agenda se habilitará 10 minutos ` +
-    `antes y el botón para unirte a la reunión, a la hora exacta: ${portalUrl}#clase-hoy` + LEF_TEXT_FOOTER;
+    `${c.teacher ? ` con ${c.teacher}` : ""}.\n\nEse día entra a tu portal, en Mi curso → Clase de hoy: la agenda y el botón para unirte ` +
+    `a la reunión se habilitan 10 minutos antes de la hora de la clase: ${portalUrl}#clase-hoy` + LEF_TEXT_FOOTER;
   return { subject, html, text };
 }

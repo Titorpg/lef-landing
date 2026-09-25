@@ -7,10 +7,12 @@
 //     días de su horario) le toca la agenda "DAY N". Un día "Sin clase" igual
 //     consume su número (el ciclo no se detiene); esa agenda se ve el día y la
 //     hora de su reposición (evento "reposicion" del calendario).
-//   * La agenda se abre 10 minutos antes de la hora de la clase; el enlace de
-//     Meet, a la hora exacta; ambos se cierran al terminar la clase. Fuera de
-//     ese horario el servidor NO entrega ni la agenda ni el Meet.
-//   * "Agendas anteriores" = las de clases que ya ocurrieron.
+//   * La agenda y el enlace de Meet se abren 10 minutos antes de la hora de la
+//     clase. El Meet se cierra a la hora de fin; la agenda sigue abierta el
+//     resto del día (por si la clase se alarga) y a medianoche pasa a
+//     "Agendas anteriores" (pedido del usuario, 25 sep 2026). Antes de abrir,
+//     el servidor NO entrega ni la agenda ni el Meet.
+//   * "Agendas anteriores" = las de clases de días anteriores.
 //
 // Cómo encuentra la clase, sin que el admin configure nada:
 //   estudiante → su inscripción vigente con grupo → profesor + módulo (A2.1)
@@ -34,7 +36,7 @@ function json(req: Request, body: unknown, status = 200) {
 }
 
 const TZ = "America/Bogota";
-const OPEN_EARLY_MIN = 10; // la agenda se abre 10 minutos antes de la clase
+const OPEN_EARLY_MIN = 10; // agenda y Meet se abren 10 minutos antes de la clase
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const dateFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 const hmFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
@@ -183,9 +185,11 @@ Deno.serve(async (req) => {
       slots.push({ kind: "reposicion", day: sessionNumber(days, cyc.start_date, x.makeup_of!), start: s, end: x.end_time ? toMin(x.end_time) : s + 60 });
     });
     slots.sort((a, b) => a.start - b.start);
-    const phaseOf = (s: Slot) => nowMin < s.start - OPEN_EARLY_MIN ? "antes" : nowMin < s.start ? "abierta" : nowMin < s.end ? "en_curso" : "terminada";
+    // antes → (10 min antes) en_curso: agenda + Meet → (hora de fin) terminada: solo agenda, hasta medianoche.
+    const phaseOf = (s: Slot) => nowMin < s.start - OPEN_EARLY_MIN ? "antes" : nowMin < s.end ? "en_curso" : "terminada";
 
-    // Anteriores: clases que ya ocurrieron (no canceladas) y reposiciones ya hechas.
+    // Anteriores: clases de días anteriores (no canceladas) y reposiciones ya hechas.
+    // Las de hoy siguen en "Clase de hoy" hasta medianoche.
     const prevDays = new Map<number, string>(); // DAY → fecha en que se vio
     if (cyc.start_date) {
       for (let d = cyc.start_date; d < today; d = addDays(d, 1)) {
@@ -194,10 +198,9 @@ Deno.serve(async (req) => {
     }
     evs.filter((x) => x.category === "reposicion" && x.makeup_of && x.starts_on < today)
       .forEach((x) => prevDays.set(sessionNumber(days, cyc.start_date, x.makeup_of!), x.starts_on));
-    slots.filter((s) => phaseOf(s) === "terminada").forEach((s) => prevDays.set(s.day, today));
 
     // Agendas del módulo en Classroom (solo si hay algo que mostrar).
-    const needAgendas = prevDays.size > 0 || slots.some((s) => phaseOf(s) === "abierta" || phaseOf(s) === "en_curso");
+    const needAgendas = prevDays.size > 0 || slots.some((s) => phaseOf(s) !== "antes");
     // deno-lint-ignore no-explicit-any
     let byDay = new Map<number, any[]>();
     let maxDay = 0;
@@ -235,7 +238,7 @@ Deno.serve(async (req) => {
 
     const slotsOut = slots.map((s) => {
       const phase = phaseOf(s);
-      const open = phase === "abierta" || phase === "en_curso";
+      const open = phase !== "antes";
       return {
         kind: s.kind, day: s.day, start: hm(s.start), end: hm(s.end), opens_at: hm(Math.max(0, s.start - OPEN_EARLY_MIN)), phase,
         agenda: open ? (byDay.get(s.day) || []) : [],
@@ -250,6 +253,7 @@ Deno.serve(async (req) => {
 
     // Próximo cambio de estado (para que el portal se actualice solo).
     const changes = slots.flatMap((s) => [s.start - OPEN_EARLY_MIN, s.start, s.end]).filter((m) => m > nowMin);
+    if (!changes.length && slots.length) changes.push(24 * 60); // a medianoche la agenda pasa a anteriores
     const refreshIn = changes.length ? (Math.min(...changes) - nowMin) * 60 : null;
 
     return json(req, {
