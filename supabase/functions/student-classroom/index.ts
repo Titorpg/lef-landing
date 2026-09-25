@@ -160,7 +160,16 @@ Deno.serve(async (req) => {
       .sort((a, b) => (b.day ?? -1) - (a.day ?? -1) || String(b.published_on).localeCompare(String(a.published_on)));
 
     const todays = agendas.filter((a) => a.published_on === today);
-    const previous = agendas.filter((a) => a.published_on !== today).slice(0, 40);
+    // Anteriores = solo lo que YA cursó ESTE estudiante: publicadas desde el
+    // inicio de su ciclo hasta ayer. La clase de Classroom se reutiliza entre
+    // grupos, así que lo publicado para grupos anteriores no cuenta (pedido del
+    // usuario, 24 sep 2026: "si vamos en el día 2, en anteriores solo el 1").
+    const since = cyc.start_date || (() => {
+      const d = new Date(today + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 30); return d.toISOString().slice(0, 10);
+    })();
+    const previous = agendas
+      .filter((a) => a.published_on && a.published_on >= since && a.published_on < today)
+      .slice(0, 40);
     await attachEmbeds([...todays, ...previous]);
 
     return json(req, { ...base, status: "ok", course: courseOut, today_agendas: todays, previous_agendas: previous });

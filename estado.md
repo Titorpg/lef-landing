@@ -37,6 +37,10 @@
   "DAY n" en borrador y publica el del día. Nunca devuelve borradores. Requiere pago
   (`lef_enrollment_paid`). Estados: sin_grupo, sin_pago, profesor_sin_conexion,
   sin_clase_classroom. Unirse: `alternateLink?cjc=<enrollmentCode>`.
+  "Agendas anteriores" = solo publicadas desde el inicio del ciclo del estudiante
+  hasta ayer (la clase se reutiliza entre grupos; antes salían TODAS — corregido).
+  PREGUNTA ABIERTA: ¿cómo reutiliza el profesor la clase con un grupo nuevo si las
+  agendas ya quedaron publicadas (Classroom no deja volverlas a borrador)?
 - **Diseño de tarjetas flotantes en todo el panel y el portal** (aprobado por el
   usuario con capturas antes/después): cada fila de tabla es una tarjeta con
   sombra y franja del color de su estado (`tr:has(.badge.ok|warn|bad)`), en PC y
