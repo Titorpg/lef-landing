@@ -474,7 +474,6 @@
     if (ME.role !== "admin") return secDashboardTeacher(main);
     var isAdmin = true;
     head(main, "Dashboard", "Resumen general del sistema.");
-    var mkBox = h("<div></div>"); main.appendChild(mkBox); renderPendingMakeups(mkBox);
 
     var jobs = [
       q("enrollments").select("id,registration_number,status,created_at,module_id,students(full_name,whatsapp,email),modules(level,title,module_number),groups(schedules(days,start_time,end_time),teachers(full_name))").order("created_at", { ascending: false }),
@@ -592,7 +591,9 @@
   // se queda atrás), el profesor ve cada una y la reprograma: la reposición
   // entra a su calendario y al de los estudiantes del grupo, ellos reciben un
   // correo, y ese día y hora ven en "Clase de hoy" la agenda que se perdió.
-  // El aviso sigue hasta que pasa la fecha de la reposición.
+  // El aviso sigue hasta que pasa la fecha de la reposición. Solo en el
+  // Dashboard del PROFESOR (el del admin ya está muy lleno); el admin ve la
+  // cancelación y la reposición en su calendario.
   var MK_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>';
   function longDate(ymd) {
     var t = new Date(ymd + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
@@ -651,7 +652,7 @@
           : en && en <= st ? "La hora de fin debe ser después de la de inicio." : "";
         if (problem) { err.textContent = problem; err.style.display = "block"; return; }
         save.disabled = true;
-        var ev = { title: "Reposición · clase DAY " + r.session_number, category: "reposicion", audience: "group", group_id: r.group_id,
+        var ev = { title: "Clase " + r.module_level + " · reposición (DAY " + r.session_number + ")", category: "reposicion", audience: "group", group_id: r.group_id,
           starts_on: d, ends_on: d, start_time: st, end_time: en || null, makeup_of: r.class_date,
           details: "Recupera la clase del " + longDate(r.class_date).toLowerCase() + " (" + r.reason + ")." };
         (done ? q("calendar_events").delete().eq("id", r.makeup_id) : Promise.resolve({})).then(function (x) {

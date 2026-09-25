@@ -112,11 +112,14 @@
   };
 
   function catOf(it) { return it.item_type === "class" ? "clase" : it.category; }
+  // Una reposición se ve como una clase más del grupo (mismo color e ícono) y
+  // se filtra junto con "Clases".
+  function filterKey(it) { var c = catOf(it); return c === "reposicion" ? "clase" : c; }
   function colorOf(it) {
-    if (it.item_type === "class") return MODULE_COLORS[((it.module_number || 1) - 1) % MODULE_COLORS.length];
+    if (it.item_type === "class" || (it.category === "reposicion" && it.module_number)) return MODULE_COLORS[((it.module_number || 1) - 1) % MODULE_COLORS.length];
     return (CATS[it.category] || CATS.actividad).color;
   }
-  function iconOf(it) { return (CATS[catOf(it)] || CATS.actividad).icon; }
+  function iconOf(it) { return it.category === "reposicion" ? "cap" : (CATS[catOf(it)] || CATS.actividad).icon; }
   function audienceLabel(it, role) {
     if (it.audience === "group") return "Grupo " + (it.group_label || "");
     if (role === "student") return "";
@@ -296,7 +299,7 @@
     }
     function refresh() { cache = {}; upcomingP = null; render(); }
 
-    function visible(list) { return list.filter(function (it) { return !hidden[catOf(it)]; }); }
+    function visible(list) { return list.filter(function (it) { return !hidden[filterKey(it)]; }); }
 
     // Reparte cada elemento en los días que ocupa (los de varios días, en todos).
     function byDay(list, from, to) {
@@ -438,7 +441,7 @@
     function filterCard(items) {
       var counts = {};
       items.forEach(function (it) {
-        var c = catOf(it);
+        var c = filterKey(it);
         if (it.item_type === "class" && parseKey(it.starts_on).getMonth() !== cursor.getMonth()) return;
         counts[c] = (counts[c] || 0) + 1;
       });

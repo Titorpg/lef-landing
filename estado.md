@@ -12,6 +12,9 @@
   "Sin clase" consume el número y queda "por reprogramar" en el Dashboard hasta que pase
   la fecha de la reposición; agenda abre 10 min antes, Meet a la hora exacta, todo cierra
   al terminar (lo decide el servidor). Correos con lefEmail (vista previa enviada).
+  "Clases por reprogramar" SOLO en el Dashboard del profesor (no admin: pedido 25 sep);
+  la reposición se ve en los calendarios como una clase más del grupo (color/ícono de
+  clase). PREGUNTA ABIERTA: margen tras la hora de fin (propuesto 15 min).
 - **"Mi clase" del estudiante (Classroom + Clase de hoy)**: PUBLICADO 24 sep. Probar con un estudiante real que pagó
   (código, botón Unirme con `?cjc=`, agenda del día) y que un Gmail personal
   pueda entrar a la clase. Probar en iPhone un archivo de Drive privado: Safari no
