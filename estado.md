@@ -1,56 +1,86 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-### Por hacer (abiertos)
-- **Clase de hoy por horario + reposiciones + Meet + correos**: PUBLICADO 25 sep (SQL
-  `20260925000000` aplicado y verificado; funciones y Vercel desplegados). Falta: cada profesor DESCONECTA y
-  reconecta Google (para "Ya estás en la clase") y pega el Meet de cada clase en
-  Planificador. Reglas: clase n.º N (solo días del horario desde inicio del ciclo) = DAY N;
-  "Sin clase" consume el número y queda "por reprogramar" en el Dashboard hasta que pase
-  la fecha de la reposición; agenda Y Meet abren 10 min antes; el Meet se quita a la hora
-  de fin y la agenda sigue hasta medianoche, luego pasa a anteriores (lo decide el servidor). Correos con lefEmail (vista previa enviada).
-  "Clases por reprogramar" SOLO en el Dashboard del profesor (no admin: pedido 25 sep);
-  la reposición se ve en los calendarios como una clase más del grupo (color/ícono de
-  clase).
-- **"Mi clase" del estudiante (Classroom + Clase de hoy)**: PUBLICADO 24 sep. Probar con un estudiante real que pagó
-  (código, botón Unirme con `?cjc=`, agenda del día) y que un Gmail personal
-  pueda entrar a la clase. Probar en iPhone un archivo de Drive privado: Safari no
-  pasa la sesión de Google al visor incrustado → debería bastar el botón "Abrir en
-  Google Drive" (visible arriba de cada archivo, con nota). Drive se ve solo si el
-  estudiante se UNIÓ a la clase con ese correo (Classroom comparte al publicar).
-- **Profesores reales conectan su Google**: Luis Caballero y María Rada entran
-  a admin → **Planificador** → "Conectar con Google Classroom" con SU cuenta.
-  No hay que configurar nada más (el filtro por nombre ya está en vivo).
-- **Cuenta de prueba Luis Manga**: tiene `teachers.classroom_match =
-  'Luis Caballero'` para ver esas clases. Quitarlo (`set classroom_match =
-  null`) cuando el usuario ya no la necesite — SQL a mano.
+### Probar con cuentas reales (todo ya publicado)
+- **Calendario**: admin crea un evento para "Todos"; profesor (Luis Manga) una
+  actividad para su grupo; el estudiante de ese grupo ve ambas en su portal.
+- **Sin clase → correo → reposición**: el profesor marca un día de clase "Sin clase"
+  en su calendario → los estudiantes del grupo reciben el correo → aparece en el
+  Dashboard del profesor "Clases por reprogramar" → programa la reposición → segundo
+  correo, y la reposición sale en los calendarios como una clase más.
+- **Mi curso / Clase de hoy** con un estudiante que ya pagó: código y botón "Unirme"
+  (`?cjc=`) con Gmail PERSONAL (depende de la configuración del Workspace de LEF);
+  10 min antes de la clase se abren agenda (DAY N) y Meet; el Meet se quita a la
+  hora de fin; la agenda sigue hasta medianoche y luego pasa a "Agendas anteriores".
+- **iPhone**: archivo de Drive privado dentro de "Clase de hoy" (Safari no pasa la
+  sesión de Google al visor incrustado → debería bastar "Abrir en Google Drive").
+- **"Conectar con Google Classroom"** (Planificador) tras encender la verificación de
+  sesión de `classroom-oauth-start` (24 sep). Si falla, apagarla en
+  `supabase/config.toml` y redesplegar.
+
+### Lo hacen los profesores (una vez, en Planificador)
+- **Desconectar y reconectar Google** (permiso nuevo: lista de alumnos y correos,
+  para "✓ Ya estás en la clase"). Sin eso el botón "Unirme" sigue saliendo.
+- **Pegar el enlace de Meet** de su clase de Classroom (campo nuevo). Sin eso el
+  estudiante ve "Tu profesor aún no ha configurado el enlace de la reunión".
+- Luis Caballero y María Rada aún deben conectar SU Google por primera vez.
+
+### Contenido / decisiones pendientes del usuario
+- **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD 23 sep).
+  Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3** (el usuario pasa enlaces).
+- **Talleres / Recursos interactivos / Materiales** (portal → Mis recursos): sin
+  definir; el usuario debe contar qué es cada uno, quién lo sube y si va por módulo.
 - **Classroom — materiales sin tema** (caen en "Otros materiales"): en A1
-  "CAN AND COULD SITUATIONS- DAY 13", en A2 "WARM UP - DAY 5". El usuario
-  les asigna su tema en Classroom y pasan solos a su módulo.
-- **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD).
-  Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3**.
-- **Talleres / Recursos interactivos / Materiales** (portal): sin definir.
+  "CAN AND COULD SITUATIONS- DAY 13", en A2 "WARM UP - DAY 5". El usuario les asigna
+  su tema en Classroom y pasan solos a su módulo.
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
-- **Probar el calendario con cuentas reales** (admin, profesor, estudiante):
-  crear un evento para un grupo y verlo desde el portal del estudiante.
-- Ningún SQL pendiente (`calendario_propio` 24 sep y `clase_de_hoy_reposiciones` 25 sep aplicados).
-- **Probar "Conectar con Google Classroom"** (Planificador) tras encender la
-  verificación de sesión de `classroom-oauth-start` (24 sep). Si falla, volver a
-  apagarla en `supabase/config.toml` y redesplegar.
+- **Cuenta de prueba Luis Manga**: `teachers.classroom_match = 'Luis Caballero'`.
+  Quitarlo (`set classroom_match = null`) cuando ya no se necesite — SQL a mano.
+- Los estudiantes pueden ver todas las agendas y el Meet desde la app de Classroom
+  (el admin del Workspace no oculta el Meet ni el código): se les pedirá entrar
+  siempre por LEF. LEF solo controla lo que muestra LEF.
+- Ningún SQL pendiente (`calendario_propio` 24 sep y `clase_de_hoy_reposiciones`
+  25 sep aplicados y verificados).
+
+### Hecho 25 sep 2026
+- **"Clase de hoy" por horario** (`student-classroom`). En Classroom las agendas de
+  cada módulo están SIEMPRE publicadas (la misma clase por profesor y nivel se reusa
+  con cada grupo nuevo): LEF decide qué ve cada estudiante y cuándo.
+  - Clase n.º N del ciclo (contando SOLO los días del horario desde el inicio del
+    ciclo; `lef_session_number`) = agenda "DAY N" del tema del módulo.
+  - Agenda y Meet se abren 10 min antes; el Meet se quita a la hora de fin; la agenda
+    sigue hasta medianoche y luego pasa a "Agendas anteriores" (= días anteriores).
+    El servidor no entrega agenda ni Meet fuera de esa ventana. El portal se
+    refresca solo en cada cambio (`refresh_in`).
+  - Antes del ciclo: "Tu ciclo aún no empieza" + botón a Mis recursos (libro).
+  - Día "Sin clase": muestra el motivo (título/detalle del evento).
+  - "✓ Ya estás en la clase" en Mi curso: lista de alumnos de Classroom con el token
+    del profesor (scopes `classroom.rosters.readonly` + `classroom.profile.emails`),
+    coincidencia por correo o nombre; si no se puede saber, queda el botón.
+  - Meet: el de la clase de Classroom, que el profesor pega en Planificador
+    (tabla `classroom_meet_links`, por course_id; Google no lo da por la API).
+- **"Sin clase" consume su número** (el ciclo no se detiene) y queda pendiente:
+  "Clases por reprogramar" en el Dashboard del PROFESOR (no del admin, pedido del
+  usuario), `get_my_pending_makeups()`; tocar → fecha/hora → evento `reposicion`
+  (`makeup_of` = día que repone) para el grupo; ese día y hora el estudiante ve la
+  agenda perdida. El aviso sigue hasta que pasa la fecha de la reposición. En los
+  calendarios la reposición se ve como una clase más del grupo.
+- **Correos** (`notify-class-change`, `lefEmail` v2): al crear un "Sin clase" para
+  estudiantes (grupo/estudiantes/todos) y al programar una reposición. Uno por
+  estudiante (varios días → un solo correo con todas las fechas); cada evento una
+  sola vez (`notified_at`, solo lo escribe la función). Vista previa enviada al usuario.
+- Migración `20260925000000_clase_de_hoy_reposiciones.sql` (probada en PGlite,
+  aplicada por el usuario y verificada en producción).
 
 ### Hecho 24 sep 2026
-- **Mi clase en Classroom + "Clase de hoy"** (portal). Clase = la del profesor del
-  grupo cuyo nombre lleva su nombre y el nivel ("LEVEL A2 - LUIS CABALLERO": una por
-  profesor y nivel, compartida por sus grupos). Agenda de hoy = material PUBLICADO del
-  tema del módulo con `scheduledTime||updateTime` = hoy (Bogotá); el profesor tiene los
-  "DAY n" en borrador y publica el del día. Nunca devuelve borradores. Requiere pago
+- **Mi clase en Classroom** (portal → Mi curso): tarjeta con código y "Unirme"
+  (`alternateLink?cjc=<enrollmentCode>`). Clase = la del profesor del grupo cuyo
+  nombre lleva su nombre y el nivel ("LEVEL A2 - LUIS CABALLERO"). Requiere pago
   (`lef_enrollment_paid`). Estados: sin_grupo, sin_pago, profesor_sin_conexion,
-  sin_clase_classroom. Unirse: `alternateLink?cjc=<enrollmentCode>`.
-  "Agendas anteriores" = solo publicadas desde el inicio del ciclo del estudiante
-  hasta ayer (la clase se reutiliza entre grupos; antes salían TODAS — corregido).
-  PREGUNTA ABIERTA: ¿cómo reutiliza el profesor la clase con un grupo nuevo si las
-  agendas ya quedaron publicadas (Classroom no deja volverlas a borrador)?
+  sin_clase_classroom. Cada archivo de Drive trae botón "Abrir en Google Drive".
+  (La regla inicial "agenda de hoy = publicada hoy" quedó REEMPLAZADA el 25 sep por
+  la numeración por horario: las agendas siempre están publicadas.)
 - **Diseño de tarjetas flotantes en todo el panel y el portal** (aprobado por el
   usuario con capturas antes/después): cada fila de tabla es una tarjeta con
   sombra y franja del color de su estado (`tr:has(.badge.ok|warn|bad)`), en PC y
