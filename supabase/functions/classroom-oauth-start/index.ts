@@ -43,6 +43,11 @@ const SCOPES = [
   "https://www.googleapis.com/auth/classroom.courses.readonly",
   "https://www.googleapis.com/auth/classroom.topics.readonly",
   "https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly",
+  // Lista de alumnos y su correo: para mostrarle al estudiante "Ya estás en la
+  // clase" en vez del botón de unirse (24 sep 2026). Los profesores que ya
+  // estaban conectados deben reconectarse una vez para concederlo.
+  "https://www.googleapis.com/auth/classroom.rosters.readonly",
+  "https://www.googleapis.com/auth/classroom.profile.emails",
   "openid",
   "email",
 ].join(" ");

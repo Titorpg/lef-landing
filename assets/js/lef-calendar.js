@@ -72,7 +72,8 @@
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
     trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
     edit: '<path d="M11 4H4v16h16v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/>',
-    layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>'
+    layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+    redo: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>'
   };
   function ic(name, cls) {
     return '<svg class="lcal-ic' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
@@ -91,7 +92,9 @@
     evaluacion: { label: "Evaluaciones", one: "Evaluación", color: "#b4233c", icon: "check" },
     evento:     { label: "Eventos",    one: "Evento",     color: "#b7791f", icon: "star" },
     aviso:      { label: "Avisos",     one: "Aviso",      color: "#4d4d4d", icon: "megaphone" },
-    sin_clase:  { label: "Sin clase",  one: "Sin clase",  color: "#8c8c8c", icon: "calx" }
+    sin_clase:  { label: "Sin clase",  one: "Sin clase",  color: "#8c8c8c", icon: "calx" },
+    // La crea el profesor desde su Dashboard ("Clases por reprogramar"), no desde aquí.
+    reposicion: { label: "Reposiciones", one: "Reposición", color: "#6b4fa3", icon: "redo" }
   };
   var CATS_BY_ROLE = {
     teacher: ["actividad", "evaluacion", "aviso", "sin_clase"],
@@ -102,7 +105,7 @@
     evaluacion: "Quiz, examen, presentación.",
     evento: "Talleres, actividades de LEF.",
     aviso: "Un recordatorio o novedad.",
-    sin_clase: "Tacha las clases de esos días (festivo, receso)."
+    sin_clase: "Tacha las clases de esos días. Los estudiantes reciben un correo y la clase queda pendiente por reprogramar en el Dashboard del profesor."
   };
   var AUDIENCE_ES = {
     personal: "Solo para mí", teachers: "Profesores", students: "Estudiantes", all: "Profesores y estudiantes"
@@ -156,6 +159,7 @@
     if (/calendar_events_dates/.test(m)) return "Revisa las fechas: la de fin no puede ser antes de la de inicio (máximo 90 días).";
     if (/link_url/.test(m)) return "El enlace debe empezar por https://";
     if (/title/.test(m) && /check/i.test(m)) return "Escribe un título (mínimo 2 letras).";
+    if (/calendar_events_makeup/.test(m)) return "Una reposición necesita fecha y hora de inicio.";
     if (/get_my_calendar|Could not find the function/i.test(m)) return "El calendario todavía no está activado en el servidor.";
     if (/Failed to fetch|NetworkError/i.test(m)) return "Sin conexión. Revisa tu internet e intenta de nuevo.";
     return m || "Algo salió mal.";
@@ -714,10 +718,14 @@
                  it.ends_on !== it.starts_on ? "" : timeRange(it)]);
       if (it.item_type === "class") {
         rows.push(["book", it.details, "Módulo " + (it.group_label || "").split(" · ")[0]]);
+        if (it.session_number) rows.push(["text", "Agenda DAY " + it.session_number, "Clase n.º " + it.session_number + " del ciclo"]);
         if (it.author) rows.push(["user", it.author, "Profesor(a)"]);
         if (it.cycle_name) rows.push(["layers", it.cycle_name, "Ciclo"]);
         if (it.student_count != null) rows.push(["users", it.student_count + (it.student_count === 1 ? " estudiante" : " estudiantes"), "Inscritos en el grupo"]);
       } else {
+        if (it.category === "reposicion" && it.makeup_of) {
+          rows.push(["redo", "Recupera la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase(), it.session_number ? "Agenda DAY " + it.session_number : ""]);
+        }
         var aud = audienceLabel(it, role);
         if (aud) rows.push([it.audience === "personal" ? "lock" : it.audience === "group" ? "users" : "globe", aud, "Para"]);
         rows.push(["user", it.author, "Publicado por"]);
@@ -780,6 +788,7 @@
     function editEvent(ev, dayKey, atTime) {
       loadGroups().catch(function () { return []; }).then(function (groups) {
         var cats = CATS_BY_ROLE[role];
+        if (ev && cats.indexOf(ev.category) === -1) cats = [ev.category];
         var e = ev || {
           category: cats[0], starts_on: dayKey, ends_on: dayKey,
           start_time: atTime || null, end_time: null,
@@ -873,7 +882,12 @@
           return op.then(function (r) {
             if (r.error) throw r.error;
             if (!r.data || !r.data.length) throw new Error("No se pudo guardar (revisa tus permisos).");
-            toast(ev ? "Cambios guardados." : "Agregado al calendario.");
+            if (!ev && row.category === "sin_clase" && ["group", "students", "all"].indexOf(row.audience) !== -1) {
+              notifyClassChange(sb, r.data[0].id).then(function (res) {
+                toast(res && res.sent ? "Agregado. Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.")
+                  : "Agregado al calendario (no había estudiantes a quienes avisar ese día).");
+              }).catch(function () { toast("Agregado, pero no se pudo enviar el correo a los estudiantes.", "err"); });
+            } else toast(ev ? "Cambios guardados." : "Agregado al calendario.");
             cursor = parseKey(starts);
             miniMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
             refresh();
@@ -890,5 +904,17 @@
     return { reload: refresh };
   }
 
-  window.LEFCalendar = { mount: mount };
+  // Correo a los estudiantes por una clase cancelada o una reposición
+  // (función notify-class-change; cada evento se avisa una sola vez).
+  function notifyClassChange(sb, eventId) {
+    return sb.auth.getSession().then(function (r) {
+      var tok = r.data && r.data.session ? r.data.session.access_token : "";
+      return fetch(window.LEF_SUPABASE.url + "/functions/v1/notify-class-change", {
+        method: "POST", headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: eventId })
+      }).then(function (res) { return res.json().then(function (j) { if (!res.ok) throw new Error(j.error || "Error"); return j; }); });
+    });
+  }
+
+  window.LEFCalendar = { mount: mount, notifyClassChange: notifyClassChange };
 })();

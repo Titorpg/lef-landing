@@ -131,3 +131,68 @@ export const LEF_TEXT_FOOTER =
   `\n\n—\nEste es un mensaje automático, por favor no lo respondas: nadie revisa las respuestas a este correo.\n` +
   `¿Necesitas ayuda? WhatsApp ${LEF_CONTACT.whatsappLabel} · ${LEF_CONTACT.email} · Instagram ${LEF_CONTACT.instagramLabel}\n` +
   `${LEF_CONTACT.site}`;
+
+// --- Clases canceladas y reposiciones (notify-class-change, 24 sep 2026) ---
+// Un día marcado "Sin clase" y la reposición que programa el profesor se
+// avisan a cada estudiante del grupo, con tono formal y disculpa de LEF.
+type ClassInfo = {
+  name: string;          // nombre del estudiante
+  module: string;        // "A2.1 — Real Life"
+  teacher: string;
+  classDate: string;     // "martes 29 de septiembre"
+  classTime: string;     // "6:00 p. m."
+};
+
+function reasonBox(reason: string, details: string) {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+<td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Motivo</p>
+<p style="margin:0;font-family:${FONT};font-size:16px;font-weight:600;color:${INK}">${escHtml(reason)}</p>
+${details ? `<p style="margin:6px 0 0;font-family:${FONT};font-size:14.5px;color:${GRAFITO};white-space:pre-line">${escHtml(details)}</p>` : ""}
+</td></tr></table>`;
+}
+
+// Varios días (p. ej. semana de receso): un solo correo con todas las fechas (plural).
+export function classCancelledEmail(c: ClassInfo & { reason: string; details: string; plural?: boolean }, portalUrl: string) {
+  const subject = c.plural ? `No habrá clases: ${c.classDate} — ${c.module.split(" — ")[0]}`
+    : `No habrá clase el ${c.classDate} — ${c.module.split(" — ")[0]}`;
+  const heading = c.plural ? "Tus próximas clases no se realizarán" : `Tu clase del ${c.classDate} no se realizará`;
+  const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">Te escribimos para avisarte que ${c.plural ? "tus clases" : "tu clase"} de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> del <strong style="color:${INK};font-weight:600">${escHtml(c.classDate)}</strong>${c.classTime ? ` a las <strong style="color:${INK};font-weight:600">${escHtml(c.classTime)}</strong>` : ""} no se ${c.plural ? "van" : "va"} a realizar.</p>
+${reasonBox(c.reason, c.details)}
+<p style="margin:0 0 14px">Lamentamos mucho los inconvenientes que esto te pueda causar. En LEF cuidamos que no pierdas ninguna clase: ${c.teacher ? `tu profesor(a) <strong style="color:${INK};font-weight:600">${escHtml(c.teacher)}</strong>` : "tu profesor(a)"} se pondrá en contacto contigo para acordar ${c.plural ? "las fechas en que recuperarán estas clases" : "la fecha en que recuperarán esta clase"}.</p>
+<p style="margin:0">Cuando ${c.plural ? "queden programadas" : "quede programada"}, te avisaremos por este medio y la verás también en el calendario de tu portal.</p>`;
+  const html = lefEmail({
+    preheader: `${c.plural ? "Tus clases" : "Tu clase"} del ${c.classDate} no se ${c.plural ? "realizarán" : "realizará"}. Motivo: ${c.reason}.`,
+    eyebrow: "Aviso de clase", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
+  });
+  const text = `${hi}\n\n${c.plural ? "Tus clases" : "Tu clase"} de ${c.module} del ${c.classDate}${c.classTime ? ` a las ${c.classTime}` : ""} no se ${c.plural ? "van" : "va"} a realizar.\n\n` +
+    `Motivo: ${c.reason}${c.details ? `\n${c.details}` : ""}\n\nLamentamos mucho los inconvenientes. ${c.teacher ? `Tu profesor(a) ${c.teacher}` : "Tu profesor(a)"} ` +
+    `se pondrá en contacto contigo para acordar la fecha en que recuperarán esta clase. Cuando quede programada, te avisaremos ` +
+    `y la verás en el calendario de tu portal: ${portalUrl}#calendario` + LEF_TEXT_FOOTER;
+  return { subject, html, text };
+}
+
+export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime: string }, portalUrl: string) {
+  const subject = `Tu clase se recuperará el ${c.makeupDate} — ${c.module.split(" — ")[0]}`;
+  const heading = `Recuperamos tu clase el ${c.makeupDate}`;
+  const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">La clase de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> que no se realizó el ${escHtml(c.classDate)} ya tiene nueva fecha:</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+<td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Nueva fecha</p>
+<p style="margin:0;font-family:${FONT};font-size:18px;font-weight:700;color:${INK}">${escHtml(c.makeupDate)}</p>
+<p style="margin:4px 0 0;font-family:${FONT};font-size:15px;color:${GRAFITO}">${escHtml(c.makeupTime)}${c.teacher ? ` · con ${escHtml(c.teacher)}` : ""}</p>
+</td></tr></table>
+<p style="margin:0">Ese día entra a tu portal, en <strong style="color:${INK};font-weight:600">Mi curso → Clase de hoy</strong>: la agenda se habilitará 10 minutos antes y el botón para unirte a la reunión, a la hora exacta de la clase.</p>`;
+  const html = lefEmail({
+    preheader: `Tu clase del ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}.`,
+    eyebrow: "Reposición de clase", heading, bodyHtml, cta: { label: "Ir a Clase de hoy", url: portalUrl + "#clase-hoy" },
+  });
+  const text = `${hi}\n\nLa clase de ${c.module} que no se realizó el ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}` +
+    `${c.teacher ? ` con ${c.teacher}` : ""}.\n\nEse día entra a tu portal, en Mi curso → Clase de hoy: la agenda se habilitará 10 minutos ` +
+    `antes y el botón para unirte a la reunión, a la hora exacta: ${portalUrl}#clase-hoy` + LEF_TEXT_FOOTER;
+  return { subject, html, text };
+}

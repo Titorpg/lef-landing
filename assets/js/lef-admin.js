@@ -474,6 +474,7 @@
     if (ME.role !== "admin") return secDashboardTeacher(main);
     var isAdmin = true;
     head(main, "Dashboard", "Resumen general del sistema.");
+    var mkBox = h("<div></div>"); main.appendChild(mkBox); renderPendingMakeups(mkBox);
 
     var jobs = [
       q("enrollments").select("id,registration_number,status,created_at,module_id,students(full_name,whatsapp,email),modules(level,title,module_number),groups(schedules(days,start_time,end_time),teachers(full_name))").order("created_at", { ascending: false }),
@@ -584,6 +585,92 @@
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
+  /* ============ CLASES POR REPROGRAMAR (Dashboard) ============ */
+  // Pedido del usuario (24 sep 2026): un día de clase marcado "Sin clase" no
+  // detiene el ciclo (el día siguiente sigue con la agenda que le toca), así
+  // que esa clase queda pendiente. Aquí, y no en el calendario (donde la fecha
+  // se queda atrás), el profesor ve cada una y la reprograma: la reposición
+  // entra a su calendario y al de los estudiantes del grupo, ellos reciben un
+  // correo, y ese día y hora ven en "Clase de hoy" la agenda que se perdió.
+  // El aviso sigue hasta que pasa la fecha de la reposición.
+  var MK_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>';
+  function longDate(ymd) {
+    var t = new Date(ymd + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function renderPendingMakeups(box) {
+    rpc("get_my_pending_makeups").then(function (rows) {
+      box.innerHTML = "";
+      rows = rows || [];
+      if (!rows.length) return;
+      var pending = rows.filter(function (r) { return !r.makeup_id; }).length;
+      var sec = h('<section class="mk-sec"><div class="mk-sec__head"><span class="mk-sec__ic">' + MK_IC + "</span><div>" +
+        "<h2>Clases por reprogramar</h2><p>" + (pending
+          ? (pending === 1 ? "Tienes 1 clase pendiente por reprogramar." : "Tienes " + pending + " clases pendientes por reprogramar.") + " Toca cada una para agendar su reposición."
+          : "Todas tus clases canceladas ya tienen fecha de reposición.") + "</p></div></div></section>");
+      rows.forEach(function (r) { sec.appendChild(makeupCard(r, box)); });
+      box.appendChild(sec);
+    }).catch(function () { box.innerHTML = ""; });
+  }
+  function makeupCard(r, box) {
+    var done = !!r.makeup_id;
+    var chip = done ? "Reprogramada: " + longDate(r.makeup_date).split(",")[0] + " " + new Date(r.makeup_date + "T12:00:00").getDate() + ", " + time(r.makeup_start)
+      : "Pendiente";
+    var card = h('<div class="mk-card' + (done ? " is-done" : "") + '">' +
+      '<button type="button" class="mk-card__row" aria-expanded="false">' +
+      '<span class="mk-card__day"><small>Day</small>' + esc(String(r.session_number)) + "</span>" +
+      '<span class="mk-card__body"><strong>' + esc(r.module_level + " — " + r.module_title) + (ME.role === "admin" && r.teacher_name ? " · " + esc(r.teacher_name) : "") + "</strong>" +
+      "<span>" + esc(longDate(r.class_date) + " · " + time(r.start_time)) + " · Motivo: " + esc(r.reason) + "</span></span>" +
+      '<span class="mk-chip ' + (done ? "is-ok" : "is-warn") + '">' + esc(chip) + "</span>" +
+      '<span class="mk-card__chev" aria-hidden="true">&rsaquo;</span></button>' +
+      '<div class="mk-card__panel" hidden></div></div>');
+    var row = card.querySelector(".mk-card__row"), panel = card.querySelector(".mk-card__panel");
+    row.addEventListener("click", function () {
+      var open = panel.hidden;
+      panel.hidden = !open; row.setAttribute("aria-expanded", String(open)); card.classList.toggle("is-open", open);
+      if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; fillPanel(); }
+    });
+    function fillPanel() {
+      var today = new Date(); var min = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+      panel.innerHTML =
+        '<p class="mk-card__lead">' + (done ? "Esta clase se repone el <strong>" + esc(longDate(r.makeup_date)) + "</strong> de " + esc(time(r.makeup_start)) + (r.makeup_end ? " a " + esc(time(r.makeup_end)) : "") + ". Si necesitas cambiarla, elige la nueva fecha:"
+          : "Elige la fecha y la hora que acordaste con tus estudiantes para recuperar la clase del " + esc(longDate(r.class_date).toLowerCase()) + ".") + "</p>" +
+        '<div class="mk-form">' +
+        field("Fecha", '<input type="date" name="d" min="' + min + '" value="' + esc(done ? r.makeup_date : "") + '">') +
+        field("Hora de inicio", '<input type="time" name="s" value="' + esc(String((done ? r.makeup_start : r.start_time) || "").slice(0, 5)) + '">') +
+        field("Hora de fin", '<input type="time" name="e" value="' + esc(String((done ? r.makeup_end : r.end_time) || "").slice(0, 5)) + '">') +
+        "</div>" +
+        '<p class="mk-card__note">Se agregará a tu calendario y al de los estudiantes del grupo, y ellos recibirán un correo con la nueva fecha. Ese día, a esa hora, verán en <strong>Clase de hoy</strong> la agenda DAY ' + esc(String(r.session_number)) + ".</p>" +
+        '<div class="pnl-alert err" data-err style="display:none;margin:10px 0 0"></div>' +
+        '<div class="mk-card__acts"><button type="button" class="btn btn-dark" data-save>' + (done ? "Cambiar fecha" : "Programar reposición") + "</button></div>";
+      var err = panel.querySelector("[data-err]"), save = panel.querySelector("[data-save]");
+      save.addEventListener("click", function () {
+        var d = panel.querySelector("[name=d]").value, st = panel.querySelector("[name=s]").value, en = panel.querySelector("[name=e]").value;
+        err.style.display = "none";
+        var problem = !d ? "Elige la fecha de la reposición." : d < min ? "La fecha no puede ser anterior a hoy." : !st ? "Elige la hora de inicio."
+          : en && en <= st ? "La hora de fin debe ser después de la de inicio." : "";
+        if (problem) { err.textContent = problem; err.style.display = "block"; return; }
+        save.disabled = true;
+        var ev = { title: "Reposición · clase DAY " + r.session_number, category: "reposicion", audience: "group", group_id: r.group_id,
+          starts_on: d, ends_on: d, start_time: st, end_time: en || null, makeup_of: r.class_date,
+          details: "Recupera la clase del " + longDate(r.class_date).toLowerCase() + " (" + r.reason + ")." };
+        (done ? q("calendar_events").delete().eq("id", r.makeup_id) : Promise.resolve({})).then(function (x) {
+          if (x && x.error) throw x.error;
+          return q("calendar_events").insert(ev).select("id");
+        }).then(function (ins) {
+          if (ins.error) throw ins.error;
+          return window.LEFCalendar.notifyClassChange(sb, ins.data[0].id).catch(function () { return null; });
+        }).then(function (res) {
+          toast("Reposición programada" + (res && res.sent ? ". Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.") : "."));
+          renderPendingMakeups(box);
+        }).catch(function (e) {
+          err.textContent = friendly(e); err.style.display = "block"; save.disabled = false;
+        });
+      });
+    }
+    return card;
+  }
+
   // Grupos activos del profesor + sus inscripciones (Active/PendingPayment).
   // Usado por el Dashboard (resumen) y por "Mis grupos" (detalle).
   function loadMyGroups() {
@@ -607,6 +694,8 @@
   // colegio (pagos, otros módulos, etc. — eso es del admin).
   function secDashboardTeacher(main) {
     head(main, "Dashboard", "Resumen de tus grupos.");
+    var mkBox = h("<div></div>"); main.appendChild(mkBox);
+    if (ME.teacher_id) renderPendingMakeups(mkBox);
     if (!ME.teacher_id) {
       main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
       return;
@@ -1360,7 +1449,7 @@
         var code = lm ? lm[1].toUpperCase() : null;
         var key = code || ("curso:" + c.id);
         var lv = levels[key] = levels[key] || { key: key, code: code, label: code ? "Nivel " + code : c.name, links: [], modules: {} };
-        lv.links.push({ name: c.name, url: c.alternateLink });
+        lv.links.push({ id: c.id, name: c.name, url: c.alternateLink });
         var topicMod = {};
         (c.topics || []).forEach(function (t) { topicMod[t.id] = moduleCode(t.name, code, mods) || t.name; });
         (c.materials || []).forEach(function (m) {
@@ -1408,6 +1497,36 @@
       b.addEventListener("click", onBack);
       return b;
     }
+    // Enlace de Meet de la clase (Google no lo entrega por la API): el
+    // estudiante lo ve como "Únete a la reunión" en Clase de hoy, SOLO a la
+    // hora de su clase (lo decide la función student-classroom).
+    var meetLinksP = null;
+    function meetEditor(l) {
+      var box = h('<div class="meet-edit"><span class="meet-edit__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span>' +
+        '<div class="meet-edit__main"><strong>Enlace de Meet de “' + esc(l.name) + "”</strong>" +
+        "<small>Tus estudiantes lo verán como el botón “Únete a la reunión” solo a la hora de su clase. Cópialo de Classroom (encabezado de la clase → Meet).</small>" +
+        '<div class="meet-edit__row"><input name="m" inputmode="url" placeholder="https://meet.google.com/abc-defg-hij"><button type="button" class="btn btn-dark btn-sm">Guardar</button></div>' +
+        '<span class="meet-edit__msg" data-msg></span></div></div>');
+      var inp = box.querySelector("[name=m]"), msg = box.querySelector("[data-msg]"), btnS = box.querySelector("button");
+      if (!meetLinksP) meetLinksP = q("classroom_meet_links").select("course_id,meet_url").then(function (r) { return r.data || []; }, function () { return []; });
+      meetLinksP.then(function (rows) {
+        var m = rows.filter(function (x) { return x.course_id === String(l.id); })[0];
+        if (m) { inp.value = m.meet_url; msg.textContent = "✓ Guardado"; }
+      });
+      btnS.addEventListener("click", function () {
+        var v = inp.value.trim().replace(/\?.*$/, "");
+        if (!/^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i.test(v)) { msg.textContent = "Pega el enlace completo de Meet (https://meet.google.com/…)."; msg.className = "meet-edit__msg is-err"; return; }
+        btnS.disabled = true;
+        q("classroom_meet_links").upsert({ course_id: String(l.id), meet_url: v.toLowerCase(), teacher_id: ME.teacher_id, updated_at: new Date().toISOString() })
+          .then(function (r) {
+            btnS.disabled = false;
+            if (r.error) { msg.textContent = friendly(r.error); msg.className = "meet-edit__msg is-err"; return; }
+            inp.value = v.toLowerCase(); msg.textContent = "✓ Guardado"; msg.className = "meet-edit__msg";
+            meetLinksP = null;
+          });
+      });
+      return box;
+    }
     function modLabel(mod) { return mod.key + (mod.title ? " — " + mod.title : ""); }
 
     function showLevels(nav, tree) {
@@ -1426,6 +1545,7 @@
       nav.appendChild(h('<p style="margin-bottom:14px">' + lv.links.map(function (l) {
         return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir “' + esc(l.name) + "” en Classroom ↗</a>";
       }).join(" · ") + "</p>"));
+      lv.links.forEach(function (l) { nav.appendChild(meetEditor(l)); });
       if (!lv.moduleList.length) nav.appendChild(h('<div class="pnl-alert ok">Esta clase todavía no tiene materiales.</div>'));
       lv.moduleList.forEach(function (mod) {
         var n = mod.items.length;

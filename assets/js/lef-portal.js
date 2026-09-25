@@ -159,6 +159,7 @@
 
   function route() {
     var id = location.hash.slice(1);
+    if (id !== "clase-hoy" && typeof clearTodayTimers === "function") clearTodayTimers();
     var tab = TABS.filter(function (t) { return t.id === id; })[0] || TABS[0];
     document.querySelectorAll(".pnl-nav a").forEach(function (a) {
       a.classList.toggle("active", a.getAttribute("href") === "#" + (tab.parent || tab.id));
@@ -902,7 +903,9 @@
     ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
-    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/>'
+    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/>',
+    video: '<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>'
   };
   function mcIc(name) {
     return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -956,6 +959,11 @@
         return;
       }
       card.querySelector("[data-name]").textContent = d.course.name;
+      if (d.joined === true) {
+        body.innerHTML = '<p class="myclass__joined">' + mcIc("check") + "<span>Ya estás en la clase de Classroom</span></p>" +
+          '<p class="myclass__hint">Entra siempre a tu clase desde aquí: la agenda y el botón de la reunión se activan a la hora de tu clase en <strong>Clase de hoy</strong>.</p>';
+        return;
+      }
       body.innerHTML = codeBlock(d.course) +
         '<p class="myclass__hint">Entra con tu cuenta de Google (tu correo personal) y toca <strong>Unirme a la clase</strong>. ' +
         "Si Classroom te pide el código, cópialo de aquí.</p>";
@@ -1010,98 +1018,185 @@
     return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
   }
 
+  // "Clase de hoy" por horario (pedido del usuario, 24 sep 2026): la clase
+  // n.º N del ciclo (solo días del horario) muestra la agenda DAY N; se abre
+  // 10 min antes de la hora de la clase y el botón de Meet a la hora exacta;
+  // todo se cierra al terminar. Un día "Sin clase" muestra el motivo. La
+  // función student-classroom decide y NO entrega agenda ni Meet fuera de hora;
+  // aquí solo se pinta y se vuelve a consultar sola cuando cambia el estado.
+  var todayTimers = [];
+  function clearTodayTimers() { todayTimers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); todayTimers = []; }
+  function hmToMin(s) { var p = String(s || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
+  function t12(s) { return fmtTime(String(s || "").slice(0, 5)); }
+  function longYmd(ymd) {
+    return new Date(ymd + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  }
+  function inLabel(min) {
+    if (min <= 0) return "en un momento";
+    if (min < 60) return "en " + min + " min";
+    var h2 = Math.floor(min / 60), m2 = min % 60;
+    return "en " + h2 + " h" + (m2 ? " " + m2 + " min" : "");
+  }
+
   function renderClassToday(main) {
+    clearTodayTimers();
     main.innerHTML = "";
     var back = h('<button type="button" class="resource-back">&larr; Mi curso</button>');
-    back.addEventListener("click", function () { go("curso"); });
+    back.addEventListener("click", function () { clearTodayTimers(); go("curso"); });
     main.appendChild(back);
     var box = h('<div class="today"><div class="today-hero is-loading"><div class="today-hero__date"><span class="today-hero__k">Clase de hoy</span>' +
       '<span class="today-hero__num">' + new Date().getDate() + "</span></div>" +
-      '<div class="today-hero__info"><p class="today-hero__mod">Buscando la agenda de hoy…</p></div></div></div>');
+      '<div class="today-hero__info"><p class="today-hero__mod">Buscando tu clase de hoy…</p></div></div></div>');
     main.appendChild(box);
 
     classFn("today").then(function (d) {
+      if (location.hash.slice(1) !== "clase-hoy") return;
       box.innerHTML = "";
       var g = d.group || {}, todayD = d.today ? new Date(d.today + "T12:00:00") : new Date();
-      var agendas = d.today_agendas || [];
-      var state = d.status !== "ok" ? "off" : agendas.length ? "ok" : d.is_class_day ? "wait" : "off";
-      var pill = d.status !== "ok" ? "" : agendas.length ? "Agenda publicada" : d.is_class_day ? "Pendiente de publicar" : "Hoy no tienes clase";
+      // Reloj del servidor (hora de Colombia) contra el del navegador, para las cuentas regresivas.
+      var serverNow = hmToMin(d.now), clientAt = Date.now();
+      function nowMin() { return serverNow + Math.floor((Date.now() - clientAt) / 60000); }
+      var slots = d.slots || [];
+      var cur = slots.filter(function (s) { return s.phase !== "terminada"; })[0] || slots[slots.length - 1] || null;
+
+      var state = "off", pill = "";
+      if (d.status !== "ok") { state = "off"; pill = ""; }
+      else if (d.before_cycle) { state = "off"; pill = "Tu ciclo aún no empieza"; }
+      else if (d.cancel && !cur) { state = "off"; pill = "Hoy no hay clase"; }
+      else if (cur) {
+        state = cur.phase === "en_curso" ? "live" : cur.phase === "abierta" ? "ok" : cur.phase === "antes" ? "wait" : "off";
+        pill = cur.phase === "en_curso" ? "Clase en curso" : cur.phase === "abierta" ? "Agenda abierta" : cur.phase === "antes" ? "Hoy tienes clase" : "Clase terminada";
+      } else { pill = "Hoy no tienes clase"; }
+      var timeTxt = cur ? t12(cur.start) + " – " + t12(cur.end) : (g.start_time ? fmtTime(g.start_time) + (g.end_time ? " – " + fmtTime(g.end_time) : "") : "");
       box.appendChild(h('<div class="today-hero">' +
         '<div class="today-hero__date"><span class="today-hero__k">Clase de hoy</span>' +
         '<span class="today-hero__num">' + todayD.getDate() + "</span>" +
-        '<span class="today-hero__dm">' + esc(todayD.toLocaleDateString("es-CO", { weekday: "long" })) + " · " +
-        esc(todayD.toLocaleDateString("es-CO", { month: "long" })) + "</span></div>" +
+        '<span class="today-hero__dm">' + esc(todayD.toLocaleDateString("es-CO", { weekday: "long" })) + " · " + esc(todayD.toLocaleDateString("es-CO", { month: "long" })) + "</span></div>" +
         '<div class="today-hero__info">' +
         (g.module_level ? '<p class="today-hero__mod">' + esc(g.module_level + " — " + g.module_title) + "</p>" : "") +
-        (g.start_time ? '<p class="today-hero__meta">' + mcIc("clock") + esc(fmtTime(g.start_time) + (g.end_time ? " – " + fmtTime(g.end_time) : "")) +
-          (g.teacher ? " · " + esc(g.teacher) : "") + "</p>" : "") +
+        (timeTxt ? '<p class="today-hero__meta">' + mcIc("clock") + esc(timeTxt) + (g.teacher ? " · " + esc(g.teacher) : "") + "</p>" : "") +
         (pill ? '<span class="today-pill is-' + state + '"><i></i>' + esc(pill) + "</span>" : "") +
         "</div></div>"));
 
+      function empty(icon, title, text, cls) {
+        return h('<div class="today-empty' + (cls ? " " + cls : "") + '"><span class="today-empty__ic">' + mcIc(icon) + "</span><h2>" + esc(title) + "</h2><p>" + text + "</p></div>");
+      }
+
       if (d.status !== "ok") {
         var m = CLASS_MSG[d.status] || CLASS_MSG.error;
-        var st = h('<div class="today-empty"><span class="today-empty__ic">' + mcIc(m[0]) + "</span><h2>" + esc(m[1]) + "</h2><p>" + esc(m[2]) + "</p>" +
-          (d.status === "sin_pago" ? '<button type="button" class="btn btn-blue">Ir a Facturación</button>' : "") + "</div>");
-        var fb = st.querySelector("button"); if (fb) fb.addEventListener("click", function () { go("facturacion"); });
+        var st = empty(m[0], m[1], esc(m[2]));
+        if (d.status === "sin_pago") {
+          var fb = h('<button type="button" class="btn btn-blue">Ir a Facturación</button>');
+          fb.addEventListener("click", function () { go("facturacion"); });
+          st.appendChild(fb);
+        }
         box.appendChild(st);
         return;
       }
 
-      if (agendas.length) {
-        agendas.forEach(function (a) {
-          var art = h('<article class="agenda">' +
-            '<header class="agenda__head"><span class="agenda__day"><small>Day</small>' + esc(a.day != null ? String(a.day) : "·") + "</span>" +
-            '<div class="agenda__titles"><h2>' + esc(a.title || "Agenda de hoy") + "</h2><p>Publicada hoy por " + esc(g.teacher || "tu profesor") + "</p></div>" +
-            '<a class="btn btn-ghost btn-sm" href="' + esc(a.alternateLink) + '" target="_blank" rel="noopener">' + mcIc("ext") + "<span>Classroom</span></a></header>" +
-            '<div class="agenda__body">' + mcPost(a) + "</div></article>");
-          box.appendChild(art);
-        });
-      } else if (d.is_class_day) {
-        var w = h('<div class="today-empty is-wait"><span class="today-empty__ic">' + mcIc("clock") + "</span>" +
-          "<h2>Tu profesor publicará la agenda de hoy en breve</h2>" +
-          "<p>" + (g.start_time ? "Tu clase de hoy empieza a las " + esc(fmtTime(g.start_time)) + " Vuelve" : "Vuelve") + " a revisar un poco antes de empezar.</p>" +
-          '<button type="button" class="btn btn-dark">' + mcIc("refresh") + "<span>Actualizar</span></button></div>");
-        w.querySelector("button").addEventListener("click", function () { renderClassToday(main); });
-        box.appendChild(w);
+      // fmtTime ya termina en "p.m.": no se le agrega otro punto.
+      var dot = g.start_time ? "" : ".";
+      var nextTxt = d.next_class ? "<strong>" + esc(longYmd(d.next_class)) + (g.start_time ? " a las " + esc(fmtTime(g.start_time)) : "") + "</strong>" : "";
+      if (d.before_cycle) {
+        var bc = empty("calx", "Tu ciclo aún no empieza",
+          (nextTxt ? "Tu primera clase es el " + nextTxt + dot : "Pronto empezarán tus clases.") +
+          " Mientras tanto, puedes ir revisando el libro de tu módulo en Mis recursos.");
+        var rb = h('<button type="button" class="btn btn-dark">' + mcIc("book") + "<span>Ir a Mis recursos</span></button>");
+        rb.addEventListener("click", function () { go("recursos"); });
+        bc.appendChild(rb);
+        box.appendChild(bc);
+      } else if (d.cancel && !cur) {
+        box.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>Hoy no hay clase</h2>" +
+          '<div class="today-reason"><span>Motivo</span><strong>' + esc(d.cancel.reason) + "</strong>" + (d.cancel.details ? "<p>" + esc(d.cancel.details) + "</p>" : "") + "</div>" +
+          "<p>Tu profesor se pondrá en contacto contigo para acordar cuándo recuperarán esta clase; la nueva fecha aparecerá en tu calendario." +
+          (nextTxt ? " Tu próxima clase es el " + nextTxt + dot : "") + "</p></div>"));
+      } else if (!cur) {
+        box.appendChild(empty("calx", "Hoy no tienes clase",
+          (nextTxt ? "Tu próxima clase es el " + nextTxt : "Revisa tu horario en Mi curso") +
+          ((d.previous || []).length ? " — mientras tanto, puedes repasar las agendas anteriores." : ".")));
       } else {
-        var nx = d.next_class ? new Date(d.next_class + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" }) : "";
-        box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("calx") + "</span>" +
-          "<h2>Hoy no tienes clase</h2>" +
-          "<p>" + (nx ? "Tu próxima clase es el <strong>" + esc(nx) + (g.start_time ? " a las " + esc(fmtTime(g.start_time)) : "") + "</strong>" : "Revisa tu horario en Mi curso") +
-          " — mientras tanto, puedes repasar las agendas anteriores.</p></div>"));
+        slots.forEach(function (s) { box.appendChild(slotBlock(s)); });
       }
 
-      // Recordatorio para unirse a la clase de Classroom.
-      if (d.course) {
-        var jn = h('<div class="today-join"><span class="today-join__ic">' + mcIc("board") + "</span>" +
-          '<div class="today-join__t"><strong>¿Todavía no estás en la clase de Classroom?</strong>' +
-          "<span>" + esc(d.course.name) + (d.course.enrollment_code ? " · código <b>" + esc(d.course.enrollment_code) + "</b>" : "") + "</span></div>" +
-          '<a class="btn btn-blue btn-sm" href="' + esc(d.course.join_url) + '" target="_blank" rel="noopener">Unirme ↗</a></div>');
-        box.appendChild(jn);
+      function slotBlock(s) {
+        var wrap = h('<div class="today-slot"></div>');
+        var label = s.kind === "reposicion" ? "Reposición · clase DAY " + s.day : "Clase n.º " + s.day + " · agenda DAY " + s.day;
+        if (s.phase === "antes") {
+          var w = h('<div class="today-empty is-wait"><span class="today-empty__ic">' + mcIc("clock") + "</span>" +
+            "<h2>" + (s.kind === "reposicion" ? "Hoy tienes la reposición de tu clase" : "Hoy tienes clase") + "</h2>" +
+            "<p>Tendrás acceso a tu agenda a las <strong>" + esc(t12(s.opens_at)) + "</strong> y a la reunión a las <strong>" + esc(t12(s.start)) + "</strong>" +
+            ' <span class="today-count" data-count></span>.</p><span class="today-tag">' + esc(label) + "</span></div>");
+          var cnt = w.querySelector("[data-count]");
+          var paint = function () { cnt.textContent = "(" + inLabel(hmToMin(s.opens_at) - nowMin()) + ")"; };
+          paint(); todayTimers.push(setInterval(paint, 30000));
+          wrap.appendChild(w);
+          return wrap;
+        }
+        if (s.phase === "terminada") {
+          wrap.appendChild(empty("calx", "Tu clase de hoy terminó", "La agenda quedó guardada abajo, en Agendas anteriores, para que la repases."));
+          return wrap;
+        }
+        // Abierta o en curso: la agenda del día + el botón de la reunión.
+        if (!s.agenda.length) {
+          wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está en Classroom", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
+        }
+        s.agenda.forEach(function (a) {
+          wrap.appendChild(h('<article class="agenda">' +
+            '<header class="agenda__head"><span class="agenda__day"><small>Day</small>' + esc(String(s.day)) + "</span>" +
+            '<div class="agenda__titles"><h2>' + esc(a.title || "Agenda de hoy") + "</h2><p>" + esc(label) + "</p></div>" +
+            '<a class="btn btn-ghost btn-sm" href="' + esc(a.alternateLink) + '" target="_blank" rel="noopener">' + mcIc("ext") + "<span>Classroom</span></a></header>" +
+            '<div class="agenda__body">' + mcPost(a) + "</div></article>"));
+        });
+        var meet;
+        if (s.phase === "en_curso" && s.meet_url) {
+          meet = h('<a class="today-meet is-on" href="' + esc(s.meet_url) + '" target="_blank" rel="noopener">' +
+            '<span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Únete a la reunión</strong>' +
+            "<small>Tu clase está en curso · termina a las " + esc(t12(s.end)) + "</small></span>" + mcIc("arrow") + "</a>");
+        } else if (s.phase === "en_curso") {
+          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Reunión no disponible</strong>' +
+            "<small>Tu profesor aún no ha configurado el enlace de la reunión. Escríbele o espera un momento.</small></span></div>");
+        } else {
+          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Únete a la reunión</strong>' +
+            "<small>Se habilita a las " + esc(t12(s.start)) + ' <span data-count></span></small></span></div>');
+          var c2 = meet.querySelector("[data-count]");
+          var paint2 = function () { c2.textContent = "(" + inLabel(hmToMin(s.start) - nowMin()) + ")"; };
+          paint2(); todayTimers.push(setInterval(paint2, 30000));
+        }
+        wrap.appendChild(meet);
+        return wrap;
       }
 
-      var prev = d.previous_agendas || [];
+      var prev = d.previous || [];
       if (prev.length) {
         box.appendChild(h('<h2 class="today-sec">Agendas anteriores</h2>'));
-        prev.forEach(function (a) {
-          var wrap = h('<div class="cls-day"></div>');
-          var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
-            '<div style="min-width:0"><div style="font-weight:600">' + esc(a.title || "Agenda") + "</div>" +
-            '<span style="font-size:12.5px;color:var(--grafito)">Publicada el ' + esc(a.published_on ? shortDate(a.published_on) : "—") + "</span></div>" +
-            '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
-          var panel = h('<div class="cls-day__body" hidden></div>');
-          function toggle() {
-            var open = panel.hidden;
-            panel.hidden = !open;
-            row.setAttribute("aria-expanded", open ? "true" : "false");
-            wrap.classList.toggle("is-open", open);
-            if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = '<div class="cls-post">' + mcPost(a) + "</div>"; }
-          }
-          row.addEventListener("click", toggle);
-          row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
-          wrap.appendChild(row); wrap.appendChild(panel);
-          box.appendChild(wrap);
+        prev.forEach(function (p) {
+          p.agendas.forEach(function (a) {
+            var item = h('<div class="cls-day"></div>');
+            var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
+              '<div style="min-width:0"><div style="font-weight:600">' + esc(a.title || ("Agenda DAY " + p.day)) + "</div>" +
+              '<span style="font-size:12.5px;color:var(--grafito)">Clase del ' + esc(p.seen_on ? shortDate(p.seen_on) : "—") + "</span></div>" +
+              '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
+            var panel = h('<div class="cls-day__body" hidden></div>');
+            var toggle = function () {
+              var open = panel.hidden;
+              panel.hidden = !open;
+              row.setAttribute("aria-expanded", open ? "true" : "false");
+              item.classList.toggle("is-open", open);
+              if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = '<div class="cls-post">' + mcPost(a) + "</div>"; }
+            };
+            row.addEventListener("click", toggle);
+            row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+            item.appendChild(row); item.appendChild(panel);
+            box.appendChild(item);
+          });
         });
+      }
+
+      // Se vuelve a consultar sola cuando se abre la agenda, empieza o termina la clase.
+      if (d.refresh_in != null) {
+        todayTimers.push(setTimeout(function () {
+          if (location.hash.slice(1) === "clase-hoy") renderClassToday(main);
+        }, (d.refresh_in + 5) * 1000));
       }
     }).catch(function () {
       box.innerHTML = "";

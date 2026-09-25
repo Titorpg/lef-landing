@@ -3,6 +3,15 @@
 ## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
 ### Por hacer (abiertos)
+- **Clase de hoy por horario + reposiciones + Meet + correos** (24 sep): en git, NO
+  publicado. Falta: (1) usuario corre `20260925000000_clase_de_hoy_reposiciones.sql`;
+  (2) desplegar funciones student-classroom, notify-class-change, classroom-oauth-start
+  (scopes rosters+emails), classroom-list; (3) Vercel. Luego: cada profesor DESCONECTA y
+  reconecta Google (para "Ya estás en la clase") y pega el Meet de cada clase en
+  Planificador. Reglas: clase n.º N (solo días del horario desde inicio del ciclo) = DAY N;
+  "Sin clase" consume el número y queda "por reprogramar" en el Dashboard hasta que pase
+  la fecha de la reposición; agenda abre 10 min antes, Meet a la hora exacta, todo cierra
+  al terminar (lo decide el servidor). Correos con lefEmail (vista previa enviada).
 - **"Mi clase" del estudiante (Classroom + Clase de hoy)**: PUBLICADO 24 sep. Probar con un estudiante real que pagó
   (código, botón Unirme con `?cjc=`, agenda del día) y que un Gmail personal
   pueda entrar a la clase. Probar en iPhone un archivo de Drive privado: Safari no

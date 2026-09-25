@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.student-classroom]
 verify_jwt = true
+
+[functions.notify-class-change]
+verify_jwt = true
