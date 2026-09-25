@@ -3,10 +3,8 @@
 ## 📌 PENDIENTES VIGENTES (actualizado 24 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
 ### Por hacer (abiertos)
-- **Clase de hoy por horario + reposiciones + Meet + correos** (24 sep): en git, NO
-  publicado. Falta: (1) usuario corre `20260925000000_clase_de_hoy_reposiciones.sql`;
-  (2) desplegar funciones student-classroom, notify-class-change, classroom-oauth-start
-  (scopes rosters+emails), classroom-list; (3) Vercel. Luego: cada profesor DESCONECTA y
+- **Clase de hoy por horario + reposiciones + Meet + correos**: PUBLICADO 25 sep (SQL
+  `20260925000000` aplicado y verificado; funciones y Vercel desplegados). Falta: cada profesor DESCONECTA y
   reconecta Google (para "Ya estás en la clase") y pega el Meet de cada clase en
   Planificador. Reglas: clase n.º N (solo días del horario desde inicio del ciclo) = DAY N;
   "Sin clase" consume el número y queda "por reprogramar" en el Dashboard hasta que pase
@@ -36,7 +34,7 @@
 - **Cuentas Workspace de profesores** + agregarlos en Classroom.
 - **Probar el calendario con cuentas reales** (admin, profesor, estudiante):
   crear un evento para un grupo y verlo desde el portal del estudiante.
-- Ningún SQL pendiente (`calendario_propio` aplicado el 24 sep, sin errores).
+- Ningún SQL pendiente (`calendario_propio` 24 sep y `clase_de_hoy_reposiciones` 25 sep aplicados).
 - **Probar "Conectar con Google Classroom"** (Planificador) tras encender la
   verificación de sesión de `classroom-oauth-start` (24 sep). Si falla, volver a
   apagarla en `supabase/config.toml` y redesplegar.
