@@ -1,17 +1,18 @@
 -- LEF — Libro complementario POR NIVEL (pedido del usuario, 26 sep 2026).
--- Hay un libro complementario para todo el nivel (A1, A2, B1, B2, C1), no uno
--- por módulo. En "Mis recursos" del estudiante sale en la carpeta "Libros
+-- Hay un libro complementario para todo el nivel (A2, B1, B2, C1; el A1 NO tiene),
+-- no uno por módulo; el admin lo carga desde el primer módulo del nivel (A2.1,
+-- B1.1, B2.1, C1.1). En "Mis recursos" del estudiante sale en la carpeta "Libros
 -- complementarios" y se le abre el del nivel en cuanto tenga pagado CUALQUIER
 -- módulo de ese nivel (y ya queda abierto de ahí en adelante).
 -- La columna modules.complementary_book_url (20260926010000) queda sin uso.
 
 create table if not exists public.level_books (
-  level                  text primary key check (level in ('A1','A2','B1','B2','C1')),
+  level                  text primary key check (level in ('A2','B1','B2','C1')),
   complementary_book_url text,
   updated_at             timestamptz not null default now()
 );
 
-insert into public.level_books (level) values ('A1'),('A2'),('B1'),('B2'),('C1')
+insert into public.level_books (level) values ('A2'),('B1'),('B2'),('C1')
 on conflict (level) do nothing;
 
 alter table public.level_books enable row level security;
@@ -38,7 +39,7 @@ create or replace function public.get_my_level_books()
       and split_part(m.level, '.', 1) = lb.level
       and public.lef_enrollment_paid(e.id)
   )
-  order by array_position(array['A1','A2','B1','B2','C1'], lb.level);
+  order by array_position(array['A2','B1','B2','C1'], lb.level);
 $$;
 
 revoke all on function public.get_my_level_books() from public, anon;

@@ -12,7 +12,7 @@
 ### SQL — confirmar
 - **`20260926040000_libros_complementarios_por_nivel.sql`** (tabla `level_books` +
   `get_my_level_books()`): pasado al usuario el 26 sep, SIN confirmar. Si en Académico →
-  Módulos → "Libros complementarios por nivel" sale el aviso rojo "Falta aplicar…",
+  Módulos → Editar A2.1 la casilla "Libro complementario del nivel A2" sale gris,
   no está aplicado.
 - `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
   YA NO HACE FALTA — el libro complementario pasó a ser por nivel; la columna queda sin uso.
@@ -21,11 +21,13 @@
 
 ### ✅ Hecho 26 sep — Mis recursos por carpetas (aprobado con capturas)
 - Mis recursos → carpetas de nivel (solo los niveles del estudiante) + "Libros
-  complementarios" (al mismo nivel que A1…C1; un libro por nivel, se abre con cualquier
+  complementarios" (al mismo nivel que A1…C1; un libro por nivel SOLO para A2, B1, B2 y C1
+  — el A1 NO tiene, y un estudiante solo de A1 no ve la carpeta; se abre con cualquier
   módulo pagado del nivel) → módulos del nivel (candado si no está pagado) → Libro de
   estudio (libro + workbook, `heyzine_url`) · Talleres (semana 1–4 + Repaso) · Recursos
   interactivos (Vocabulario, Gramática, Listening, Reading).
-- Admin: Académico → Módulos → botón "Libros complementarios por nivel".
+- Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
+  módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
 
 ### Pendiente del usuario: contenido de Talleres e Interactivos
 - **Talleres**: HTML interactivos ya hechos (solo texto). Por ahora los sube Claude desde

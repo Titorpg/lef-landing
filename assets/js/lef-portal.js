@@ -1242,9 +1242,11 @@
   // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
   // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
   // tampoco entrega su libro). El libro complementario es de TODO el nivel y se
-  // abre con cualquier módulo pagado de ese nivel (get_my_level_books).
+  // abre con cualquier módulo pagado de ese nivel (get_my_level_books). El A1
+  // NO tiene libro complementario: un estudiante solo de A1 no ve esa carpeta.
   // Talleres e interactivos todavía no tienen contenido: se muestran vacíos.
   var RS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+  var RS_BOOK_LEVELS = ["A2", "B1", "B2", "C1"];
   var RS_TALLERES = ["Taller semana 1", "Taller semana 2", "Taller semana 3", "Taller semana 4", "Repaso del módulo"];
   var RS_INTERACTIVOS = [
     { label: "Vocabulario", icon: "abc" },
@@ -1332,9 +1334,10 @@
         sub: n + (n === 1 ? " módulo" : " módulos") + " · " + L.mods.map(function (m) { return m.module_level; }).join(", "),
         onOpen: function () { rsLevel(main, M, L); } }));
     });
-    var open = M.levels.filter(function (L) { return L.open; });
-    grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !open.length,
-      sub: open.length ? "Uno por nivel · " + open.map(function (L) { return L.code; }).join(", ") : "Se abre cuando pagues tu primer módulo.",
+    var withBook = M.levels.filter(function (L) { return RS_BOOK_LEVELS.indexOf(L.code) >= 0; });
+    var open = withBook.filter(function (L) { return L.open; });
+    if (withBook.length) grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !open.length,
+      sub: open.length ? "Uno por nivel · " + open.map(function (L) { return L.code; }).join(", ") : "Se abre cuando pagues tu primer módulo del nivel.",
       onOpen: function () { if (open.length) rsComp(main, M); else go("facturacion"); } }));
     body.appendChild(grid);
   }
@@ -1343,7 +1346,7 @@
     var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Libros complementarios",
       "Un libro para todo el nivel. Se abre con tu primer módulo pagado de ese nivel.");
     var grid = h('<div class="rs-grid"></div>');
-    M.levels.filter(function (L) { return L.open; }).forEach(function (L) {
+    M.levels.filter(function (L) { return L.open && RS_BOOK_LEVELS.indexOf(L.code) >= 0; }).forEach(function (L) {
       grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libro complementario " + L.code, sub: "Para todo el nivel " + L.code,
         chip: L.bookUrl ? null : ["soon", "Próximamente"],
         onOpen: function () {
