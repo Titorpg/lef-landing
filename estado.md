@@ -1,37 +1,39 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (actualizado 26 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-### ⚠️ Aplicar en Supabase (SQL Editor) — cambio de módulo por error (26 sep)
-- `supabase/migrations/20260926030000_corregir_modulo.sql` (va DESPUÉS de 20260926020000):
-  Estudiantes → Editar → "— Cambio de módulo por error: pasarlo a otro sin generar nuevo cobro —".
-  La misma inscripción pasa al módulo correcto con su mensualidad y pagos; nada queda completado,
-  sin cobro nuevo, suelta el grupo, queda en el Registro de eventos. Probado en Postgres local.
+### Decisión pendiente del usuario — botón "Unirme a la clase" (Mi curso)
+- Pidió quitar todo lo que invite al estudiante a Classroom. Ya se quitó de las agendas
+  (26 sep). El botón "Unirme a la clase" + recuadro "Tu clase en Google Classroom" de
+  Mi curso SIGUE, porque hoy los archivos de Drive de las agendas y el Meet dependen de
+  que el estudiante esté en la clase de Classroom. Opciones planteadas:
+  - **A (recomendada)**: quitarlo y que nada dependa de Classroom — profesores comparten
+    Drive como "cualquier persona con el enlace" y el Workspace permite entrar al Meet
+    sin estar en la clase (ajustes de Google, sin código; darle los pasos).
+  - **B**: la plataforma inscribe sola al estudiante en Classroom al pagar (Google igual
+    le manda un correo de invitación).
 
-### ⚠️ Aplicar en Supabase (SQL Editor) — cobro al asignar módulo (26 sep)
-- `supabase/migrations/20260926020000_cobro_al_asignar_modulo.sql`: Estudiantes → Editar → módulo
-  ahora crea también la mensualidad (antes solo la inscripción: caso "Liam", pago pendiente sin
-  nada en Facturación). "Generar pago" ya no duplica. Al aplicarlo, las inscripciones pendientes
-  sin mensualidad reciben la suya (pagador = el de su última mensualidad o el estudiante).
-  Probado en Postgres local.
-
-### ⚠️ Aplicar en Supabase (SQL Editor) — libro complementario (26 sep)
-- `supabase/migrations/20260926010000_libro_complementario.sql`: columna `modules.complementary_book_url`.
-  Hasta aplicarlo, la casilla "Libro complementario" de Académico → Módulos → Editar sale deshabilitada.
+### SQL — confirmar
+- `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
+  el usuario NO confirmó haberlo aplicado. Si en Académico → Módulos → Editar la casilla
+  "Libro complementario" sale gris/deshabilitada, falta aplicarlo.
+- Aplicados 26 sep (confirmados por el usuario): festivos, cobro al asignar módulo,
+  cambio de módulo por error. (Claude no puede leer producción para verificarlo.)
 
 ### Pendiente: dónde mostrar el libro complementario
 - Cada módulo tiene 1 libro principal (`heyzine_url`, en Mis recursos → Libro de estudio) y 1
   complementario (`complementary_book_url`, ya se guarda desde Académico → Módulos → Editar).
-  El usuario decidirá más adelante dónde se despliega el complementario (portal del estudiante,
-  Recursos del profesor, etc.) — hoy no se muestra en ningún sitio.
+  El usuario decidirá más adelante dónde se despliega (portal del estudiante, Recursos del
+  profesor, etc.) — hoy no se muestra en ningún sitio.
 
-### ⚠️ Aplicar en Supabase (SQL Editor) — festivos (26 sep)
-- `supabase/migrations/20260926000000_festivos_colombia.sql`: festivos de Colombia calculados por ley
-  (Ley 51/1983 + Ley 2578/2026, 9 de julio). Hasta aplicarlo, el calendario no muestra festivos
-  (el código ya publicado funciona igual que antes). Funciones y Vercel ya desplegados.
-  Probado en Postgres local: 2026 y 2027 coinciden con los calendarios oficiales (19 festivos).
-  Clase en festivo = tachada "Día festivo", pendiente en Dashboard del profesor, SIN correo;
-  correo solo al programar la reposición ("no hubo el … por el festivo (…)").
+### Verificar en la plataforma (hecho 26 sep, sin prueba en producción)
+- **Festivos**: calendario de octubre → lunes 12 en naranja; clase de ese día tachada
+  "Día festivo" y en "Clases por reprogramar" del profesor; al programar la reposición
+  llega el correo ("no hubo el … por el festivo (…)"). SQL de control:
+  `select * from lef_holidays('2026-01-01','2026-12-31');` → 19 filas.
+- **Liam**: debe tener su mensualidad de $297.500 del módulo nuevo en Pagos y en su
+  Facturación (creada por el arreglo del SQL de cobro).
+- **Cambio de módulo por error**: primera vez que se use, revisar el Registro de eventos.
 
 ### Probar con cuentas reales (todo ya publicado)
 - **Calendario**: admin crea un evento para "Todos"; profesor (Luis Manga) una
@@ -74,8 +76,41 @@
 - Los estudiantes pueden ver todas las agendas y el Meet desde la app de Classroom
   (el admin del Workspace no oculta el Meet ni el código): se les pedirá entrar
   siempre por LEF. LEF solo controla lo que muestra LEF.
-- Ningún SQL pendiente (`calendario_propio` 24 sep y `clase_de_hoy_reposiciones`
-  25 sep aplicados y verificados).
+- SQL: ver "SQL — confirmar" arriba (solo falta confirmar el del libro complementario).
+
+### Hecho 26 sep 2026
+- **Clase de hoy estilo Classroom** (25–26 sep): barra superior más grande (módulo,
+  horario, profesor); recuadro de Meet a la izquierda (logo de Meet, "Unirse" amarillo
+  cuando la reunión está abierta, gris y deshabilitado si no, con el motivo); recuadro
+  "Clases anteriores" → "Ver todo" abre la lista como carpeta, con la fecha de cada clase.
+- **Inicio del estudiante**: botón verde de WhatsApp en lugar de "Escribir a LEF".
+- **Horarios y Grupos**: el ciclo se muestra con fechas exactas ("29 Sep – 29 Oct 2026")
+  en listas, tablas, avisos de cruce y "Finalizar ciclo" (`cycleDates` en lef-admin.js).
+- **Festivos de Colombia** (`lef_holidays`, calculados por ley: Ley 51/1983 + Ley 2578
+  del 1 jun 2026 que agrega el 9 de julio, Virgen de Chiquinquirá → 19 festivos). Fijos
+  en todos los calendarios (naranja, bandera, mensaje corto, nadie los edita). Clase que
+  cae en festivo = "Sin clase" automático: tachada, al abrirla dice "DÍA FESTIVO", queda
+  en "Clases por reprogramar" del profesor desde que existe el grupo, SIN correo; el
+  correo sale al programar la reposición. "Clase de hoy" dice "Hoy es festivo". El
+  "Sin clase" manual no avisa por días que ya eran festivo. Solo el Dashboard del
+  profesor muestra reprogramaciones (el usuario lo confirmó: la novedad es en los
+  CALENDARIOS de todos, no en los dashboards).
+- **Libro complementario**: casilla nueva en Académico → Módulos → Editar (el campo de
+  Heyzine ahora se llama "Libro principal"). Solo se guarda; dónde se muestra: pendiente.
+- **Agendas sin Classroom**: fuera el botón "Classroom" de cada agenda, "Ver en
+  Classroom ↗" y los textos que invitaban a unirse a Classroom (ver decisión pendiente).
+- **Cobro al asignar módulo** (caso Liam): Estudiantes → Editar → otro módulo creaba la
+  inscripción pendiente SIN mensualidad. Ahora `admin_assign_module` crea también la
+  mensualidad (`lef_ensure_subscription`: precio fijo, pagador = el de su última
+  mensualidad o el estudiante; liga mensualidades viejas sin `enrollment_id` en vez de
+  duplicar). "Generar pago" reutiliza la mensualidad sin pagos (no duplica). El SQL
+  arregló las inscripciones pendientes que habían quedado sin cobro.
+- **Cambio de módulo por error** (`admin_correct_module`): opción nueva en Estudiantes →
+  Editar. La MISMA inscripción pasa al módulo correcto con su mensualidad y pagos (si
+  estaba pagada sigue activa), nada queda completado, sin cobro nuevo, suelta el grupo,
+  y queda en el Registro de eventos ("Cambio de módulo por error (sin cobro nuevo)",
+  explicado en palabras).
+- Todo el SQL de hoy se probó antes en un Postgres local (PGlite en el scratchpad).
 
 ### Hecho 25 sep 2026
 - **"Clase de hoy" por horario** (`student-classroom`). En Classroom las agendas de
