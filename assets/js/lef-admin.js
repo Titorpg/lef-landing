@@ -1511,11 +1511,6 @@
       row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } });
       return row;
     }
-    function backBtn(label, onBack) {
-      var b = h('<button type="button" class="resource-back">&larr; ' + esc(label) + "</button>");
-      b.addEventListener("click", onBack);
-      return b;
-    }
     // Enlace de Meet de la clase (Google no lo entrega por la API): el
     // estudiante lo ve como "Únete a la reunión" en Clase de hoy, SOLO a la
     // hora de su clase (lo decide la función student-classroom).
@@ -1547,9 +1542,29 @@
       return box;
     }
     function modLabel(mod) { return mod.key + (mod.title ? " — " + mod.title : ""); }
+    // Barra fija arriba con "Atrás" (vuelve UNA carpeta) y la ruta (pedido del
+    // usuario, 26 sep 2026). crumbs: [[texto, al hacer clic], …]; el último es "Atrás".
+    function foldBar(crumbs, here) {
+      window.scrollTo(0, 0);
+      var bar = h('<div class="fold-bar"><button type="button" class="fold-back" aria-label="Atrás: volver a ' + esc(crumbs[crumbs.length - 1][0]) + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
+        "<span>Atrás</span></button></div>");
+      bar.querySelector(".fold-back").addEventListener("click", crumbs[crumbs.length - 1][1]);
+      var nav = h('<nav class="rs-crumbs" aria-label="Ruta"></nav>');
+      crumbs.forEach(function (c) {
+        var a = h('<button type="button" class="rs-crumbs__a">' + esc(c[0]) + "</button>");
+        a.addEventListener("click", c[1]);
+        nav.appendChild(a);
+        nav.appendChild(h('<span class="rs-crumbs__sep" aria-hidden="true">›</span>'));
+      });
+      nav.appendChild(h('<span class="rs-crumbs__here">' + esc(here) + "</span>"));
+      bar.appendChild(nav);
+      return bar;
+    }
 
     function showLevels(nav, tree) {
       nav.innerHTML = "";
+      window.scrollTo(0, 0);
       tree.forEach(function (lv) {
         var n = lv.moduleList.filter(function (m) { return m.key !== OTHERS; }).length;
         nav.appendChild(folderRow(lv.label, n + (n === 1 ? " módulo" : " módulos") + " · " + lv.links.map(function (l) { return l.name; }).join(", "),
@@ -1559,7 +1574,7 @@
 
     function showModules(nav, tree, lv) {
       nav.innerHTML = "";
-      nav.appendChild(backBtn("Planificador", function () { showLevels(nav, tree); }));
+      nav.appendChild(foldBar([["Planificador", function () { showLevels(nav, tree); }]], lv.label));
       nav.appendChild(h('<h2 class="pnl-h" style="font-size:18px;margin-bottom:2px">' + esc(lv.label) + "</h2>"));
       nav.appendChild(h('<p style="margin-bottom:14px">' + lv.links.map(function (l) {
         return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir “' + esc(l.name) + "” en Classroom ↗</a>";
@@ -1576,7 +1591,7 @@
     // abrir cada día, para no traer 16 visores de una vez.
     function showDays(nav, tree, lv, mod) {
       nav.innerHTML = "";
-      nav.appendChild(backBtn(lv.label, function () { showModules(nav, tree, lv); }));
+      nav.appendChild(foldBar([["Planificador", function () { showLevels(nav, tree); }], [lv.label, function () { showModules(nav, tree, lv); }]], modLabel(mod)));
       nav.appendChild(h('<h2 class="pnl-h" style="font-size:18px;margin-bottom:14px">' + esc(modLabel(mod)) + "</h2>"));
       mod.items.forEach(function (m) {
         var wrap = h('<div class="cls-day"></div>');

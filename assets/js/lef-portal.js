@@ -1293,9 +1293,15 @@
   }
 
   // Página de una carpeta: ruta (Mis recursos › A1 › A1.1), título y contenido.
+  // Barra fija arriba con "Atrás" (vuelve UNA carpeta) y la ruta completa
+  // (pedido del usuario, 26 sep 2026: la ruta sola era difícil de usar).
   function rsPage(main, crumbs, title, sub) {
     main.innerHTML = "";
+    window.scrollTo(0, 0);
     if (crumbs.length) {
+      var bar = h('<div class="fold-bar"><button type="button" class="fold-back" aria-label="Atrás: volver a ' + esc(crumbs[crumbs.length - 1][0]) + '">' +
+        mcIc("arrow") + "<span>Atrás</span></button></div>");
+      bar.querySelector(".fold-back").addEventListener("click", crumbs[crumbs.length - 1][1]);
       var nav = h('<nav class="rs-crumbs" aria-label="Ruta"></nav>');
       crumbs.forEach(function (c) {
         var a = h('<button type="button" class="rs-crumbs__a">' + esc(c[0]) + "</button>");
@@ -1304,7 +1310,8 @@
         nav.appendChild(h('<span class="rs-crumbs__sep" aria-hidden="true">›</span>'));
       });
       nav.appendChild(h('<span class="rs-crumbs__here">' + esc(title) + "</span>"));
-      main.appendChild(nav);
+      bar.appendChild(nav);
+      main.appendChild(bar);
     }
     main.appendChild(h('<h1 class="pnl-h">' + esc(title) + "</h1>"));
     if (sub) main.appendChild(h('<p class="pnl-sub">' + esc(sub) + "</p>"));

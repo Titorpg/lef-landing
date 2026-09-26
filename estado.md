@@ -25,6 +25,9 @@
   módulo pagado del nivel) → módulos del nivel (candado si no está pagado) → Libro de
   estudio (libro + workbook, `heyzine_url`) · Talleres (semana 1–4 + Repaso) · Recursos
   interactivos (Vocabulario, Gramática, Listening, Reading).
+- **Botón "Atrás"** (26 sep, pedido del usuario): barra fija bajo el encabezado con "Atrás"
+  (vuelve UNA carpeta) + la ruta, en Mis recursos (estudiante) y en el Planificador
+  (profesor). Clase CSS `.fold-bar` / `.fold-back`.
 - Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
   módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
 
