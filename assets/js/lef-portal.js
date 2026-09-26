@@ -1280,10 +1280,19 @@
     return { levels: levels };
   }
 
-  // Tarjeta de carpeta: color e ícono según lo que contiene.
+  // Ícono de nivel (26 sep 2026, diseño del usuario): globo de conversación con el
+  // nivel adentro (A1, A2…) y destellos dorados. Solo en carpetas de nivel y módulo.
+  function lvlIc(code) {
+    return '<svg class="lvl-ic" viewBox="0 0 48 48" fill="none" aria-hidden="true">' +
+      '<path d="M21 9.5c-8.6 0-15.5 6-15.5 13.4 0 3.6 1.6 6.9 4.3 9.3l-2.3 6.3 7-3.3c2 .7 4.2 1 6.5 1 8.6 0 15.5-6 15.5-13.3S29.6 9.5 21 9.5z" stroke="#1b2a5e" stroke-width="2.6" stroke-linejoin="round" fill="#fff"/>' +
+      '<text x="21" y="27.4" text-anchor="middle" font-family="Jost,system-ui,sans-serif" font-weight="700" font-size="11.5" fill="#1b2a5e">' + esc(String(code).split(".")[0]) + "</text>" +
+      '<path d="M37.5 5.5 36 9.5M42.5 10.5l-3.8 2M43.5 17.5h-4M41.5 30l-3-1.8M38 35.5l-1.6-3" stroke="#d9a52b" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  }
+
+  // Tarjeta de carpeta: color e ícono según lo que contiene (o.badge = nivel/módulo).
   function rsCard(o) {
     var el = h('<button type="button" class="rs-card is-' + o.tone + (o.locked ? " is-locked" : "") + '">' +
-      '<span class="rs-card__top"><span class="rs-card__ic">' + mcIc(o.icon) + "</span>" +
+      '<span class="rs-card__top"><span class="rs-card__ic">' + (o.badge ? lvlIc(o.badge) : mcIc(o.icon)) + "</span>" +
       '<span class="rs-card__go" aria-hidden="true">' + mcIc(o.locked ? "lock" : "arrow") + "</span></span>" +
       '<span class="rs-card__t">' + esc(o.title) + "</span>" +
       (o.sub ? '<span class="rs-card__s">' + esc(o.sub) + "</span>" : "") +
@@ -1339,7 +1348,7 @@
     var grid = h('<div class="rs-grid"></div>');
     M.levels.forEach(function (L) {
       var n = L.mods.length;
-      grid.appendChild(rsCard({ tone: "blue", icon: "folder", title: "Nivel " + L.code,
+      grid.appendChild(rsCard({ tone: "lvl", badge: L.code, title: "Nivel " + L.code,
         sub: n + (n === 1 ? " módulo" : " módulos") + " · " + L.mods.map(function (m) { return m.module_level; }).join(", "),
         onOpen: function () { rsLevel(main, M, L); } }));
     });
@@ -1364,7 +1373,7 @@
   }
 
   function rsLevel(main, M, L) {
-    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Nivel " + L.code, "Elige un módulo o los libros complementarios del nivel.");
+    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Nivel " + L.code, RS_BOOK_LEVELS.indexOf(L.code) >= 0 ? "Elige un módulo o los libros complementarios del nivel." : "Elige un módulo.");
     var grid = h('<div class="rs-grid"></div>');
     if (RS_BOOK_LEVELS.indexOf(L.code) >= 0) {
       grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !L.open,
@@ -1373,7 +1382,7 @@
     }
     L.mods.forEach(function (c) {
       var locked = !c.module_paid;
-      grid.appendChild(rsCard({ tone: "blue", icon: "folder", title: c.module_level, sub: c.module_title, locked: locked,
+      grid.appendChild(rsCard({ tone: "lvl", badge: c.module_level, title: c.module_level, sub: c.module_title, locked: locked,
         chip: locked ? ["warn", "Pendiente de pago"] : c.enrollment_status === "Completed" ? ["done", "Culminado"] : ["ok", "En curso"],
         onOpen: function () { if (locked) go("facturacion"); else rsModule(main, M, L, c); } }));
     });

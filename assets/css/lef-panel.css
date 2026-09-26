@@ -1246,3 +1246,10 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .rc-molde{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0;font-size:13.5px;}
 .rc-molde a{color:var(--azul);font-weight:600;text-decoration:none;}
 .rc-molde a:hover{text-decoration:underline;}
+/* Carpetas de nivel y módulo (26 sep 2026): globo con el nivel, fondo arena y franja dorada. */
+.rs-card.is-lvl{--c:#d9a52b;--cbg:#f4efe4;}
+.rs-card.is-lvl .rs-card__ic{width:60px;height:60px;border-radius:16px;}
+.rs-card__ic .lvl-ic{width:54px;height:54px;}
+.rs-card.is-lvl .rs-card__t{color:#1b2a5e;}
+.rs-card.is-lvl.is-locked .lvl-ic{opacity:.45;filter:grayscale(1);}
+@media(max-width:520px){.rs-card.is-lvl .rs-card__ic{width:50px;height:50px;border-radius:13px;}.rs-card__ic .lvl-ic{width:45px;height:45px;}}

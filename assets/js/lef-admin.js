@@ -1645,9 +1645,17 @@
   function rcIc(n) {
     return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (RC_ICONS[n] || "") + "</svg>";
   }
+  // Ícono de nivel (26 sep 2026, diseño del usuario): globo de conversación con el
+  // nivel adentro (A1, A2…) y destellos dorados. Solo en carpetas de nivel y módulo.
+  function lvlIc(code) {
+    return '<svg class="lvl-ic" viewBox="0 0 48 48" fill="none" aria-hidden="true">' +
+      '<path d="M21 9.5c-8.6 0-15.5 6-15.5 13.4 0 3.6 1.6 6.9 4.3 9.3l-2.3 6.3 7-3.3c2 .7 4.2 1 6.5 1 8.6 0 15.5-6 15.5-13.3S29.6 9.5 21 9.5z" stroke="#1b2a5e" stroke-width="2.6" stroke-linejoin="round" fill="#fff"/>' +
+      '<text x="21" y="27.4" text-anchor="middle" font-family="Jost,system-ui,sans-serif" font-weight="700" font-size="11.5" fill="#1b2a5e">' + esc(String(code).split(".")[0]) + "</text>" +
+      '<path d="M37.5 5.5 36 9.5M42.5 10.5l-3.8 2M43.5 17.5h-4M41.5 30l-3-1.8M38 35.5l-1.6-3" stroke="#d9a52b" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  }
   function rcCard(o) {
     var el = h('<button type="button" class="rs-card is-' + o.tone + '">' +
-      '<span class="rs-card__top"><span class="rs-card__ic">' + rcIc(o.icon) + '</span><span class="rs-card__go" aria-hidden="true">' + rcIc("arrow") + "</span></span>" +
+      '<span class="rs-card__top"><span class="rs-card__ic">' + (o.badge ? lvlIc(o.badge) : rcIc(o.icon)) + '</span><span class="rs-card__go" aria-hidden="true">' + rcIc("arrow") + "</span></span>" +
       '<span class="rs-card__t">' + esc(o.title) + "</span>" +
       (o.sub ? '<span class="rs-card__s">' + esc(o.sub) + "</span>" : "") +
       (o.chip ? '<span class="rs-chip is-' + o.chip[0] + '">' + esc(o.chip[1]) + "</span>" : "") + "</button>");
@@ -1734,7 +1742,7 @@
       var mods = S.mods.filter(function (m) { return String(m.level).split(".")[0] === lv; });
       if (!mods.length) return;
       var n = mods.filter(function (m) { return m.heyzine_url; }).length;
-      grid.appendChild(rcCard({ tone: "blue", icon: "folder", title: "Nivel " + lv, sub: mods.map(function (m) { return m.level; }).join(", "),
+      grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: mods.map(function (m) { return m.level; }).join(", "),
         chip: n === mods.length ? ["ok", "Todos cargados"] : ["soon", n + " de " + mods.length + " cargados"],
         onOpen: function () { rcPrincipalesNivel(main, S, lv); } }));
     });
@@ -1746,7 +1754,7 @@
     var body = rcPage(main, crumbs, "Nivel " + lv, "Elige el módulo.");
     var grid = h('<div class="rs-grid"></div>');
     S.mods.filter(function (m) { return String(m.level).split(".")[0] === lv; }).forEach(function (m) {
-      grid.appendChild(rcCard({ tone: "blue", icon: "folder", title: m.level, sub: m.title,
+      grid.appendChild(rcCard({ tone: "lvl", badge: m.level, title: m.level, sub: m.title,
         chip: m.heyzine_url ? ["ok", "Con libro"] : ["soon", "Sin libro"],
         onOpen: function () { rcPrincipalModulo(main, S, lv, m); } }));
     });
@@ -1816,7 +1824,7 @@
       var grid = h('<div class="rs-grid"></div>');
       RC_BOOK_LEVELS.forEach(function (lv) {
         var n = count[lv] || 0;
-        grid.appendChild(rcCard({ tone: "amber", icon: "folder", title: "Nivel " + lv, sub: n ? n + (n === 1 ? " libro" : " libros") : "Sin libros todavía",
+        grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: n ? n + (n === 1 ? " libro" : " libros") : "Sin libros todavía",
           onOpen: function () { rcComplementariosNivel(main, S, lv); } }));
       });
       body.appendChild(grid);
@@ -1910,7 +1918,7 @@
       RC_WS_LEVELS.forEach(function (lv) {
         var mods = rcModsOf(S, lv);
         var n = S.ws.filter(function (w) { return w.module_level.split(".")[0] === lv; }).length;
-        grid.appendChild(rcCard({ tone: "violet", icon: "folder", title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
+        grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
           chip: n ? ["ok", rcCount(n, "taller", "talleres")] : ["soon", "Vacío"],
           onOpen: function () { rcTalleresNivel(main, S, lv); } }));
       });
@@ -1923,7 +1931,7 @@
     var grid = h('<div class="rs-grid"></div>');
     rcModsOf(S, lv).forEach(function (m) {
       var n = S.ws.filter(function (w) { return w.module_level === m.code; }).length;
-      grid.appendChild(rcCard({ tone: "violet", icon: "folder", title: m.code, sub: m.title || "Módulo " + m.code,
+      grid.appendChild(rcCard({ tone: "lvl", badge: m.code, title: m.code, sub: m.title || "Módulo " + m.code,
         chip: n ? ["ok", rcCount(n, "taller", "talleres")] : ["soon", "Vacío"],
         onOpen: function () { rcTalleresModulo(main, S, lv, m); } }));
     });
