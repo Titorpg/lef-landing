@@ -111,11 +111,17 @@ Deno.serve(async (req) => {
     module_level: mod.level, module_title: mod.title, days, start_time: sch.start_time, end_time: sch.end_time,
     teacher: grp.teachers?.full_name || "", cycle_start: cyc.start_date || null, cycle_end: cyc.end_date || null,
   };
+  // Festivos de Colombia (fijos, lef_holidays): esa clase no se dicta y queda
+  // por reprogramar, igual que un día "Sin clase" (pedido del usuario, 26 sep 2026).
+  const holFrom = cyc.start_date && cyc.start_date < today ? cyc.start_date : today;
+  const { data: holRows } = await admin.rpc("lef_holidays", { p_from: holFrom, p_to: addDays(today, 60) });
+  const holidays = new Map<string, { name: string; blurb: string }>();
+  ((holRows || []) as { day: string; name: string; blurb: string }[]).forEach((x) => holidays.set(x.day, { name: x.name, blurb: x.blurb }));
   let nextClass: string | null = null;
   for (let i = 1; i <= 60; i++) {
     const d = addDays(today, i);
     if (cyc.end_date && d > cyc.end_date) break;
-    if (isClassDate(d)) { nextClass = d; break; }
+    if (isClassDate(d) && !holidays.has(d)) { nextClass = d; break; }
   }
   const beforeCycle = !!cyc.start_date && today < cyc.start_date;
   const base = { group, today, now: hm(nowMin), next_class: nextClass, before_cycle: beforeCycle };
@@ -170,14 +176,18 @@ Deno.serve(async (req) => {
     const evs = ((evRows || []) as Ev[]).filter((x) =>
       x.category === "reposicion" ? x.group_id === grp.id
         : (x.audience === "students" || x.audience === "all" || (x.audience === "group" && x.group_id === grp.id)));
-    const cancelOf = (ymd: string) => evs.find((x) => x.category === "sin_clase" && x.starts_on <= ymd && ymd <= x.ends_on) || null;
+    const cancelOf = (ymd: string): { title: string; details: string; holiday?: boolean } | null => {
+      const hol = holidays.get(ymd);
+      if (hol) return { title: "Día festivo: " + hol.name, details: hol.blurb, holiday: true };
+      return evs.find((x) => x.category === "sin_clase" && x.starts_on <= ymd && ymd <= x.ends_on) || null;
+    };
 
     type Slot = { kind: "clase" | "reposicion"; day: number; start: number; end: number };
     const slots: Slot[] = [];
-    let cancel: { reason: string; details: string } | null = null;
+    let cancel: { reason: string; details: string; holiday: boolean } | null = null;
     if (isClassDate(today)) {
       const c = cancelOf(today);
-      if (c) cancel = { reason: c.title, details: c.details || "" };
+      if (c) cancel = { reason: c.title, details: c.details || "", holiday: !!c.holiday };
       else slots.push({ kind: "clase", day: sessionNumber(days, cyc.start_date, today), start: startMin, end: endMin });
     }
     evs.filter((x) => x.category === "reposicion" && x.starts_on === today && x.makeup_of).forEach((x) => {

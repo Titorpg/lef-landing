@@ -68,6 +68,14 @@ Deno.serve(async (req) => {
   if (ev.group_id) gq = gq.eq("id", ev.group_id);
   const { data: groups } = await gq;
 
+  // Festivos de Colombia en las fechas del evento: esas clases ya no se dictan
+  // (no se avisa por el festivo); la reposición de un festivo lo menciona.
+  const holFrom = ev.category === "reposicion" ? (ev.makeup_of || ev.starts_on) : ev.starts_on;
+  const holTo = ev.category === "reposicion" ? (ev.makeup_of || ev.starts_on) : ev.ends_on;
+  const { data: holRows } = await admin.rpc("lef_holidays", { p_from: holFrom, p_to: holTo });
+  const holidays = new Map<string, string>();
+  ((holRows || []) as { day: string; name: string }[]).forEach((x) => holidays.set(x.day, x.name));
+
   // Por grupo, los días de clase afectados (un solo correo por estudiante).
   // deno-lint-ignore no-explicit-any
   const pairs: { g: any; dates: string[] }[] = [];
@@ -78,7 +86,7 @@ Deno.serve(async (req) => {
       (!cyc.start_date || cyc.start_date <= d) && (!cyc.end_date || d <= cyc.end_date);
     if (ev.category === "reposicion") { if (ev.makeup_of) pairs.push({ g, dates: [ev.makeup_of] }); return; }
     const dates: string[] = [];
-    for (let d = ev.starts_on; d <= ev.ends_on; d = addDays(d, 1)) if (isClass(d)) dates.push(d);
+    for (let d = ev.starts_on; d <= ev.ends_on; d = addDays(d, 1)) if (isClass(d) && !holidays.has(d)) dates.push(d);
     if (dates.length) pairs.push({ g, dates });
   });
 
@@ -105,7 +113,7 @@ Deno.serve(async (req) => {
       };
       const m = ev.category === "sin_clase"
         ? classCancelledEmail({ ...info, reason: ev.title, details: ev.details || "", plural: dates.length > 1 }, portalUrl)
-        : classMakeupEmail({ ...info, makeupDate: longDate(ev.starts_on),
+        : classMakeupEmail({ ...info, makeupDate: longDate(ev.starts_on), holiday: (ev.makeup_of && holidays.get(ev.makeup_of)) || "",
             makeupTime: `de ${time12(ev.start_time)}${ev.end_time ? ` a ${time12(ev.end_time)}` : ""}` }, portalUrl);
       emails.push({ from, to: [to], subject: m.subject, html: m.html, text: m.text });
     });

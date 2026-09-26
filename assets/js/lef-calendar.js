@@ -73,7 +73,8 @@
     trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
     edit: '<path d="M11 4H4v16h16v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/>',
     layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
-    redo: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>'
+    redo: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
+    flag: '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>'
   };
   function ic(name, cls) {
     return '<svg class="lcal-ic' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
@@ -94,7 +95,9 @@
     aviso:      { label: "Avisos",     one: "Aviso",      color: "#4d4d4d", icon: "megaphone" },
     sin_clase:  { label: "Sin clase",  one: "Sin clase",  color: "#8c8c8c", icon: "calx" },
     // La crea el profesor desde su Dashboard ("Clases por reprogramar"), no desde aquí.
-    reposicion: { label: "Reposiciones", one: "Reposición", color: "#6b4fa3", icon: "redo" }
+    reposicion: { label: "Reposiciones", one: "Reposición", color: "#6b4fa3", icon: "redo" },
+    // Festivos de Colombia: los pone el sistema (get_my_calendar), nadie los edita.
+    festivo:    { label: "Festivos", one: "Festivo", color: "#c2410c", icon: "flag" }
   };
   var CATS_BY_ROLE = {
     teacher: ["actividad", "evaluacion", "aviso", "sin_clase"],
@@ -537,7 +540,7 @@
             (hgt < 40 ? " is-short" : "") + (hgt >= 64 ? " is-tall" : "") + (p.lanes > 1 ? " is-narrow" : "") + '" style="--c:' + c + ";top:" + top + "px;height:" + hgt + "px;left:calc(" + (p.lane / p.lanes * 100) + "% + 2px);width:calc(" + (100 / p.lanes) + '% - 5px)">' +
             '<span class="lcal-blk__title">' + ic(iconOf(it)) + "<span>" + esc(it.title) + "</span></span>" +
             '<span class="lcal-blk__time">' + esc(fmtTime(it.start_time) + (it.end_time ? " – " + fmtTime(it.end_time) : "")) + "</span>" +
-            (hgt >= 70 ? '<span class="lcal-blk__meta">' + esc(it.cancelled ? "Sin clase" : metaLine(it, role)) + "</span>" : "") +
+            (hgt >= 70 ? '<span class="lcal-blk__meta">' + esc(it.cancelled ? (it.holiday ? "Festivo" : "Sin clase") : metaLine(it, role)) + "</span>" : "") +
             "</button>");
           blk.onclick = function (ev) { ev.stopPropagation(); showItem(it); };
           col.appendChild(blk);
@@ -621,7 +624,8 @@
           var k = keyOf(day), list = map[k] || [];
           var wd = (day.getDay() + 6) % 7;
           var cell = h('<div class="lcal-cell' + (day.getMonth() !== cursor.getMonth() ? " is-out" : "") + (k === keyOf(today) ? " is-today" : "") +
-            (k === keyOf(cursor) ? " is-sel" : "") + (wd > 4 ? " is-wkd" : "") + '">' +
+            (k === keyOf(cursor) ? " is-sel" : "") + (wd > 4 ? " is-wkd" : "") +
+            (list.some(function (it) { return it.category === "festivo"; }) ? " is-holiday" : "") + '">' +
             '<div class="lcal-cell__top"><span class="lcal-cell__num">' + day.getDate() + "</span>" +
             (editable ? '<button type="button" class="lcal-cell__add" aria-label="Agregar el ' + esc(longDay(day)) + '">' + ic("plus") + "</button>" : "") +
             '</div><div class="lcal-cell__evs"></div>' +
@@ -668,7 +672,7 @@
             '<span class="lcal-acard__time">' + (it.start_time ? esc(fmtTime(it.start_time)) + (it.end_time ? "<small>" + esc(fmtTime(it.end_time)) + "</small>" : "") : "<small>" + esc(timeRange(it)) + "</small>") + "</span>" +
             '<span class="lcal-acard__icon">' + ic(iconOf(it)) + "</span>" +
             '<span class="lcal-acard__body"><strong>' + esc(it.title) + "</strong>" +
-            '<span>' + esc(it.cancelled ? "Sin clase este día" : [CATS[catOf(it)].one, metaLine(it, role)].filter(Boolean).join(" · ")) + "</span></span>" +
+            '<span>' + esc(it.cancelled ? (it.holiday ? "Día festivo · sin clase" : "Sin clase este día") : [CATS[catOf(it)].one, metaLine(it, role)].filter(Boolean).join(" · ")) + "</span></span>" +
             '<span class="lcal-acard__chev">' + ic("right") + "</span></button>");
           card.onclick = function () { showItem(it); };
           box.appendChild(card);
@@ -716,6 +720,9 @@
 
     function showItem(it) {
       var c = colorOf(it), cat = CATS[catOf(it)] || CATS.actividad;
+      // Clase que cae en festivo: se abre como "Día festivo" (no como clase cancelada).
+      var isHolidayClass = it.item_type === "class" && it.cancelled && !!it.holiday;
+      if (isHolidayClass) { c = CATS.festivo.color; cat = { one: "Día festivo", icon: "flag" }; }
       var rows = [];
       rows.push(["clock", it.ends_on !== it.starts_on ? "Del " + longDay(parseKey(it.starts_on)) + " al " + longDay(parseKey(it.ends_on)) : longDay(parseKey(it.starts_on)),
                  it.ends_on !== it.starts_on ? "" : timeRange(it)]);
@@ -725,20 +732,27 @@
         if (it.author) rows.push(["user", it.author, "Profesor(a)"]);
         if (it.cycle_name) rows.push(["layers", it.cycle_name, "Ciclo"]);
         if (it.student_count != null) rows.push(["users", it.student_count + (it.student_count === 1 ? " estudiante" : " estudiantes"), "Inscritos en el grupo"]);
+      } else if (it.category === "festivo") {
+        rows.push(["flag", "Festivo nacional en Colombia", "Nadie tiene clase este día"]);
       } else {
         if (it.category === "reposicion" && it.makeup_of) {
-          rows.push(["redo", "Recupera la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase(), it.session_number ? "Agenda DAY " + it.session_number : ""]);
+          rows.push(["redo", "Recupera la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase() + (it.holiday ? " (festivo)" : ""), it.session_number ? "Agenda DAY " + it.session_number : ""]);
         }
         var aud = audienceLabel(it, role);
         if (aud) rows.push([it.audience === "personal" ? "lock" : it.audience === "group" ? "users" : "globe", aud, "Para"]);
         rows.push(["user", it.author, "Publicado por"]);
       }
       var b = h('<div class="lcal-detail">' +
-        (it.cancelled ? '<div class="lcal-note">' + ic("calx") + "<span>Este día no hay clase.</span></div>" : "") +
+        (isHolidayClass
+          ? '<div class="lcal-note is-holiday">' + ic("flag") + "<span><strong>" + esc(it.holiday) + "</strong>" + esc(it.holiday_blurb || "") +
+            "<small>" + (role === "student"
+              ? "Esta clase no se dicta por ser festivo. Tu profesor acordará contigo la nueva fecha y te llegará un correo cuando la programe."
+              : "Esta clase no se dicta por ser festivo y queda pendiente por reprogramar en el Dashboard del profesor.") + "</small></span></div>"
+          : it.cancelled ? '<div class="lcal-note">' + ic("calx") + "<span>Este día no hay clase.</span></div>" : "") +
         '<ul class="lcal-meta">' + rows.map(function (r) {
           return "<li>" + ic(r[0]) + "<span><strong>" + esc(r[1]) + "</strong>" + (r[2] ? "<small>" + esc(r[2]) + "</small>" : "") + "</span></li>";
         }).join("") + "</ul>" +
-        (it.item_type !== "class" && it.details ? '<div class="lcal-desc">' + ic("text") + "<p>" + esc(it.details) + "</p></div>" : "") +
+        (it.item_type !== "class" && it.details ? '<div class="lcal-desc' + (it.category === "festivo" ? " is-holiday" : "") + '">' + ic("text") + "<p>" + esc(it.details) + "</p></div>" : "") +
         (it.link_url && /^https:\/\//.test(it.link_url) ? '<a class="lcal-linkbtn" href="' + esc(it.link_url) + '" target="_blank" rel="noopener">' + ic("link") + "<span>Abrir enlace</span></a>" : "") +
         "</div>");
       var actions = [];

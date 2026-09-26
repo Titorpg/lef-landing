@@ -174,12 +174,14 @@ ${reasonBox(c.reason, c.details)}
   return { subject, html, text };
 }
 
-export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime: string }, portalUrl: string) {
+export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime: string; holiday?: string }, portalUrl: string) {
+  // Clase que cayó en festivo: "que no hubo el lunes 12 de octubre por el festivo (…)".
+  const why = c.holiday ? `que no hubo el ${c.classDate} por el festivo (${c.holiday})` : `que no se realizó el ${c.classDate}`;
   const subject = `Tu clase se recuperará el ${c.makeupDate} — ${c.module.split(" — ")[0]}`;
   const heading = `Recuperamos tu clase el ${c.makeupDate}`;
   const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
   const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
-<p style="margin:0 0 22px">La clase de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> que no se realizó el ${escHtml(c.classDate)} ya tiene nueva fecha:</p>
+<p style="margin:0 0 22px">La clase de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> ${escHtml(why)} ya tiene nueva fecha:</p>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
 <td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
 <p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Nueva fecha</p>
@@ -191,7 +193,7 @@ export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime
     preheader: `Tu clase del ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}.`,
     eyebrow: "Reposición de clase", heading, bodyHtml, cta: { label: "Ir a Clase de hoy", url: portalUrl + "#clase-hoy" },
   });
-  const text = `${hi}\n\nLa clase de ${c.module} que no se realizó el ${c.classDate} se recuperará el ${c.makeupDate}, ${c.makeupTime}` +
+  const text = `${hi}\n\nLa clase de ${c.module} ${why} se recuperará el ${c.makeupDate}, ${c.makeupTime}` +
     `${c.teacher ? ` con ${c.teacher}` : ""}.\n\nEse día entra a tu portal, en Mi curso → Clase de hoy: la agenda y el botón para unirte ` +
     `a la reunión se habilitan 10 minutos antes de la hora de la clase: ${portalUrl}#clase-hoy` + LEF_TEXT_FOOTER;
   return { subject, html, text };

@@ -1073,7 +1073,7 @@
       var state = "off", pill = "";
       if (d.status !== "ok") { state = "off"; pill = ""; }
       else if (d.before_cycle) { state = "off"; pill = "Tu ciclo aún no empieza"; }
-      else if (d.cancel && !cur) { state = "off"; pill = "Hoy no hay clase"; }
+      else if (d.cancel && !cur) { state = "off"; pill = d.cancel.holiday ? "Hoy es festivo" : "Hoy no hay clase"; }
       else if (cur) {
         var started = nowMin() >= hmToMin(cur.start);
         state = cur.phase === "en_curso" ? (started ? "live" : "ok") : cur.phase === "antes" ? "wait" : "off";
@@ -1159,7 +1159,7 @@
         bc.appendChild(rb);
         col.appendChild(bc);
       } else if (d.cancel && !cur) {
-        col.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>Hoy no hay clase</h2>" +
+        col.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>" + (d.cancel.holiday ? "Hoy es festivo: no hay clase" : "Hoy no hay clase") + "</h2>" +
           '<div class="today-reason"><span>Motivo</span><strong>' + esc(d.cancel.reason) + "</strong>" + (d.cancel.details ? "<p>" + esc(d.cancel.details) + "</p>" : "") + "</div>" +
           "<p>Tu profesor se pondrá en contacto contigo para acordar cuándo recuperarán esta clase; la nueva fecha aparecerá en tu calendario." +
           (nextTxt ? " Tu próxima clase es el " + nextTxt + dot : "") + "</p></div>"));
