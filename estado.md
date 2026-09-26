@@ -2,6 +2,14 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+### ⚠️ Aplicar en Supabase (SQL Editor) — festivos (26 sep)
+- `supabase/migrations/20260926000000_festivos_colombia.sql`: festivos de Colombia calculados por ley
+  (Ley 51/1983 + Ley 2578/2026, 9 de julio). Hasta aplicarlo, el calendario no muestra festivos
+  (el código ya publicado funciona igual que antes). Funciones y Vercel ya desplegados.
+  Probado en Postgres local: 2026 y 2027 coinciden con los calendarios oficiales (19 festivos).
+  Clase en festivo = tachada "Día festivo", pendiente en Dashboard del profesor, SIN correo;
+  correo solo al programar la reposición ("no hubo el … por el festivo (…)").
+
 ### Probar con cuentas reales (todo ya publicado)
 - **Calendario**: admin crea un evento para "Todos"; profesor (Luis Manga) una
   actividad para su grupo; el estudiante de ese grupo ve ambas en su portal.
