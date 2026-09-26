@@ -907,17 +907,8 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(46,78,158,.12)
 .myclass__k{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--plata);}
 .myclass__t{font-size:17px;font-weight:600;color:var(--ink);margin:1px 0;overflow-wrap:anywhere;}
 .myclass__m{font-size:13px;color:var(--grafito);}
-.myclass__code{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;
-  background:#f4f7fc;border:1px dashed var(--azul-niebla);margin-bottom:10px;}
-.myclass__code-k{display:block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--azul);}
-.myclass__code-v{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--ink);}
-.myclass__copy{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--azul-niebla);background:#fff;color:var(--azul);
-  border-radius:10px;padding:8px 12px;font:600 13px 'Jost',sans-serif;cursor:pointer;}
-.myclass__copy .mc-ic{width:15px;height:15px;}
-.myclass__copy:hover{border-color:var(--azul);}
 .myclass__hint{font-size:13.5px;color:var(--grafito);}
 .myclass__acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line,#ececea);}
-.myclass__acts .btn[hidden]{display:none;}
 .myclass__acts .mc-ic{width:16px;height:16px;}
 /* Clase de hoy */
 .today{display:flex;flex-direction:column;gap:14px;}
@@ -1023,8 +1014,6 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(46,78,158,.12)
 .past-list{display:flex;flex-direction:column;gap:6px;}
 .past-item__date{display:flex;align-items:center;gap:7px;margin:0 0 7px 2px;font-size:13.5px;font-weight:600;color:var(--azul);}
 .past-item__date .mc-ic{width:16px;height:16px;}
-.myclass__joined{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:var(--ok-bg);color:var(--ok);font-weight:600;font-size:14px;margin-bottom:8px;}
-.myclass__joined .mc-ic{width:18px;height:18px;}
 /* Dashboard: clases por reprogramar */
 .mk-sec{margin:0 0 22px;background:#fff;border:1px solid #ecdcaa;border-radius:18px;box-shadow:var(--card-shadow);overflow:hidden;}
 .mk-sec__head{display:flex;gap:14px;align-items:center;padding:16px 18px;background:linear-gradient(180deg,#fdf8e9,#fff);border-bottom:1px solid #f3e7c2;}

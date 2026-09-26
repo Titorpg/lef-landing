@@ -2,16 +2,12 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 26 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-### Decisión pendiente del usuario — botón "Unirme a la clase" (Mi curso)
-- Pidió quitar todo lo que invite al estudiante a Classroom. Ya se quitó de las agendas
-  (26 sep). El botón "Unirme a la clase" + recuadro "Tu clase en Google Classroom" de
-  Mi curso SIGUE, porque hoy los archivos de Drive de las agendas y el Meet dependen de
-  que el estudiante esté en la clase de Classroom. Opciones planteadas:
-  - **A (recomendada)**: quitarlo y que nada dependa de Classroom — profesores comparten
-    Drive como "cualquier persona con el enlace" y el Workspace permite entrar al Meet
-    sin estar en la clase (ajustes de Google, sin código; darle los pasos).
-  - **B**: la plataforma inscribe sola al estudiante en Classroom al pagar (Google igual
-    le manda un correo de invitación).
+### ✅ Resuelto 26 sep — sin botón "Unirme a la clase" (Mi curso)
+- El usuario probó con un estudiante que NO está en la clase de Classroom: ve la agenda
+  y entra al Meet sin problema. Se quitó de Mi curso el botón "Unirme a la clase", el
+  código para copiar y "✓ Ya estás en la clase"; la tarjeta ("Tu clase") queda con
+  módulo, profesor, horario y el botón "Clase de hoy". Los mensajes de estado ya no
+  piden el código de la clase. (La acción `info` de `student-classroom` queda sin uso.)
 
 ### SQL — confirmar
 - `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
@@ -42,8 +38,8 @@
   en su calendario → los estudiantes del grupo reciben el correo → aparece en el
   Dashboard del profesor "Clases por reprogramar" → programa la reposición → segundo
   correo, y la reposición sale en los calendarios como una clase más.
-- **Mi curso / Clase de hoy** con un estudiante que ya pagó: código y botón "Unirme"
-  (`?cjc=`) con Gmail PERSONAL (depende de la configuración del Workspace de LEF);
+- **Mi curso / Clase de hoy** con un estudiante que ya pagó (sin botón "Unirme" desde
+  el 26 sep; Meet probado por el usuario sin estar en la clase de Classroom);
   10 min antes de la clase se abren agenda (DAY N) y Meet; el Meet se quita a la
   hora de fin; la agenda sigue hasta medianoche y luego pasa a "Clases anteriores".
   Diseño tipo Classroom (25 sep): recuadro de Meet a la izquierda (botón amarillo
@@ -56,8 +52,6 @@
   `supabase/config.toml` y redesplegar.
 
 ### Lo hacen los profesores (una vez, en Planificador)
-- **Desconectar y reconectar Google** (permiso nuevo: lista de alumnos y correos,
-  para "✓ Ya estás en la clase"). Sin eso el botón "Unirme" sigue saliendo.
 - ~~**Pegar el enlace de Meet** de su clase de Classroom~~ — YA NO HACE FALTA: el 26 sep
   en la mañana, en otra sesión (cerrada sin dejar notas ni commit), se sacaron los enlaces
   de "Unirse a la reunión" de TODAS las clases de Classroom y se cargaron en la plataforma

@@ -869,8 +869,8 @@
   }
 
   /* ---------- Mi clase en Google Classroom + "Clase de hoy" ---------- */
-  // Pedido del usuario (24 sep 2026): desde Mi curso el estudiante entra a la
-  // clase de Classroom de su profesor (botón + código) y abre "Clase de hoy",
+  // Pedido del usuario (24 sep 2026): desde Mi curso el estudiante abre "Clase de hoy"
+  // (desde el 26 sep sin botón ni código para unirse a Classroom),
   // donde ve la agenda que el profesor publicó hoy (en Classroom las agendas
   // "DAY n" están en borrador y el profesor publica la del día). Todo sale de
   // la función student-classroom, que lee Classroom con la conexión del
@@ -923,66 +923,29 @@
   }
 
   var CLASS_MSG = {
-    sin_pago: ["lock", "Tu clase se activa con el pago", "El acceso a tu clase de Classroom y a la agenda diaria se activa cuando pagues tu mensualidad."],
-    profesor_sin_conexion: ["alert", "Tu profesor aún no ha conectado Classroom", "Mientras tanto, pídele directamente el código de la clase. Aquí aparecerá en cuanto lo conecte."],
-    sin_clase_classroom: ["alert", "Tu clase aún no está en Classroom", "Tu profesor todavía no ha creado la clase de tu nivel. Aparecerá aquí apenas la cree."],
+    sin_pago: ["lock", "Tu clase se activa con el pago", "La agenda diaria y la reunión de tu clase se activan cuando pagues tu mensualidad."],
+    profesor_sin_conexion: ["alert", "Tu profesor aún no ha conectado Classroom", "Tu agenda aparecerá aquí en cuanto lo conecte."],
+    sin_clase_classroom: ["alert", "Tu clase aún no está en Classroom", "Tu profesor todavía no ha creado la clase de tu nivel. Tu agenda aparecerá aquí apenas la cree."],
     sin_grupo: ["clock", "Aún no tienes grupo asignado", "Cuando LEF te asigne un grupo, aquí aparecerá tu clase."],
     error: ["alert", "No pudimos consultar Classroom", "Intenta de nuevo en unos minutos."]
   };
 
-  function copyText(btn, text) {
-    var label = btn.querySelector("span") || btn;
-    var original = label.textContent;
-    function done(ok) { label.textContent = ok ? "¡Copiado!" : "No se pudo copiar"; setTimeout(function () { label.textContent = original; }, 2000); }
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
-    else done(false);
-  }
-
-  function codeBlock(course) {
-    if (!course || !course.enrollment_code) return "";
-    return '<div class="myclass__code"><div><span class="myclass__code-k">Código de la clase</span>' +
-      '<strong class="myclass__code-v">' + esc(course.enrollment_code) + "</strong></div>" +
-      '<button type="button" class="myclass__copy" data-copy>' + mcIc("copy") + "<span>Copiar</span></button></div>";
-  }
-
+  // Tarjeta de Mi curso: solo los datos del grupo y el acceso a "Clase de hoy".
+  // Ya no invita a unirse a Classroom (26 sep 2026): la agenda y el Meet se ven
+  // desde la plataforma sin estar inscrito en la clase.
   function renderMyClassCard(main, c) {
     var card = h('<div class="myclass">' +
       '<div class="myclass__head"><span class="myclass__ic">' + mcIc("board") + "</span>" +
-      '<div style="min-width:0"><p class="myclass__k">Tu clase en Google Classroom</p>' +
-      '<h3 class="myclass__t" data-name>' + esc(c.module_level + " — " + c.module_title) + "</h3>" +
+      '<div style="min-width:0"><p class="myclass__k">Tu clase</p>' +
+      '<h3 class="myclass__t">' + esc(c.module_level + " — " + c.module_title) + "</h3>" +
       '<p class="myclass__m">' + esc([c.teacher_full_name, fmtDays(c.schedule_days), fmtTime(c.schedule_start_time)].filter(Boolean).join(" · ")) + "</p></div></div>" +
-      '<div data-body><p class="muted" style="font-size:13.5px">Buscando tu clase…</p></div>' +
+      '<p class="myclass__hint">' + (c.module_paid
+        ? "La agenda y el botón de la reunión se activan 10 minutos antes de tu clase en <strong>Clase de hoy</strong>."
+        : esc(CLASS_MSG.sin_pago[2])) + "</p>" +
       '<div class="myclass__acts">' +
-      '<a class="btn btn-blue" data-join target="_blank" rel="noopener" hidden>' + mcIc("ext") + "<span>Unirme a la clase</span></a>" +
       '<button type="button" class="btn btn-dark" data-today>' + mcIc("sun") + "<span>Clase de hoy</span></button></div></div>");
-    var body = card.querySelector("[data-body]"), join = card.querySelector("[data-join]");
     card.querySelector("[data-today]").addEventListener("click", function () { go("clase-hoy"); });
     main.appendChild(card);
-    if (!c.module_paid) {
-      body.innerHTML = '<p class="myclass__hint">' + esc(CLASS_MSG.sin_pago[2]) + "</p>";
-      return;
-    }
-    classFn("info").then(function (d) {
-      if (d.status !== "ok") {
-        var m = CLASS_MSG[d.status] || CLASS_MSG.error;
-        body.innerHTML = '<p class="myclass__hint">' + esc(m[2]) + "</p>";
-        return;
-      }
-      card.querySelector("[data-name]").textContent = d.course.name;
-      if (d.joined === true) {
-        body.innerHTML = '<p class="myclass__joined">' + mcIc("check") + "<span>Ya estás en la clase de Classroom</span></p>" +
-          '<p class="myclass__hint">Entra siempre a tu clase desde aquí: la agenda y el botón de la reunión se activan a la hora de tu clase en <strong>Clase de hoy</strong>.</p>';
-        return;
-      }
-      body.innerHTML = codeBlock(d.course) +
-        '<p class="myclass__hint">Entra con tu cuenta de Google (tu correo personal) y toca <strong>Unirme a la clase</strong>. ' +
-        "Si Classroom te pide el código, cópialo de aquí.</p>";
-      var cp = body.querySelector("[data-copy]");
-      if (cp) cp.addEventListener("click", function () { copyText(cp, d.course.enrollment_code); });
-      join.href = d.course.join_url; join.hidden = false;
-    }).catch(function () {
-      body.innerHTML = '<p class="myclass__hint">' + esc(CLASS_MSG.error[2]) + "</p>";
-    });
   }
 
   // Adjuntos embebidos (misma lógica que el Planificador del profesor).
