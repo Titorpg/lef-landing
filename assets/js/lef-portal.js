@@ -1005,7 +1005,7 @@
         '<div class="drive-att__bar"><span class="drive-att__name">' + mcIc("book") + "<span>" + esc(att.title || "Archivo de Google Drive") + "</span></span>" +
         '<a href="' + esc(open) + '" target="_blank" rel="noopener" class="btn btn-blue btn-sm">' + mcIc("ext") + "<span>Abrir en Google Drive</span></a></div>" +
         '<div class="cls-embed"><iframe src="https://drive.google.com/file/d/' + esc(att.id) + '/preview" allow="autoplay" loading="lazy"></iframe></div>' +
-        '<p class="drive-att__note">¿Dice que no tienes acceso? Únete a la clase de Classroom y entra a Google con el mismo correo con el que te uniste. ' +
+        '<p class="drive-att__note">¿Dice que no tienes acceso? Entra a Google con el mismo correo con el que te uniste a tu clase. ' +
         "En iPhone, usa “Abrir en Google Drive”.</p></div>";
     }
     if (att.type === "youtube") {
@@ -1018,10 +1018,12 @@
     }
     return "";
   }
+  // Sin enlaces a Classroom (pedido del usuario, 26 sep 2026): la agenda se
+  // ve completa aquí y nada invita al estudiante a irse a otra plataforma.
   function mcPost(m) {
     var html = (m.attachments || []).map(mcAttachment).join("");
-    return (m.description ? '<p class="agenda__desc">' + esc(m.description) + "</p>" : "") +
-      (html || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>');
+    var desc = m.description ? '<p class="agenda__desc">' + esc(m.description) + "</p>" : "";
+    return desc + html || '<p class="muted" style="font-size:13.5px">Esta agenda no tiene contenido adicional.</p>';
   }
 
   // "Clase de hoy" por horario (pedido del usuario, 24–25 sep 2026): la clase
@@ -1189,13 +1191,13 @@
         // visible hasta medianoche; el botón de la reunión (recuadro de Meet)
         // solo se activa en curso.
         if (!s.agenda.length) {
-          wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está en Classroom", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
+          wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está publicada", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
         }
         s.agenda.forEach(function (a) {
           wrap.appendChild(h('<article class="agenda">' +
             '<header class="agenda__head"><span class="agenda__day"><small>Day</small>' + esc(String(s.day)) + "</span>" +
             '<div class="agenda__titles"><h2>' + esc(a.title || "Agenda de hoy") + "</h2><p>" + esc(label) + "</p></div>" +
-            '<a class="btn btn-ghost btn-sm" href="' + esc(a.alternateLink) + '" target="_blank" rel="noopener">' + mcIc("ext") + "<span>Classroom</span></a></header>" +
+            "</header>" +
             '<div class="agenda__body">' + mcPost(a) + "</div></article>"));
         });
         if (s.phase === "terminada") {
