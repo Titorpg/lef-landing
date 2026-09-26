@@ -1219,3 +1219,21 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
   .fold-bar{top:55px;margin:-8px -6px 12px;padding:8px 6px;}
   .fold-bar .rs-crumbs{font-size:12.5px;}
 }
+/* ---- Recursos compartidos de las clases (admin, 26 sep 2026): libro con su
+   encabezado (título, link, Editar/Eliminar) y el visor debajo. ---- */
+.rc-books{display:flex;flex-direction:column;gap:22px;}
+.rc-book{background:#fff;border:1px solid var(--niebla);border-radius:16px;box-shadow:var(--card-shadow);padding:16px;}
+.rc-book__head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.rc-book__ic{flex:none;width:44px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#eaf0fb;color:var(--azul);}
+.rc-book__ic .mc-ic{width:22px;height:22px;}
+.rc-book__main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.rc-book__main strong{font-size:16.5px;font-weight:600;}
+.rc-book__main a{font-size:12.5px;color:var(--grafito);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rc-book__main a:hover{color:var(--azul);text-decoration:underline;}
+.rc-book__acts{display:flex;gap:8px;flex-wrap:wrap;}
+.rc-book__acts .btn .mc-ic,.rc-add .btn .mc-ic{width:15px;height:15px;}
+.rc-add{background:#fff;border:1px dashed var(--azul-niebla);border-radius:16px;padding:20px;max-width:640px;box-shadow:var(--card-shadow);}
+.rc-add__t{font-weight:600;margin-bottom:12px;}
+.rc-add__err{color:var(--bad);font-size:13.5px;margin-top:8px;}
+.rc-add__err:empty{display:none;}
+.pnl-toolbar .btn .mc-ic{width:15px;height:15px;}

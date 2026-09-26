@@ -31,6 +31,19 @@
 - Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
   módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
 
+### ✅ Hecho 26 sep — Recursos compartidos de las clases (parte 1: Libros)
+- Pestaña nueva del admin "Recursos compartidos de las clases" (se construye POR PARTES,
+  el usuario explica cada una y confirma). Parte 1 = **Libros**:
+  Libros → Libros principales → nivel → módulo (título opcional + link, Editar; libro
+  desplegado abajo; `modules.heyzine_url` + `modules.book_title`) · Libros complementarios
+  → A2/B1/B2/C1 → VARIOS con título + link (Agregar, Editar, Eliminar;
+  `level_complementary_books`). Académico → Módulos → Editar ya no tiene libros.
+- Portal: Libros complementarios del nivel muestra todos con su título
+  (`get_my_complementary_books`; si falta el SQL, usa el libro único de level_books).
+- **SQL `20260926050000_recursos_compartidos_libros.sql`**: pasado al usuario, SIN confirmar.
+  Si en la pestaña → Libros complementarios sale "Falta aplicar…", no está aplicado.
+- Siguientes partes (las contará el usuario): talleres, recursos interactivos, otros.
+
 ### ✅ Hecho 26 sep — Talleres interactivos dentro del portal
 - **A1.1 · Taller semana 1** publicado (aprobado con capturas). El HTML del usuario se
   pasó a contenido (`supabase/functions/student-taller/talleres/A1.1-semana-1.json`) y el

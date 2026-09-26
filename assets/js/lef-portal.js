@@ -1243,7 +1243,8 @@
   // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
   // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
   // tampoco entrega su libro). El libro complementario es de TODO el nivel y se
-  // abre con cualquier módulo pagado de ese nivel (get_my_level_books). El A1
+  // abre con cualquier módulo pagado de ese nivel (get_my_complementary_books;
+  // varios libros con título, los carga el admin en Recursos compartidos). El A1
   // NO tiene libro complementario: un estudiante solo de A1 no ve esa carpeta.
   // Talleres e interactivos todavía no tienen contenido: se muestran vacíos.
   var RS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
@@ -1267,13 +1268,13 @@
       if (!prev || (!prev.module_paid && c.module_paid)) L.byMod[c.module_level] = c;
     });
     var urls = {};
-    (books || []).forEach(function (b) { urls[b.level] = b.complementary_book_url; });
+    (books || []).forEach(function (b) { (urls[b.level] = urls[b.level] || []).push({ title: b.title, url: b.url }); });
     var levels = RS_LEVELS.filter(function (k) { return byLevel[k]; }).map(function (k) {
       var L = byLevel[k];
       L.mods = Object.keys(L.byMod).sort(function (a, b) { return a.localeCompare(b, "es", { numeric: true }); })
         .map(function (m) { return L.byMod[m]; });
       L.open = L.mods.some(function (m) { return m.module_paid; });
-      L.bookUrl = urls[k] || null;
+      L.books = urls[k] || [];
       return L;
     });
     return { levels: levels };
@@ -1349,14 +1350,16 @@
   // corrección del usuario, 26 sep 2026). Solo A2, B1, B2 y C1: el A1 no tiene.
   function rsComp(main, M, L) {
     var crumbs = [["Mis recursos", function () { rsRoot(main, M); }], ["Nivel " + L.code, function () { rsLevel(main, M, L); }]];
-    var body = rsPage(main, crumbs, "Libros complementarios", "Un libro para todo el nivel " + L.code + ".");
+    var body = rsPage(main, crumbs, "Libros complementarios", "Libros para todo el nivel " + L.code + ".");
+    if (!L.books.length) { body.appendChild(rsEmpty("Todavía no hay libros aquí", "LEF los agregará pronto.")); return; }
     var grid = h('<div class="rs-grid"></div>');
-    grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libro complementario " + L.code, sub: "Para todo el nivel " + L.code,
-      chip: L.bookUrl ? null : ["soon", "Próximamente"],
-      onOpen: function () {
-        var b = rsPage(main, crumbs.concat([["Libros complementarios", function () { rsComp(main, M, L); }]]), "Libro complementario " + L.code);
-        rsViewer(b, L.bookUrl, "Libro complementario — " + L.code);
-      } }));
+    L.books.forEach(function (bk) {
+      grid.appendChild(rsCard({ tone: "amber", icon: "books", title: bk.title, sub: "Para todo el nivel " + L.code,
+        onOpen: function () {
+          var b = rsPage(main, crumbs.concat([["Libros complementarios", function () { rsComp(main, M, L); }]]), bk.title);
+          rsViewer(b, bk.url, bk.title);
+        } }));
+    });
     body.appendChild(grid);
   }
 
@@ -1386,9 +1389,9 @@
     var body = rsPage(main, crumbs, name, "Elige qué quieres ver.");
     var inner = crumbs.concat([[c.module_level, function () { rsModule(main, M, L, c); }]]);
     var grid = h('<div class="rs-grid"></div>');
-    grid.appendChild(rsCard({ tone: "ink", icon: "read", title: "Libro de estudio", sub: "Libro + workbook",
+    grid.appendChild(rsCard({ tone: "ink", icon: "read", title: "Libro de estudio", sub: c.module_book_title || "Libro + workbook",
       chip: c.module_heyzine_url ? null : ["soon", "Próximamente"],
-      onOpen: function () { rsViewer(rsPage(main, inner, "Libro de estudio"), c.module_heyzine_url, "Libro de estudio — " + c.module_level); } }));
+      onOpen: function () { rsViewer(rsPage(main, inner, "Libro de estudio", c.module_book_title || ""), c.module_heyzine_url, c.module_book_title || "Libro de estudio — " + c.module_level); } }));
     grid.appendChild(rsCard({ tone: "violet", icon: "pencil", title: "Talleres", sub: "4 semanas + repaso del módulo",
       onOpen: function () { rsTalleres(main, inner, c); } }));
     grid.appendChild(rsCard({ tone: "green", icon: "spark", title: "Recursos interactivos", sub: "Vocabulario, gramática, listening y reading",
@@ -1585,7 +1588,15 @@
     Promise.all([
       sb.rpc("get_my_course"),
       // Si la base de datos aún no tiene los libros por nivel, la carpeta sale igual, sin libro.
-      sb.rpc("get_my_level_books").then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; })
+      // Libros complementarios del nivel (varios, con título). Mientras no se aplique
+      // el SQL de Recursos compartidos, se usa el libro único de antes (level_books).
+      sb.rpc("get_my_complementary_books").then(function (r) {
+        if (!r.error) return r.data || [];
+        return sb.rpc("get_my_level_books").then(function (o) {
+          return (o.data || []).filter(function (b) { return b.complementary_book_url; })
+            .map(function (b) { return { level: b.level, title: "Libro complementario " + b.level, url: b.complementary_book_url }; });
+        });
+      }).then(null, function () { return []; })
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       rsRoot(main, rsModel(res[0].data || [], res[1]));

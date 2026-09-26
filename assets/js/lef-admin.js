@@ -349,6 +349,7 @@
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "novedades", label: "Novedades", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
+    { id: "compartidos", label: "Recursos compartidos de las clases", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
     { id: "registro", label: "Registro de eventos", roles: ["admin"] },
     { id: "micuenta", label: "Mi cuenta", roles: ["admin", "teacher"] }
@@ -391,7 +392,7 @@
     var fn = ({
       dashboard: secDashboard, estudiantes: secEstudiantes, misgrupos: secMisGrupos,
       recursos_clase: secRecursosClase, classroom: secClassroom, calendario: secCalendario,
-      pagos: secPagos, novedades: secNovedades, academico: secAcademico, usuarios: secUsuarios,
+      pagos: secPagos, novedades: secNovedades, academico: secAcademico, compartidos: secRecursosCompartidos, usuarios: secUsuarios,
       registro: secRegistro, micuenta: secMiCuenta
     })[id];
     if (fn) fn(main); else main.innerHTML = "<p>Sección no encontrada.</p>";
@@ -1621,6 +1622,261 @@
   // botón "Volver". Libro de trabajo reusa el mismo visor de Heyzine
   // (.resource-frame-wrap) que ya ve el estudiante, pero aquí el profesor
   // elige con cuál módulo entrar mediante una barra de búsqueda.
+  /* ============ RECURSOS COMPARTIDOS DE LAS CLASES (solo admin) ============ */
+  // Pedido del usuario (26 sep 2026): el lugar donde viven los recursos que no
+  // cambian según el profesor. Se construye por partes; la primera es Libros:
+  //   Libros → Libros principales → nivel → módulo → libro (título + link, Editar)
+  //          → Libros complementarios → nivel (A2…C1, el A1 no tiene) → varios
+  //            libros con título + link (Agregar, Editar, Eliminar)
+  // El estudiante los ve en "Mis recursos" solo si pagó (get_my_course /
+  // get_my_complementary_books). Mismas carpetas y botón "Atrás" que el portal.
+  var RC_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+  var RC_BOOK_LEVELS = ["A2", "B1", "B2", "C1"];
+  var RC_ICONS = {
+    folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+    books: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/>',
+    read: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
+  };
+  function rcIc(n) {
+    return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (RC_ICONS[n] || "") + "</svg>";
+  }
+  function rcCard(o) {
+    var el = h('<button type="button" class="rs-card is-' + o.tone + '">' +
+      '<span class="rs-card__top"><span class="rs-card__ic">' + rcIc(o.icon) + '</span><span class="rs-card__go" aria-hidden="true">' + rcIc("arrow") + "</span></span>" +
+      '<span class="rs-card__t">' + esc(o.title) + "</span>" +
+      (o.sub ? '<span class="rs-card__s">' + esc(o.sub) + "</span>" : "") +
+      (o.chip ? '<span class="rs-chip is-' + o.chip[0] + '">' + esc(o.chip[1]) + "</span>" : "") + "</button>");
+    el.addEventListener("click", o.onOpen);
+    return el;
+  }
+  function rcPage(main, crumbs, title, sub) {
+    main.innerHTML = "";
+    window.scrollTo(0, 0);
+    if (crumbs.length) {
+      var bar = h('<div class="fold-bar"><button type="button" class="fold-back">' + rcIc("arrow") + "<span>Atrás</span></button></div>");
+      bar.querySelector(".fold-back").addEventListener("click", crumbs[crumbs.length - 1][1]);
+      var nav = h('<nav class="rs-crumbs" aria-label="Ruta"></nav>');
+      crumbs.forEach(function (c) {
+        var a = h('<button type="button" class="rs-crumbs__a">' + esc(c[0]) + "</button>");
+        a.addEventListener("click", c[1]);
+        nav.appendChild(a);
+        nav.appendChild(h('<span class="rs-crumbs__sep" aria-hidden="true">›</span>'));
+      });
+      nav.appendChild(h('<span class="rs-crumbs__here">' + esc(title) + "</span>"));
+      bar.appendChild(nav);
+      main.appendChild(bar);
+    }
+    main.appendChild(h('<h1 class="pnl-h">' + esc(title) + "</h1>"));
+    if (sub) main.appendChild(h('<p class="pnl-sub">' + esc(sub) + "</p>"));
+    var body = h('<div class="rs-body"></div>');
+    main.appendChild(body);
+    return body;
+  }
+  function rcValidUrl(u) { return /^https?:\/\/\S+$/i.test(u); }
+  // Libro: encabezado (título + acciones) y el visor debajo.
+  function rcBookBlock(title, url, actions) {
+    var box = h('<div class="rc-book"><div class="rc-book__head"><span class="rc-book__ic">' + rcIc("read") + "</span>" +
+      '<div class="rc-book__main"><strong>' + esc(title) + '</strong><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + "</a></div>" +
+      '<div class="rc-book__acts"></div></div>' +
+      '<div class="resource-frame-wrap"><iframe src="' + esc(url) + '" allowfullscreen loading="lazy" title="' + esc(title) + '"></iframe></div></div>');
+    var acts = box.querySelector(".rc-book__acts");
+    actions.forEach(function (a) { acts.appendChild(a); });
+    return box;
+  }
+  function rcBtn(label, icon, cls, fn) {
+    var b = h('<button type="button" class="btn btn-sm ' + cls + '">' + rcIc(icon) + "<span>" + esc(label) + "</span></button>");
+    b.onclick = fn;
+    return b;
+  }
+
+  function secRecursosCompartidos(main) {
+    head(main, "Recursos compartidos de las clases", "Cargando…");
+    q("modules").select("*").order("module_number").then(function (r) {
+      if (r.error) throw r.error;
+      rcRoot(main, { mods: r.data || [] });
+    }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function rcRoot(main, S) {
+    var body = rcPage(main, [], "Recursos compartidos de las clases",
+      "Recursos que se usan igual en todas las clases, sin importar el profesor. Los estudiantes los ven en Mis recursos cuando pagan su módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Libros", sub: "Libros principales y complementarios", onOpen: function () { rcLibros(main, S); } }));
+    body.appendChild(grid);
+  }
+
+  function rcLibros(main, S) {
+    var crumbs = [["Recursos compartidos", function () { rcRoot(main, S); }]];
+    var body = rcPage(main, crumbs, "Libros");
+    var withBook = S.mods.filter(function (m) { return m.heyzine_url; }).length;
+    var grid = h('<div class="rs-grid"></div>');
+    grid.appendChild(rcCard({ tone: "blue", icon: "read", title: "Libros principales", sub: "Uno por módulo · " + withBook + " de " + S.mods.length + " cargados",
+      onOpen: function () { rcPrincipales(main, S); } }));
+    grid.appendChild(rcCard({ tone: "amber", icon: "books", title: "Libros complementarios", sub: "Varios por nivel, desde A2",
+      onOpen: function () { rcComplementarios(main, S); } }));
+    body.appendChild(grid);
+  }
+
+  function rcCrumbsLibros(main, S) {
+    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Libros", function () { rcLibros(main, S); }]];
+  }
+
+  function rcPrincipales(main, S) {
+    var body = rcPage(main, rcCrumbsLibros(main, S), "Libros principales", "Elige el nivel.");
+    var grid = h('<div class="rs-grid"></div>');
+    RC_LEVELS.forEach(function (lv) {
+      var mods = S.mods.filter(function (m) { return String(m.level).split(".")[0] === lv; });
+      if (!mods.length) return;
+      var n = mods.filter(function (m) { return m.heyzine_url; }).length;
+      grid.appendChild(rcCard({ tone: "blue", icon: "folder", title: "Nivel " + lv, sub: mods.map(function (m) { return m.level; }).join(", "),
+        chip: n === mods.length ? ["ok", "Todos cargados"] : ["soon", n + " de " + mods.length + " cargados"],
+        onOpen: function () { rcPrincipalesNivel(main, S, lv); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcPrincipalesNivel(main, S, lv) {
+    var crumbs = rcCrumbsLibros(main, S).concat([["Libros principales", function () { rcPrincipales(main, S); }]]);
+    var body = rcPage(main, crumbs, "Nivel " + lv, "Elige el módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    S.mods.filter(function (m) { return String(m.level).split(".")[0] === lv; }).forEach(function (m) {
+      grid.appendChild(rcCard({ tone: "blue", icon: "folder", title: m.level, sub: m.title,
+        chip: m.heyzine_url ? ["ok", "Con libro"] : ["soon", "Sin libro"],
+        onOpen: function () { rcPrincipalModulo(main, S, lv, m); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcPrincipalModulo(main, S, lv, m) {
+    var crumbs = rcCrumbsLibros(main, S).concat([["Libros principales", function () { rcPrincipales(main, S); }], ["Nivel " + lv, function () { rcPrincipalesNivel(main, S, lv); }]]);
+    var body = rcPage(main, crumbs, m.level + " — " + m.title, "Libro de estudio del módulo (libro + workbook). El estudiante lo ve en Mis recursos → " + m.level + " → Libro de estudio.");
+    var hasTitle = Object.prototype.hasOwnProperty.call(m, "book_title");
+    function save(title, url) {
+      var upd = { heyzine_url: url || null };
+      if (hasTitle) upd.book_title = title || null;
+      return q("modules").update(upd).eq("id", m.id).then(function (u) {
+        if (u.error) throw u.error;
+        m.heyzine_url = upd.heyzine_url; if (hasTitle) m.book_title = upd.book_title;
+        toast("Libro guardado.");
+        rcPrincipalModulo(main, S, lv, m);
+      });
+    }
+    function form(onSave, title, url) {
+      return h("<div>" +
+        field("Título del libro" + (hasTitle ? " (opcional)" : ""), '<input name="t" placeholder="Ej.: Student\'s Book ' + esc(m.level) + '" value="' + esc(title || "") + '"' + (hasTitle ? "" : " disabled") + ">") +
+        (hasTitle ? "" : '<p class="pnl-sub" style="margin:-4px 0 10px">El título se activa cuando se aplique en Supabase la actualización de Recursos compartidos.</p>') +
+        field("Link del libro (Heyzine)", '<input name="u" inputmode="url" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(url || "") + '">') + "</div>");
+    }
+    function read(b) {
+      var t = b.querySelector("[name=t]").value.trim(), u = b.querySelector("[name=u]").value.trim();
+      if (!rcValidUrl(u)) throw new Error("Pega el link completo del libro (empieza por https://).");
+      return [t, u];
+    }
+    if (!m.heyzine_url) {
+      var card = h('<div class="rc-add"><p class="rc-add__t">Este módulo todavía no tiene libro. Pega el link y se mostrará aquí abajo.</p></div>');
+      var f = form(); card.appendChild(f);
+      var err = h('<p class="rc-add__err"></p>');
+      card.appendChild(rcBtn("Guardar libro", "plus", "btn-dark", function () {
+        try { var v = read(f); } catch (e) { err.textContent = e.message; return; }
+        save(v[0], v[1]).catch(function (e) { err.textContent = friendly(e); });
+      }));
+      card.appendChild(err);
+      body.appendChild(card);
+      return;
+    }
+    var title = m.book_title || (m.level + " — " + m.title);
+    body.appendChild(rcBookBlock(title, m.heyzine_url, [
+      rcBtn("Editar", "edit", "btn-ghost", function () {
+        var b = form(null, m.book_title, m.heyzine_url);
+        b.appendChild(h('<p class="pnl-sub" style="margin:0">Para quitar el libro del módulo, borra el link y guarda.</p>'));
+        modal("Editar libro de " + m.level, b, function () {
+          var t = b.querySelector("[name=t]").value.trim(), u = b.querySelector("[name=u]").value.trim();
+          if (u && !rcValidUrl(u)) throw new Error("Pega el link completo del libro (empieza por https://).");
+          return save(t, u);
+        });
+      })
+    ]));
+  }
+
+  function rcComplementarios(main, S) {
+    var crumbs = rcCrumbsLibros(main, S);
+    var body = rcPage(main, crumbs, "Libros complementarios", "Libros para todo el nivel. El A1 no tiene.");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    q("level_complementary_books").select("level").then(function (r) {
+      body.innerHTML = "";
+      if (r.error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Recursos compartidos (20260926050000_recursos_compartidos_libros.sql).</div>')); return; }
+      var count = {};
+      (r.data || []).forEach(function (x) { count[x.level] = (count[x.level] || 0) + 1; });
+      var grid = h('<div class="rs-grid"></div>');
+      RC_BOOK_LEVELS.forEach(function (lv) {
+        var n = count[lv] || 0;
+        grid.appendChild(rcCard({ tone: "amber", icon: "folder", title: "Nivel " + lv, sub: n ? n + (n === 1 ? " libro" : " libros") : "Sin libros todavía",
+          onOpen: function () { rcComplementariosNivel(main, S, lv); } }));
+      });
+      body.appendChild(grid);
+    });
+  }
+
+  function rcComplementariosNivel(main, S, lv) {
+    var crumbs = rcCrumbsLibros(main, S).concat([["Libros complementarios", function () { rcComplementarios(main, S); }]]);
+    var body = rcPage(main, crumbs, "Libros complementarios " + lv, "Para todo el nivel " + lv + ". El estudiante los ve en Mis recursos → Nivel " + lv + " → Libros complementarios.");
+    function bookForm(t, u) {
+      return h("<div>" + field("Título", '<input name="t" placeholder="Ej.: Grammar in Use ' + lv + '" value="' + esc(t || "") + '">') +
+        field("Link del libro (Heyzine)", '<input name="u" inputmode="url" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(u || "") + '">') + "</div>");
+    }
+    function readForm(b) {
+      var t = b.querySelector("[name=t]").value.trim(), u = b.querySelector("[name=u]").value.trim();
+      if (!t) throw new Error("Escribe el título del libro.");
+      if (!rcValidUrl(u)) throw new Error("Pega el link completo del libro (empieza por https://).");
+      return { title: t, url: u };
+    }
+    var bar = h('<div class="pnl-toolbar" style="margin-bottom:16px"></div>');
+    bar.appendChild(rcBtn("Agregar libro complementario", "plus", "btn-dark", function () {
+      var b = bookForm();
+      modal("Agregar libro complementario " + lv, b, function () {
+        var v = readForm(b); v.level = lv;
+        return q("level_complementary_books").insert(v).then(function (r) {
+          if (r.error) throw r.error;
+          toast("Libro agregado."); rcComplementariosNivel(main, S, lv);
+        });
+      });
+    }));
+    body.appendChild(bar);
+    var list = h('<div class="rc-books"><p class="muted">Cargando…</p></div>');
+    body.appendChild(list);
+    q("level_complementary_books").select("*").eq("level", lv).order("created_at").then(function (r) {
+      list.innerHTML = "";
+      if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Recursos compartidos.</div>')); bar.remove(); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay libros complementarios para ' + lv + '. Usa "Agregar libro complementario".</div>')); return; }
+      r.data.forEach(function (bk) {
+        list.appendChild(rcBookBlock(bk.title, bk.url, [
+          rcBtn("Editar", "edit", "btn-ghost", function () {
+            var b = bookForm(bk.title, bk.url);
+            modal("Editar libro complementario", b, function () {
+              var v = readForm(b); v.updated_at = new Date().toISOString();
+              return q("level_complementary_books").update(v).eq("id", bk.id).then(function (u) {
+                if (u.error) throw u.error;
+                toast("Libro guardado."); rcComplementariosNivel(main, S, lv);
+              });
+            });
+          }),
+          rcBtn("Eliminar", "trash", "btn-ghost", function () {
+            confirmDelete("Eliminar libro complementario", "Se quitará “" + bk.title + "” de Libros complementarios " + lv + ". Los estudiantes dejarán de verlo.", function () {
+              return q("level_complementary_books").delete().eq("id", bk.id).then(function (u) {
+                if (u.error) throw u.error;
+                toast("Libro eliminado."); rcComplementariosNivel(main, S, lv);
+              });
+            });
+          })
+        ]));
+      });
+    });
+  }
+
   function secRecursosClase(main) {
     renderRecursosRoot(main);
   }
@@ -2642,43 +2898,17 @@
       });
   }
 
-  // Libro complementario (26 sep 2026): uno por NIVEL, y se carga desde el
-  // primer módulo del nivel (A2.1, B1.1, B2.1, C1.1). El A1 no tiene. El
-  // estudiante lo ve en "Mis recursos" → Libros complementarios cuando tiene
-  // pagado cualquier módulo de ese nivel. Se guarda en level_books.
-  var BOOK_MODULES = { "A2.1": "A2", "B1.1": "B1", "B2.1": "B2", "C1.1": "C1" };
+  // Los libros (principal del módulo y complementarios del nivel) se cargan en
+  // "Recursos compartidos de las clases" → Libros (26 sep 2026); aquí solo
+  // título y descripción del módulo.
   function editModule(box, m) {
-    var lv = BOOK_MODULES[m.level];
-    var bookP = lv
-      ? q("level_books").select("complementary_book_url").eq("level", lv).maybeSingle().then(function (r) {
-          return r.error ? { missing: true } : { url: (r.data && r.data.complementary_book_url) || "" };
-        }, function () { return { missing: true }; })
-      : Promise.resolve(null);
-    bookP.then(function (book) {
-      var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
-        field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") +
-        field("Libro de estudio — URL en Heyzine (opcional)", '<input name="hz" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(m.heyzine_url || "") + '">') +
-        '<p class="pnl-sub" style="margin:-4px 0 0">Libro + workbook del módulo. El estudiante lo ve en "Mis recursos" → nivel → este módulo → Libro de estudio. Déjalo vacío si todavía no hay libro.</p>' +
-        (book ? '<div style="margin-top:14px">' + field("Libro complementario del nivel " + lv + " — URL en Heyzine (opcional)",
-            '<input name="cb" placeholder="https://heyzine.com/flip-book/xxxxx.html"' + (book.missing ? " disabled" : ' value="' + esc(book.url) + '"') + ">") + "</div>" +
-          '<p class="pnl-sub" style="margin:-4px 0 0">' + (book.missing
-            ? "Esta casilla se activa cuando se aplique en Supabase la actualización de los libros por nivel."
-            : "Un solo libro para todo el nivel " + lv + ". El estudiante lo ve en \"Mis recursos\" → Libros complementarios en cuanto paga cualquier módulo del nivel.") + "</p>"
-          : "") +
-        "</div>");
-      modal("Editar módulo " + m.level, b, function () {
-        var upd = {
-          title: b.querySelector("[name=t]").value.trim(),
-          description: b.querySelector("[name=d]").value.trim(),
-          heyzine_url: b.querySelector("[name=hz]").value.trim() || null
-        };
-        return q("modules").update(upd).eq("id", m.id).then(function (u) {
-          if (u.error) throw u.error;
-          if (!book || book.missing) return;
-          return q("level_books").upsert({ level: lv, complementary_book_url: b.querySelector("[name=cb]").value.trim() || null, updated_at: new Date().toISOString() })
-            .then(function (r) { if (r.error) throw r.error; });
-        }).then(function () { toast("Guardado."); acModulos(box); });
-      });
+    var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
+      field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") +
+      '<p class="pnl-sub" style="margin:-4px 0 0">Los libros del módulo se cargan en "Recursos compartidos de las clases" → Libros.</p>' +
+      "</div>");
+    modal("Editar módulo " + m.level, b, function () {
+      var upd = { title: b.querySelector("[name=t]").value.trim(), description: b.querySelector("[name=d]").value.trim() };
+      return q("modules").update(upd).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
     });
   }
 
