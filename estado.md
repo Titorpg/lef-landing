@@ -10,14 +10,12 @@
   piden el código de la clase. (La acción `info` de `student-classroom` queda sin uso.)
 
 ### SQL — confirmar
-- **`20260926040000_libros_complementarios_por_nivel.sql`** (tabla `level_books` +
-  `get_my_level_books()`): pasado al usuario el 26 sep, SIN confirmar. Si en Académico →
-  Módulos → Editar A2.1 la casilla "Libro complementario del nivel A2" sale gris,
-  no está aplicado.
+- `20260926040000_libros_complementarios_por_nivel.sql` (tabla `level_books` +
+  `get_my_level_books()`, sin A1): APLICADO por el usuario el 26 sep, sin errores.
 - `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
   YA NO HACE FALTA — el libro complementario pasó a ser por nivel; la columna queda sin uso.
 - Aplicados 26 sep (confirmados por el usuario): festivos, cobro al asignar módulo,
-  cambio de módulo por error. (Claude no puede leer producción para verificarlo.)
+  cambio de módulo por error, libros complementarios por nivel. (Claude no puede leer producción para verificarlo.)
 
 ### ✅ Hecho 26 sep — Mis recursos por carpetas (aprobado con capturas)
 - Mis recursos → carpetas de nivel (solo los niveles del estudiante) + "Libros
