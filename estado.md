@@ -58,8 +58,12 @@
 ### Lo hacen los profesores (una vez, en Planificador)
 - **Desconectar y reconectar Google** (permiso nuevo: lista de alumnos y correos,
   para "✓ Ya estás en la clase"). Sin eso el botón "Unirme" sigue saliendo.
-- **Pegar el enlace de Meet** de su clase de Classroom (campo nuevo). Sin eso el
-  estudiante ve "Tu profesor aún no ha configurado el enlace de la reunión".
+- ~~**Pegar el enlace de Meet** de su clase de Classroom~~ — YA NO HACE FALTA: el 26 sep
+  en la mañana, en otra sesión (cerrada sin dejar notas ni commit), se sacaron los enlaces
+  de "Unirse a la reunión" de TODAS las clases de Classroom y se cargaron en la plataforma
+  (según el usuario; cambio de datos, no de código). Si una clase nueva no tiene enlace,
+  el estudiante ve "Tu profesor aún no ha configurado el enlace de la reunión" y el
+  profesor lo pega en Planificador.
 - Luis Caballero y María Rada aún deben conectar SU Google por primera vez.
 
 ### Contenido / decisiones pendientes del usuario
