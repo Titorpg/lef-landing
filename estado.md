@@ -40,8 +40,7 @@
   `level_complementary_books`). Académico → Módulos → Editar ya no tiene libros.
 - Portal: Libros complementarios del nivel muestra todos con su título
   (`get_my_complementary_books`; si falta el SQL, usa el libro único de level_books).
-- **SQL `20260926050000_recursos_compartidos_libros.sql`**: pasado al usuario, SIN confirmar.
-  Si en la pestaña → Libros complementarios sale "Falta aplicar…", no está aplicado.
+- SQL `20260926050000_recursos_compartidos_libros.sql`: APLICADO por el usuario (26 sep, "Listo").
 - Siguientes partes (las contará el usuario): talleres, recursos interactivos, otros.
 
 ### ✅ Hecho 26 sep — Talleres interactivos dentro del portal
