@@ -916,6 +916,7 @@
     grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
     headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
     read: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
     file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>'
   };
   // Logo de Google Meet (el de Classroom) para el recuadro de la reunión.
@@ -1383,20 +1384,181 @@
       chip: c.module_heyzine_url ? null : ["soon", "Próximamente"],
       onOpen: function () { rsViewer(rsPage(main, inner, "Libro de estudio"), c.module_heyzine_url, "Libro de estudio — " + c.module_level); } }));
     grid.appendChild(rsCard({ tone: "violet", icon: "pencil", title: "Talleres", sub: "4 semanas + repaso del módulo",
-      onOpen: function () { rsTalleres(rsPage(main, inner, "Talleres", "Un taller por semana y el repaso del módulo.")); } }));
+      onOpen: function () { rsTalleres(main, inner, c); } }));
     grid.appendChild(rsCard({ tone: "green", icon: "spark", title: "Recursos interactivos", sub: "Vocabulario, gramática, listening y reading",
       onOpen: function () { rsInteractivos(main, inner); } }));
     body.appendChild(grid);
   }
 
-  function rsTalleres(body) {
+  // Talleres ya cargados: módulo → números de taller (1–4 semanas, 5 repaso).
+  // El contenido NO está en el sitio público: lo entrega la función
+  // student-taller solo si el estudiante pagó ese módulo (sus .json viven en
+  // supabase/functions/student-taller/talleres). El motor de abajo lo dibuja con
+  // el diseño del portal. Para agregar uno: su .json allá + su número aquí.
+  var RS_TALLER_READY = {
+    "A1.1": [1]
+  };
+
+  function rsTalleres(main, crumbs, c) {
+    var body = rsPage(main, crumbs, "Talleres", "Un taller por semana y el repaso del módulo.");
+    var here = crumbs.concat([["Talleres", function () { rsTalleres(main, crumbs, c); }]]);
+    var ready = RS_TALLER_READY[c.module_level] || [];
     var list = h('<div class="rs-files"></div>');
     RS_TALLERES.forEach(function (t, i) {
-      list.appendChild(h('<div class="rs-file is-violet"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
-        '<span class="rs-file__t">' + esc(t) + '<small>' + (i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo") + "</small></span>" +
-        '<span class="rs-chip is-soon">Próximamente</span></div>'));
+      var file = ready.indexOf(i + 1) >= 0;
+      var row = h('<' + (file ? 'button type="button"' : "div") + ' class="rs-file' + (file ? " is-ready" : "") + '"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
+        '<span class="rs-file__t">' + esc(t) + "<small>" + (i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo") + "</small></span>" +
+        (file ? '<span class="rs-chip is-ok">Disponible</span><span class="rs-card__go" aria-hidden="true">' + mcIc("arrow") + "</span>"
+          : '<span class="rs-chip is-soon">Próximamente</span>') +
+        "</" + (file ? "button" : "div") + ">");
+      if (file) row.addEventListener("click", function () { rsTallerOpen(main, here, t, c.module_level, i + 1); });
+      list.appendChild(row);
     });
     body.appendChild(list);
+  }
+
+  function rsTallerOpen(main, crumbs, name, level, n) {
+    var body = rsPage(main, crumbs, name);
+    body.innerHTML = '<p class="muted">Cargando el taller…</p>';
+    // Token fresco (la sesión se renueva sola cada hora), como en Clase de hoy.
+    sb.auth.getSession().then(function (r) {
+      var tok = (r.data && r.data.session) ? r.data.session.access_token : TOKEN;
+      return fetch(window.LEF_SUPABASE.url + "/functions/v1/student-taller", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+        body: JSON.stringify({ module: level, n: n })
+      });
+    }).then(function (res) {
+      return res.json().then(function (j) { if (!res.ok || !j.taller) throw new Error(j.error || "Error"); return j.taller; });
+    }).then(function (T) {
+      body.innerHTML = "";
+      rsTallerRender(main, body, T);
+    }).catch(function () {
+      body.innerHTML = '<div class="pnl-alert err">No pudimos abrir el taller. Intenta de nuevo en unos minutos.</div>';
+    });
+  }
+
+  // Motor del taller (misma lógica del HTML original del usuario, 26 sep 2026):
+  // opción ("choice") o escribir ("write"); cada parte se revisa completa (avisa
+  // si falta alguna respuesta), marca ✓/✗ con la explicación, y se puede
+  // reintentar. Barra de progreso por parte y puntaje final con mensaje.
+  // El contenido (preguntas y explicaciones) lo escribe LEF: trae <b> a propósito.
+  function rsTallerRender(main, body, T) {
+    var norm = function (s) { return String(s).toLowerCase().replace(/[’‘`´]/g, "'").replace(/[.!?]+$/, "").replace(/\s+/g, " ").trim(); };
+    var state = T.parts.map(function (p) {
+      return { checked: false, correct: 0, total: p.exercises.reduce(function (n, e) { return n + e.items.length; }, 0) };
+    });
+    var wrap = h('<div class="tw"></div>');
+    var hero = h('<div class="tw-hero"><span class="tw-hero__ic">' + mcIc("pencil") + "</span>" +
+      '<div class="tw-hero__main"><p class="tw-hero__k">' + esc(T.level) + " · " + esc(T.title) + "</p>" +
+      '<h2 class="tw-hero__t">' + esc(T.topic) + "</h2>" +
+      '<p class="tw-hero__how">Responde, revisa y vuelve a intentarlo las veces que quieras.' + (T.duration ? " Tiempo aproximado: " + esc(T.duration) + "." : "") + "</p>" +
+      '<div class="tw-prog" data-prog>' + T.parts.map(function () { return "<span></span>"; }).join("") + "</div>" +
+      '<p class="tw-prog__l" data-prog-l></p></div></div>');
+    wrap.appendChild(hero);
+    var prog = hero.querySelector("[data-prog]"), progL = hero.querySelector("[data-prog-l]");
+    var fin = h('<div class="tw-final" aria-live="polite" hidden><span class="tw-final__ic">' + mcIc("check") + '</span><div><div class="tw-final__big" data-fs></div><p data-fm></p></div></div>');
+
+    T.parts.forEach(function (part, pi) {
+      var sec = h('<section class="tw-part"><div class="tw-part__head"><span class="tw-part__n">Parte ' + (pi + 1) + "</span><h3>" + part.title + "</h3></div></section>");
+      part.exercises.forEach(function (ex, ei) {
+        var html = '<div class="tw-ex">';
+        if (ex.reading) html += '<div class="tw-reading">' + ex.reading.map(function (p) { return "<p>" + p + "</p>"; }).join("") + "</div>";
+        html += '<p class="tw-ex__ins">' + ex.ins + '</p><p class="tw-ex__help">' + ex.help + "</p>";
+        ex.items.forEach(function (it, ii) {
+          html += '<div class="tw-item" data-e="' + ei + '" data-i="' + ii + '">' +
+            '<div class="tw-q"><span class="tw-q__n">' + (ii + 1) + '.</span><span class="tw-q__t">' + it.q + '</span><span class="tw-q__mark" aria-hidden="true"></span></div>';
+          if (ex.type === "choice") {
+            html += '<div class="tw-opts" role="group" aria-label="Opciones para la pregunta ' + (ii + 1) + '">' +
+              ex.options.map(function (o) { return '<button type="button" class="tw-opt" data-v="' + esc(o) + '">' + esc(o) + "</button>"; }).join("") + "</div>";
+          } else {
+            html += '<input class="tw-write" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta ' + (ii + 1) + '" placeholder="Escribe aquí">';
+          }
+          html += '<div class="tw-why"></div></div>';
+        });
+        sec.appendChild(h(html + "</div>"));
+      });
+      var act = h('<div class="tw-acts"><button type="button" class="btn btn-dark" data-act="check">Revisar respuestas</button>' +
+        '<span class="tw-score" aria-live="polite"></span><span class="tw-err" aria-live="polite"></span></div>');
+      sec.appendChild(act);
+      wrap.appendChild(sec);
+
+      sec.addEventListener("click", function (e) {
+        var opt = e.target.closest(".tw-opt");
+        if (opt && !state[pi].checked) {
+          opt.parentElement.querySelectorAll(".tw-opt").forEach(function (b) { b.classList.remove("is-sel"); });
+          opt.classList.add("is-sel");
+          act.querySelector(".tw-err").textContent = "";
+          return;
+        }
+        var btn = e.target.closest("[data-act]");
+        if (!btn) return;
+        if (btn.dataset.act === "check") checkPart(pi, sec, act); else resetPart(pi, sec, act);
+      });
+      sec.addEventListener("input", function () { act.querySelector(".tw-err").textContent = ""; });
+    });
+    wrap.appendChild(fin);
+    body.appendChild(wrap);
+
+    function answerOf(el, ex) {
+      if (ex.type === "choice") { var s = el.querySelector(".tw-opt.is-sel"); return s ? s.dataset.v : ""; }
+      return el.querySelector(".tw-write").value;
+    }
+
+    function checkPart(pi, sec, act) {
+      var part = T.parts[pi];
+      var items = [].slice.call(sec.querySelectorAll(".tw-item"));
+      var missing = items.filter(function (el) { return !answerOf(el, part.exercises[el.dataset.e]).trim(); }).length;
+      if (missing) {
+        act.querySelector(".tw-err").textContent = missing === 1 ? "Te falta 1 respuesta. Complétala antes de revisar." : "Te faltan " + missing + " respuestas. Complétalas antes de revisar.";
+        return;
+      }
+      var ok = 0;
+      items.forEach(function (el) {
+        var ex = part.exercises[el.dataset.e], it = ex.items[el.dataset.i];
+        var val = answerOf(el, ex);
+        var good = ex.type === "choice" ? val === it.a : it.a.map(norm).indexOf(norm(val)) >= 0;
+        el.classList.add(good ? "is-ok" : "is-bad");
+        el.querySelector(".tw-q__mark").innerHTML = mcIc(good ? "check" : "x");
+        if (!good) el.querySelector(".tw-why").innerHTML = (ex.type === "choice" ? "Respuesta correcta: <b>" + esc(it.a) + "</b>. " : "Respuesta correcta: ") + it.why;
+        el.querySelectorAll(".tw-opt,.tw-write").forEach(function (x) { x.disabled = true; });
+        if (good) ok++;
+      });
+      state[pi].checked = true; state[pi].correct = ok;
+      act.querySelector(".tw-score").textContent = ok + " de " + items.length + " correctas";
+      var b = act.querySelector("[data-act]");
+      b.dataset.act = "reset"; b.textContent = "Intentar de nuevo"; b.className = "btn btn-ghost";
+      updateProgress();
+    }
+
+    function resetPart(pi, sec, act) {
+      sec.querySelectorAll(".tw-item").forEach(function (el) {
+        el.classList.remove("is-ok", "is-bad");
+        el.querySelector(".tw-q__mark").innerHTML = "";
+        el.querySelector(".tw-why").innerHTML = "";
+        el.querySelectorAll(".tw-opt").forEach(function (o) { o.classList.remove("is-sel"); o.disabled = false; });
+        var w = el.querySelector(".tw-write"); if (w) { w.value = ""; w.disabled = false; }
+      });
+      state[pi].checked = false; state[pi].correct = 0;
+      act.querySelector(".tw-score").textContent = "";
+      var b = act.querySelector("[data-act]");
+      b.dataset.act = "check"; b.textContent = "Revisar respuestas"; b.className = "btn btn-dark";
+      updateProgress();
+    }
+
+    function updateProgress() {
+      var done = state.filter(function (s) { return s.checked; }).length;
+      [].slice.call(prog.children).forEach(function (s, i) { s.classList.toggle("is-done", state[i].checked); });
+      progL.textContent = done + " de " + state.length + " partes revisadas";
+      if (done === state.length) {
+        var c = state.reduce(function (n, s) { return n + s.correct; }, 0), t = state.reduce(function (n, s) { return n + s.total; }, 0);
+        var pct = Math.round(c / t * 100), M = T.messages || {};
+        fin.querySelector("[data-fs]").innerHTML = c + "/" + t + " <small>" + pct + "%</small>";
+        fin.querySelector("[data-fm]").textContent = pct >= 90 ? M.high : pct >= 70 ? M.mid : M.low;
+        fin.hidden = false;
+      } else fin.hidden = true;
+    }
+    updateProgress();
   }
 
   function rsInteractivos(main, crumbs) {

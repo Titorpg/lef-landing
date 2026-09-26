@@ -1,0 +1,343 @@
+{
+ "level": "A1.1",
+ "week": 1,
+ "title": "Taller semana 1",
+ "topic": "Greetings, subject pronouns and verb to be",
+ "duration": "15 a 20 minutos",
+ "messages": {
+  "high": "¡Excelente trabajo! Dominas los temas de la semana 1.",
+  "mid": "¡Muy bien! Revisa los ítems marcados con ✗ e inténtalo otra vez.",
+  "low": "Repasa las páginas 2, 3 y 4 del libro y vuelve a hacer el taller."
+ },
+ "parts": [
+  {
+   "title": "Vocabulary: greetings and introductions",
+   "exercises": [
+    {
+     "type": "choice",
+     "ins": "What is each expression for? Choose the correct group.",
+     "help": "¿Para qué sirve cada expresión? Elige el grupo correcto.",
+     "options": [
+      "Greeting",
+      "Introducing yourself",
+      "Introducing someone else",
+      "Asking for information",
+      "Farewell"
+     ],
+     "items": [
+      {
+       "q": "Good afternoon!",
+       "a": "Greeting",
+       "why": "Es un saludo que usamos en la tarde."
+      },
+      {
+       "q": "This is my friend, Camila.",
+       "a": "Introducing someone else",
+       "why": "Con \"This is...\" presentamos a otra persona."
+      },
+      {
+       "q": "Where are you from?",
+       "a": "Asking for information",
+       "why": "Es una pregunta para saber de dónde es alguien."
+      },
+      {
+       "q": "See you tomorrow!",
+       "a": "Farewell",
+       "why": "Es una despedida: nos vemos mañana."
+      },
+      {
+       "q": "I'm from Barranquilla.",
+       "a": "Introducing yourself",
+       "why": "Hablas de ti: de dónde eres."
+      },
+      {
+       "q": "How old are you?",
+       "a": "Asking for information",
+       "why": "Es una pregunta para saber la edad."
+      },
+      {
+       "q": "He is my classmate, Andrés.",
+       "a": "Introducing someone else",
+       "why": "Presentas a otra persona: tu compañero."
+      },
+      {
+       "q": "Hi, how are you?",
+       "a": "Greeting",
+       "why": "Es un saludo informal."
+      },
+      {
+       "q": "My name is Valentina.",
+       "a": "Introducing yourself",
+       "why": "Dices tu nombre: te presentas."
+      },
+      {
+       "q": "Have a nice day!",
+       "a": "Farewell",
+       "why": "Se usa al despedirse: que tengas un buen día."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Grammar: subject pronouns and verb to be",
+   "exercises": [
+    {
+     "type": "choice",
+     "ins": "Choose the subject pronoun for the words.",
+     "help": "¿Qué pronombre reemplaza estas palabras?",
+     "options": [
+      "I",
+      "You",
+      "He",
+      "She",
+      "It",
+      "We",
+      "They"
+     ],
+     "items": [
+      {
+       "q": "Camila",
+       "a": "She",
+       "why": "Camila es una mujer: <b>she</b> (ella)."
+      },
+      {
+       "q": "Andrés and I",
+       "a": "We",
+       "why": "Andrés y yo = nosotros: <b>we</b>."
+      },
+      {
+       "q": "My dog",
+       "a": "It",
+       "why": "Para animales y cosas usamos <b>it</b>."
+      },
+      {
+       "q": "Mr. Pérez",
+       "a": "He",
+       "why": "Mr. Pérez es un hombre: <b>he</b> (él)."
+      },
+      {
+       "q": "Laura and Tom",
+       "a": "They",
+       "why": "Dos personas (ellos): <b>they</b>."
+      },
+      {
+       "q": "The Malecón",
+       "a": "It",
+       "why": "Un lugar es una cosa: <b>it</b>."
+      },
+      {
+       "q": "You and Pedro",
+       "a": "You",
+       "why": "Tú y Pedro = ustedes: <b>you</b>."
+      },
+      {
+       "q": "My mother and my sister",
+       "a": "They",
+       "why": "Dos personas (ellas): <b>they</b>."
+      }
+     ]
+    },
+    {
+     "type": "choice",
+     "ins": "Complete with am, is or are.",
+     "help": "Completa con la forma correcta del verbo to be.",
+     "options": [
+      "am",
+      "is",
+      "are"
+     ],
+     "items": [
+      {
+       "q": "I ___ a student at LEF.",
+       "a": "am",
+       "why": "Con <b>I</b> siempre va <b>am</b>."
+      },
+      {
+       "q": "My teacher ___ from Santa Marta.",
+       "a": "is",
+       "why": "My teacher = he o she, entonces va <b>is</b>."
+      },
+      {
+       "q": "We ___ in the English class.",
+       "a": "are",
+       "why": "Con <b>we</b> va <b>are</b>."
+      },
+      {
+       "q": "Barranquilla ___ a big city.",
+       "a": "is",
+       "why": "Barranquilla = it, entonces va <b>is</b>."
+      },
+      {
+       "q": "You ___ very friendly.",
+       "a": "are",
+       "why": "Con <b>you</b> va <b>are</b>."
+      },
+      {
+       "q": "Camila and Andrés ___ my classmates.",
+       "a": "are",
+       "why": "Camila y Andrés = they, entonces va <b>are</b>."
+      },
+      {
+       "q": "It ___ Tuesday today.",
+       "a": "is",
+       "why": "Con <b>it</b> va <b>is</b>."
+      },
+      {
+       "q": "She ___ 20 years old.",
+       "a": "is",
+       "why": "Con <b>she</b> va <b>is</b>. En inglés la edad va con to be, no con have."
+      },
+      {
+       "q": "The students ___ happy.",
+       "a": "are",
+       "why": "The students = they, entonces va <b>are</b>."
+      },
+      {
+       "q": "I ___ 19 years old.",
+       "a": "am",
+       "why": "Con <b>I</b> siempre va <b>am</b>."
+      }
+     ]
+    },
+    {
+     "type": "write",
+     "ins": "Write the contraction.",
+     "help": "Escribe la forma corta. Ejemplo: I am = I'm",
+     "items": [
+      {
+       "q": "You are",
+       "a": [
+        "you're"
+       ],
+       "why": "You are = <b>You're</b>"
+      },
+      {
+       "q": "She is",
+       "a": [
+        "she's"
+       ],
+       "why": "She is = <b>She's</b>"
+      },
+      {
+       "q": "We are",
+       "a": [
+        "we're"
+       ],
+       "why": "We are = <b>We're</b>"
+      },
+      {
+       "q": "It is",
+       "a": [
+        "it's"
+       ],
+       "why": "It is = <b>It's</b>"
+      },
+      {
+       "q": "They are",
+       "a": [
+        "they're"
+       ],
+       "why": "They are = <b>They're</b>"
+      },
+      {
+       "q": "He is",
+       "a": [
+        "he's"
+       ],
+       "why": "He is = <b>He's</b>"
+      },
+      {
+       "q": "I am from Barranquilla.",
+       "a": [
+        "i'm from barranquilla"
+       ],
+       "why": "<b>I'm from Barranquilla.</b>"
+      },
+      {
+       "q": "She is my teacher.",
+       "a": [
+        "she's my teacher"
+       ],
+       "why": "<b>She's my teacher.</b>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Reading: my first day at LEF",
+   "exercises": [
+    {
+     "type": "choice",
+     "reading": [
+      "Hi! My name is Valentina and I am 19 years old. I am from Barranquilla, but my grandparents are from Cartagena. Today is my first day in the English class at LEF.",
+      "My teacher is Mr. Pérez. He is from Santa Marta, and he is very friendly. In my group, there are two new classmates. Sebastián is 25. He is an engineer from Medellín. Mariana is 22. She is a nurse. She is from Bogotá, but now she is in Barranquilla.",
+      "We are all different, but we are happy in the class. See you next class!"
+     ],
+     "ins": "Read the text. Are the sentences true or false?",
+     "help": "Lee con atención: algunas respuestas no están escritas igual en el texto.",
+     "options": [
+      "True",
+      "False"
+     ],
+     "items": [
+      {
+       "q": "Valentina's grandparents are from Barranquilla.",
+       "a": "False",
+       "why": "Valentina es de Barranquilla, pero sus abuelos son de <b>Cartagena</b>."
+      },
+      {
+       "q": "The teacher is from the Caribbean coast.",
+       "a": "True",
+       "why": "Mr. Pérez es de <b>Santa Marta</b>, que está en la costa Caribe."
+      },
+      {
+       "q": "Mariana is from Barranquilla.",
+       "a": "False",
+       "why": "Mariana está en Barranquilla ahora, pero es de <b>Bogotá</b>."
+      },
+      {
+       "q": "All the students are from the same city.",
+       "a": "False",
+       "why": "Son de ciudades diferentes: Barranquilla, Medellín y Bogotá."
+      },
+      {
+       "q": "Valentina is a new student at LEF.",
+       "a": "True",
+       "why": "Hoy es su <b>primer día</b> de clase en LEF."
+      }
+     ]
+    },
+    {
+     "type": "choice",
+     "ins": "Who is it? Choose the correct person.",
+     "help": "¿Quién es? Piensa en lo que dice el texto.",
+     "options": [
+      "Valentina",
+      "Sebastián",
+      "Mariana",
+      "Mr. Pérez"
+     ],
+     "items": [
+      {
+       "q": "Who is from the capital of Colombia?",
+       "a": "Mariana",
+       "why": "La capital es Bogotá, y <b>Mariana</b> es de Bogotá."
+      },
+      {
+       "q": "Who is from Antioquia?",
+       "a": "Sebastián",
+       "why": "<b>Sebastián</b> es de Medellín, la capital de Antioquia."
+      },
+      {
+       "q": "Who works in a hospital?",
+       "a": "Mariana",
+       "why": "<b>Mariana</b> es enfermera (nurse)."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

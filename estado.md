@@ -27,7 +27,22 @@
 - Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
   módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
 
-### Pendiente del usuario: contenido de Talleres e Interactivos
+### ✅ Hecho 26 sep — Talleres interactivos dentro del portal
+- **A1.1 · Taller semana 1** publicado (aprobado con capturas). El HTML del usuario se
+  pasó a contenido (`supabase/functions/student-taller/talleres/A1.1-semana-1.json`) y el
+  portal lo dibuja con su diseño (motor `rsTallerRender` en lef-portal.js, misma lógica:
+  opción/escribir, revisar por parte, ✓/✗ con explicación, reintentar, progreso, puntaje
+  final con 3 mensajes). NO guarda respuestas ni puntaje (igual que el original).
+- **Solo quien pagó el módulo**: la función `student-taller` (verify_jwt) entrega el
+  contenido tras comprobar con get_my_course() que ese módulo está pagado. Nada público.
+- **Agregar otro taller**: pasar el HTML a .json (bloque TALLER + level, week, duration,
+  messages high/mid/low) en esa carpeta + import y clave "módulo/n" en index.ts de la
+  función (n: 1–4 semanas, 5 repaso) + número en RS_TALLER_READY (lef-portal.js) →
+  `npx supabase functions deploy student-taller --project-ref cemrxcatbxbcipxmsnjf` y Vercel.
+- Probado en producción: sin sesión / sin usuario / taller inexistente → rechaza. Falta
+  que el usuario lo abra con un estudiante que tenga A1.1 pagado.
+
+### Pendiente del usuario: resto de Talleres e Interactivos
 - **Talleres**: HTML interactivos ya hechos (solo texto). Por ahora los sube Claude desde
   aquí; la idea es que cada profesor suba los suyos, o si son iguales para todos, un solo
   sitio para todos. NO definido → hoy salen "Próximamente". Ojo: archivos en el repo =

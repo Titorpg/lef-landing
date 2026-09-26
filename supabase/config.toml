@@ -33,3 +33,6 @@ verify_jwt = true
 
 [functions.notify-class-change]
 verify_jwt = true
+
+[functions.student-taller]
+verify_jwt = true
