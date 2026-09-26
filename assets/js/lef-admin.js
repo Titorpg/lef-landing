@@ -2587,17 +2587,27 @@
             }).catch(function (e) { toast(friendly(e), "err"); });
           }));
           cell.appendChild(btn("Editar", "btn-ghost", function () {
+            var hasCb = Object.prototype.hasOwnProperty.call(m, "complementary_book_url");
             var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
               field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") +
-              field("URL del libro en Heyzine (opcional)", '<input name="hz" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(m.heyzine_url || "") + '">') +
+              field("Libro principal — URL en Heyzine (opcional)", '<input name="hz" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(m.heyzine_url || "") + '">') +
               '<p class="pnl-sub" style="margin:-4px 0 0">El estudiante lo ve embebido en "Mis recursos" → este módulo → Libro de estudio. Déjalo vacío si todavía no hay libro para este módulo.</p>' +
+              // Libro complementario (26 sep 2026): por ahora solo se guarda el
+              // enlace; dónde se muestra se decide más adelante. Si la columna
+              // aún no existe en la BD, la casilla se ve deshabilitada.
+              '<div style="margin-top:14px">' + field("Libro complementario (opcional)", '<input name="cb" placeholder="https://heyzine.com/flip-book/xxxxx.html"' +
+                (hasCb ? ' value="' + esc(m.complementary_book_url || "") + '"' : " disabled") + ">") + "</div>" +
+              '<p class="pnl-sub" style="margin:-4px 0 0">' + (hasCb ? "Segundo libro del módulo. Por ahora solo queda guardado; más adelante se mostrará a los estudiantes."
+                : "Esta casilla se activa cuando se aplique la actualización de la base de datos.") + "</p>" +
               "</div>");
             modal("Editar módulo " + m.level, b, function () {
-              return q("modules").update({
+              var upd = {
                 title: b.querySelector("[name=t]").value.trim(),
                 description: b.querySelector("[name=d]").value.trim(),
                 heyzine_url: b.querySelector("[name=hz]").value.trim() || null
-              }).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
+              };
+              if (hasCb) upd.complementary_book_url = b.querySelector("[name=cb]").value.trim() || null;
+              return q("modules").update(upd).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
             });
           }));
           t.body.appendChild(tr);

@@ -2,6 +2,16 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+### ⚠️ Aplicar en Supabase (SQL Editor) — libro complementario (26 sep)
+- `supabase/migrations/20260926010000_libro_complementario.sql`: columna `modules.complementary_book_url`.
+  Hasta aplicarlo, la casilla "Libro complementario" de Académico → Módulos → Editar sale deshabilitada.
+
+### Pendiente: dónde mostrar el libro complementario
+- Cada módulo tiene 1 libro principal (`heyzine_url`, en Mis recursos → Libro de estudio) y 1
+  complementario (`complementary_book_url`, ya se guarda desde Académico → Módulos → Editar).
+  El usuario decidirá más adelante dónde se despliega el complementario (portal del estudiante,
+  Recursos del profesor, etc.) — hoy no se muestra en ningún sitio.
+
 ### ⚠️ Aplicar en Supabase (SQL Editor) — festivos (26 sep)
 - `supabase/migrations/20260926000000_festivos_colombia.sql`: festivos de Colombia calculados por ley
   (Ley 51/1983 + Ley 2578/2026, 9 de julio). Hasta aplicarlo, el calendario no muestra festivos
