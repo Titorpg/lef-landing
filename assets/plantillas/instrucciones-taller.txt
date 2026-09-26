@@ -1,0 +1,71 @@
+CÓMO HACER UN TALLER PARA LA PLATAFORMA LEF
+==========================================
+
+Todos los talleres se hacen con el MISMO archivo molde: taller-molde-lef.html
+Así la plataforma los reconoce y los muestra con su diseño (como el de A1.1 semana 1).
+
+Regla de oro: dentro del archivo SOLO se cambia el bloque "CONTENIDO DEL TALLER".
+Todo lo demás (diseño y funcionamiento) se deja exactamente igual.
+
+
+OPCIÓN 1 — Pedírselo a una IA (ChatGPT, Claude, Gemini…)
+--------------------------------------------------------
+1. Abre la IA y adjunta el archivo taller-molde-lef.html.
+2. Copia y pega el texto de abajo, completando lo que está entre [corchetes].
+3. Guarda el archivo que te devuelva (termina en .html).
+4. Ábrelo en tu navegador para revisarlo y hacer una prueba.
+5. Súbelo en la plataforma: Recursos compartidos → Talleres → nivel → módulo →
+   semana → "Crear taller". Al guardar debe decir "se verá con el diseño de la
+   plataforma" y en la lista debe salir "Taller interactivo".
+
+----- TEXTO PARA LA IA (copiar desde aquí) -----
+Te adjunto un archivo HTML que es el molde de talleres de mi academia de inglés LEF.
+Crea un taller nuevo usando EXACTAMENTE ese archivo, con estas reglas:
+
+1. Cambia ÚNICAMENTE el bloque que empieza con el comentario "CONTENIDO DEL TALLER"
+   (la constante TALLER). No modifiques nada más: ni estilos, ni HTML, ni la parte
+   "LÓGICA", ni el logo.
+2. Respeta los mismos campos y la misma estructura del ejemplo:
+   modulo, title, topic, tiempo, mensajes {alto, medio, bajo} y parts.
+3. Cada parte tiene "title" y "exercises". Cada ejercicio usa solo uno de estos tipos:
+   - "choice": el estudiante elige un botón. Lleva "options" (lista de botones) y en
+     cada pregunta "a" es la respuesta correcta escrita EXACTAMENTE igual que en options.
+     Sirve también para verdadero/falso (options: ["True","False"]).
+   - "write": el estudiante escribe. En cada pregunta "a" es una LISTA con las
+     respuestas aceptadas, en minúscula (ejemplo: ["you're", "you are"]).
+4. Cada pregunta lleva "q" (la pregunta), "a" (la respuesta) y "why" (explicación
+   corta en español de por qué es esa respuesta; puede usar <b>negrita</b>).
+5. "ins" (instrucción) va en inglés y "help" (ayuda) en español.
+6. Si hay lectura, va en "reading" como una lista de párrafos, dentro del ejercicio.
+7. No uses otros tipos de ejercicio (arrastrar, unir, audio, imágenes).
+8. Devuélveme el archivo HTML COMPLETO, listo para guardar.
+
+Datos del taller:
+- Módulo: [ej. A1.2 Everyday Life]
+- Nombre: [ej. Taller semana 2]
+- Tema: [ej. Present simple and daily routines]
+- Tiempo aproximado: [ej. 15 a 20 minutos]
+- Partes y contenido: [describe qué quieres: vocabulario, gramática, lectura, cuántas
+  preguntas por parte, páginas del libro, etc.]
+- Mensaje final si le va mal: [ej. Repasa las páginas 10 a 14 del libro y vuelve a
+  hacer el taller.]
+----- (copiar hasta aquí) -----
+
+
+OPCIÓN 2 — Hacerlo a mano
+-------------------------
+1. Haz una copia de taller-molde-lef.html y ponle un nombre (ej. taller-A1-2-semana-2.html).
+2. Ábrela con un editor de texto (Bloc de notas o Visual Studio Code).
+3. Busca el bloque "CONTENIDO DEL TALLER": ahí está explicado cada campo con un ejemplo.
+4. Cambia textos, preguntas, respuestas y explicaciones. Cuida las comillas, comas y
+   corchetes: copia una pregunta existente y cámbiale el texto.
+5. Ábrelo en tu navegador para revisar que funcione y súbelo como en la opción 1.
+
+
+SI ALGO SALE MAL
+----------------
+- Si al subirlo en la lista sale "HTML" (y no "Taller interactivo"), el archivo no
+  respetó el molde: se verá con su propio diseño. Pídele a la IA que lo rehaga
+  cambiando SOLO el bloque de contenido, o revisa comas y comillas.
+- Si al abrirlo en tu navegador la página sale en blanco, hay un error de escritura
+  en el bloque (casi siempre una coma o comilla que falta).

@@ -166,9 +166,10 @@
       var fr = document.createElement("iframe");
       fr.setAttribute("sandbox", "allow-scripts");
       fr.style.display = "none";
-      var done = false;
+      var done = false, timer = null;
       function finish(v) {
         if (done) return; done = true;
+        clearTimeout(timer);
         window.removeEventListener("message", onMsg);
         fr.remove();
         resolve(v);
@@ -181,10 +182,13 @@
         // Mensajes finales y tiempo aproximado, tal como los trae el HTML.
         var mm = /pct\s*>=\s*90\s*\?\s*"([^"]*)"\s*:\s*pct\s*>=\s*70\s*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/.exec(text);
         var dm = /Tiempo aproximado:\s*([^<.]+)/.exec(text);
+        // El molde (assets/plantillas/taller-molde-lef.html) los trae en el bloque:
+        // tiempo y mensajes {alto, medio, bajo}; el taller original, en el código.
+        var M = T.mensajes || {};
         finish({
           level: level || T.level || "", title: T.title || "Taller", topic: T.topic || "",
-          duration: dm ? dm[1].trim() : "",
-          messages: mm ? { high: mm[1], mid: mm[2], low: mm[3] } : {
+          duration: T.tiempo || (dm ? dm[1].trim() : ""),
+          messages: (M.alto && M.medio && M.bajo) ? { high: M.alto, mid: M.medio, low: M.bajo } : mm ? { high: mm[1], mid: mm[2], low: mm[3] } : {
             high: "¡Excelente trabajo! Dominas los temas de este taller.",
             mid: "¡Muy bien! Revisa los ítems marcados con ✗ e inténtalo otra vez.",
             low: "Repasa el tema en tu libro y vuelve a hacer el taller."
@@ -195,7 +199,7 @@
       window.addEventListener("message", onMsg);
       fr.srcdoc = "<script>try{var T=(" + lit + ");parent.postMessage({lefTaller:JSON.stringify(T)},\"*\")}catch(e){parent.postMessage({lefTaller:null},\"*\")}<\/script>";
       document.body.appendChild(fr);
-      setTimeout(function () { finish(null); }, 4000);
+      timer = setTimeout(function () { finish(null); }, 4000);
     });
   }
 

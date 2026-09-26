@@ -1243,3 +1243,6 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .rc-ws__acts .btn .mc-ic{width:15px;height:15px;}
 .tw-frame{display:block;width:100%;height:80vh;min-height:520px;border:1px solid var(--niebla);border-radius:14px;background:#fff;box-shadow:var(--card-shadow);}
 .tw-file-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:13.5px;color:var(--grafito);}
+.rc-molde{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0;font-size:13.5px;}
+.rc-molde a{color:var(--azul);font-weight:600;text-decoration:none;}
+.rc-molde a:hover{text-decoration:underline;}

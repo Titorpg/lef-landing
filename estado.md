@@ -54,6 +54,10 @@
   estudiante deja de verlo hasta entonces). Luego: borrar la función `student-taller`
   (`npx supabase functions delete student-taller --project-ref cemrxcatbxbcipxmsnjf`), su
   carpeta y RS_TALLER_READY / rsTallerOpen del portal.
+- **Molde de talleres** (26 sep): `assets/plantillas/taller-molde-lef.html` (el taller del usuario
+  con modulo/tiempo/mensajes dentro del bloque TALLER) + `instrucciones-taller.txt` (pasos y texto
+  para pedírselo a una IA). Enlaces en "Crear taller". Decisión: todos los talleres con el molde;
+  conversión automática con IA (opción B) queda para después si llegan HTML de otras fuentes.
 - Siguientes partes (las contará el usuario): recursos interactivos, otros.
 
 ### ✅ Hecho 26 sep — Talleres interactivos dentro del portal

@@ -1976,8 +1976,10 @@
     function wsForm(title, isEdit) {
       return h("<div>" + field("Título del taller", '<input name="t" placeholder="Ej.: Greetings and verb to be" value="' + esc(title || "") + '">') +
         field(isEdit ? "Reemplazar archivo (opcional)" : "Archivo del taller", '<input name="f" type="file" accept="' + RC_ACCEPT + '">') +
-        '<p class="pnl-sub" style="margin:-4px 0 0">HTML, PDF, Word, PowerPoint o Excel (máx. 20 MB). Si el HTML usa la plantilla de taller LEF ' +
-        '(el bloque “CONTENIDO DEL TALLER”, como el de A1.1 semana 1), se verá con el diseño de la plataforma; otro HTML se muestra tal cual.</p></div>');
+        '<p class="pnl-sub" style="margin:-4px 0 8px">HTML, PDF, Word, PowerPoint o Excel (máx. 20 MB). Los talleres interactivos se hacen con el ' +
+        '<strong>molde de taller LEF</strong>: así se ven con el diseño de la plataforma. Un HTML hecho de otra forma se muestra con su propio diseño.</p>' +
+        '<p class="rc-molde"><a href="assets/plantillas/taller-molde-lef.html" download="taller-molde-lef.html">Descargar el molde</a>' +
+        '<a href="assets/plantillas/instrucciones-taller.txt" target="_blank" rel="noopener">Cómo hacer un taller (instrucciones)</a></p></div>');
     }
     var bar = h('<div class="pnl-toolbar" style="margin-bottom:16px"></div>');
     bar.appendChild(rcBtn("Crear taller", "plus", "btn-dark", function () {
