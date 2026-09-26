@@ -224,6 +224,8 @@
     LEF_ENROLLMENT_NOT_FOUND: "No se encontró la inscripción.",
     LEF_ENROLLMENT_CANCELLED: "Esa inscripción está cancelada.",
     LEF_GROUP_NOT_FOUND: "No se encontró el grupo.",
+    LEF_NO_CURRENT_MODULE: "Ese estudiante no tiene un módulo en curso que corregir.",
+    LEF_SAME_MODULE: "Ese ya es su módulo actual: elige el módulo correcto.",
     LEF_MODULE_ALREADY_COMPLETED: "Ese estudiante ya completó ese módulo — no se puede volver a matricular. Elige otro.",
     LEF_ENROLLMENT_NOT_ACTIVE: "Ese módulo todavía no se ha pagado, así que no se puede marcar como completado. Usa “cancelar la inscripción”.",
     groups_one_per_schedule: "Ese horario ya tiene un grupo con profesor asignado. Elige otro horario, o crea uno nuevo en la pestaña Horarios.",
@@ -1106,6 +1108,7 @@
     if (curEnr) {
       extra = [{ value: "__cancel", label: "— Quitar módulo actual: cancelar la inscripción —" }];
       if (curEnr.status === "Active") extra.push({ value: "__complete", label: "— Quitar módulo actual: marcarlo como completado —" });
+      extra.push({ value: "__correct", label: "— Cambio de módulo por error: pasarlo a otro sin generar nuevo cobro —" });
       selected = curEnr.module_id;
     } else {
       extra = [{ value: "", label: "— Sin módulo por ahora —" }];
@@ -1124,12 +1127,24 @@
       field("Número de documento", '<input name="dn" value="' + esc(s ? (s.doc_number || "") : "") + '">') +
       fieldBlock("Módulo en que se inscribe", modulePicker("mod", mods, selected, completed, { lockCompleted: true, suggestedId: suggested, extra: extra })) +
       (note ? '<p class="pnl-sub" style="margin:-4px 0 12px">' + note + "</p>" : "") +
+      // "Cambio de módulo por error" (26 sep 2026): la misma inscripción pasa al
+      // módulo correcto con su mensualidad y sus pagos; sin cobro nuevo.
+      (curEnr ? '<div data-correct hidden style="margin:0 0 14px;padding:14px;border:1px solid var(--warn);border-radius:12px;background:var(--warn-bg)">' +
+        '<p class="pnl-sub" style="margin:0 0 10px;color:var(--ink)">Para cuando lo inscribiste por error en <strong>' + esc(curEnr.modules ? curEnr.modules.level : "este módulo") + "</strong>. " +
+        "Pasa al módulo correcto con su misma inscripción, su mensualidad y sus pagos: <strong>no se genera cobro nuevo</strong> y nada queda como completado. " +
+        "Si tenía grupo, queda sin grupo (asígnale el del módulo correcto en Académico → Grupos). Queda anotado en el Registro de eventos.</p>" +
+        fieldBlock("Módulo correcto", modulePicker("mod2", mods.filter(function (m) { return m.id !== curEnr.module_id; }), "", completed, { lockCompleted: true })) +
+        field("Motivo (opcional)", '<input name="why" placeholder="Ej.: se inscribió por error en A1.2, era A1.1">') + "</div>" : "") +
       field("WhatsApp", '<input name="w" value="' + esc(s ? s.whatsapp : "") + '">') +
       field("Correo", '<input name="e" type="email" value="' + esc(s ? s.email : "") + '">') +
       field("Edad (opcional)", '<input name="a" type="number" min="5" max="100" value="' + (s && s.age ? s.age : "") + '">') +
       field("Ciudad (opcional)", '<input name="c" value="' + esc(s ? (s.city || "") : "") + '">') +
       '<p class="pnl-sub">El documento del estudiante es obligatorio. Si es menor de edad, va su tarjeta de identidad; el documento de quien paga se registra aparte, en la suscripción.</p>' +
       "</div>");
+    var correctBox = b.querySelector("[data-correct]");
+    if (correctBox) b.querySelectorAll("[name=mod]").forEach(function (r) {
+      r.addEventListener("change", function () { correctBox.hidden = pickedValue(b, "mod") !== "__correct"; });
+    });
     modal(s ? "Editar estudiante" : "Nuevo estudiante", b, function () {
       var docNum = b.querySelector("[name=dn]").value.trim();
       if (docNum.length < 3) throw new Error("Ingresa el número de documento del estudiante.");
@@ -1143,15 +1158,18 @@
         city: b.querySelector("[name=c]").value.trim() || null
       };
       var moduleVal = pickedValue(b, "mod");
+      var target = moduleVal === "__correct" ? pickedValue(b, "mod2") : "";
+      if (moduleVal === "__correct" && !target) throw new Error("Elige el módulo correcto.");
       var pr = s
         ? q("students").update(payload).eq("id", s.id).then(function (r) { if (r.error) throw r.error; return s.id; })
         : q("students").insert(payload).select("id").single().then(function (r) { if (r.error) throw r.error; return r.data.id; });
       return pr.then(function (sid) {
         if (moduleVal === "__cancel") return rpc("admin_release_module", { p_student_id: sid, p_mode: "cancel" });
         if (moduleVal === "__complete") return rpc("admin_release_module", { p_student_id: sid, p_mode: "complete" });
+        if (moduleVal === "__correct") return rpc("admin_correct_module", { p_student_id: sid, p_module_id: target, p_reason: b.querySelector("[name=why]").value.trim() || null });
         if (!moduleVal) return null;
         return rpc("admin_assign_module", { p_student_id: sid, p_module_id: moduleVal });
-      }).then(function () { toast(s ? "Estudiante actualizado." : (moduleVal ? "Estudiante inscrito." : "Estudiante creado, sin módulo por ahora.")); route(); });
+      }).then(function () { toast(moduleVal === "__correct" ? "Módulo corregido, sin cobro nuevo." : s ? "Estudiante actualizado." : (moduleVal ? "Estudiante inscrito." : "Estudiante creado, sin módulo por ahora.")); route(); });
     }, s ? "Guardar" : "Inscribir");
   }
 
@@ -2271,7 +2289,8 @@
     "payment.delete": "Pago eliminado", "payment.update": "Pago editado",
     "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada",
     "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)",
-    "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)"
+    "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)",
+    "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)"
   };
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
@@ -2374,12 +2393,27 @@
           "Todos quedaron sin módulo en Estudiantes, a la espera de su siguiente inscripción. Los módulos completados se siguen viendo en su “Detalle” y en el portal."
         ];
       }
+      case "enrollment.correct_module": {
+        var dayEs = { Monday: "lunes", Tuesday: "martes", Wednesday: "miércoles", Thursday: "jueves", Friday: "viernes", Saturday: "sábado", Sunday: "domingo" };
+        var grp = d.grupo_soltado ? String(d.grupo_soltado).replace(/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/g, function (x) { return dayEs[x]; }) : "";
+        var moved = +d.mensualidades_movidas || 0;
+        return [
+          "Se CORRIGIÓ el módulo de " + (d.estudiante || "un estudiante") + (d.inscripcion ? " (inscripción " + d.inscripcion + ")" : "") +
+            " porque había quedado inscrito por error en otro módulo. Fue la MISMA inscripción: no se creó una nueva, no se generó ningún cobro nuevo y el módulo anterior NO quedó como completado.",
+          "Qué cambió:\n" + [
+            line("Módulo", (d.modulo_antes || "—") + " → " + (d.modulo_despues || "—")),
+            line("Estado de la inscripción", d.pagado ? "ya estaba pagada: sigue activa en el módulo correcto" : (d.estado === "Active" ? "activa" : "pendiente de pago")),
+            line("Mensualidad", moved ? (moved === 1 ? "su mensualidad" : "sus " + moved + " mensualidades") + " (con los pagos que tuviera) pasó al módulo correcto" : "no tenía mensualidad; se creó una sola para el módulo correcto"),
+            line("Grupo", grp ? "estaba en el grupo " + grp + " y quedó sin grupo (el grupo era del otro módulo)" : "no tenía grupo asignado")
+          ].join("\n")
+        ];
+      }
     }
     return null;
   }
 
   function secRegistro(main) {
-    head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción, o se cierra un ciclo, queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
+    head(main, "Registro de eventos", "Cada vez que se edita, reversa o elimina un pago o una suscripción, se cierra un ciclo o se corrige un módulo por error, queda anotado aquí, con el motivo — nadie puede editar ni borrar este registro, ni siquiera el admin.");
     // Nombres de estudiantes y módulos para que la explicación hable en palabras, no en códigos.
     var lk = { students: {}, modules: {} };
     Promise.all([

@@ -2,6 +2,12 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+### ⚠️ Aplicar en Supabase (SQL Editor) — cambio de módulo por error (26 sep)
+- `supabase/migrations/20260926030000_corregir_modulo.sql` (va DESPUÉS de 20260926020000):
+  Estudiantes → Editar → "— Cambio de módulo por error: pasarlo a otro sin generar nuevo cobro —".
+  La misma inscripción pasa al módulo correcto con su mensualidad y pagos; nada queda completado,
+  sin cobro nuevo, suelta el grupo, queda en el Registro de eventos. Probado en Postgres local.
+
 ### ⚠️ Aplicar en Supabase (SQL Editor) — cobro al asignar módulo (26 sep)
 - `supabase/migrations/20260926020000_cobro_al_asignar_modulo.sql`: Estudiantes → Editar → módulo
   ahora crea también la mensualidad (antes solo la inscripción: caso "Liam", pago pendiente sin
