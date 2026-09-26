@@ -1237,3 +1237,9 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .rc-add__err{color:var(--bad);font-size:13.5px;margin-top:8px;}
 .rc-add__err:empty{display:none;}
 .pnl-toolbar .btn .mc-ic{width:15px;height:15px;}
+/* Talleres en Recursos compartidos (admin) y visor de archivos de taller. */
+.rc-ws .rs-file__t{min-width:160px;}
+.rc-ws__acts{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;}
+.rc-ws__acts .btn .mc-ic{width:15px;height:15px;}
+.tw-frame{display:block;width:100%;height:80vh;min-height:520px;border:1px solid var(--niebla);border-radius:14px;background:#fff;box-shadow:var(--card-shadow);}
+.tw-file-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:13.5px;color:var(--grafito);}

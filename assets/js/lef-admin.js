@@ -349,7 +349,7 @@
     { id: "pagos", label: "Pagos", roles: ["admin"] },
     { id: "novedades", label: "Novedades", roles: ["admin"] },
     { id: "academico", label: "Académico", roles: ["admin"] },
-    { id: "compartidos", label: "Recursos compartidos de las clases", roles: ["admin"] },
+    { id: "compartidos", label: "Recursos compartidos", roles: ["admin"] },
     { id: "usuarios", label: "Usuarios", roles: ["admin"] },
     { id: "registro", label: "Registro de eventos", roles: ["admin"] },
     { id: "micuenta", label: "Mi cuenta", roles: ["admin", "teacher"] }
@@ -1639,7 +1639,8 @@
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-    trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'
+    trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>'
   };
   function rcIc(n) {
     return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (RC_ICONS[n] || "") + "</svg>";
@@ -1694,7 +1695,7 @@
   }
 
   function secRecursosCompartidos(main) {
-    head(main, "Recursos compartidos de las clases", "Cargando…");
+    head(main, "Recursos compartidos", "Cargando…");
     q("modules").select("*").order("module_number").then(function (r) {
       if (r.error) throw r.error;
       rcRoot(main, { mods: r.data || [] });
@@ -1702,10 +1703,11 @@
   }
 
   function rcRoot(main, S) {
-    var body = rcPage(main, [], "Recursos compartidos de las clases",
+    var body = rcPage(main, [], "Recursos compartidos",
       "Recursos que se usan igual en todas las clases, sin importar el profesor. Los estudiantes los ven en Mis recursos cuando pagan su módulo.");
     var grid = h('<div class="rs-grid"></div>');
     grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Libros", sub: "Libros principales y complementarios", onOpen: function () { rcLibros(main, S); } }));
+    grid.appendChild(rcCard({ tone: "violet", icon: "edit", title: "Talleres", sub: "Semana 1 a 4 y repaso de cada módulo", onOpen: function () { rcTalleres(main, S); } }));
     body.appendChild(grid);
   }
 
@@ -1873,6 +1875,170 @@
             });
           })
         ]));
+      });
+    });
+  }
+
+  // ---------- Parte 2: Talleres (26 sep 2026) ----------
+  // Talleres → nivel (A1…C1) → módulo → Taller semana 1…4 / Repaso del módulo
+  // (slot 1…5) → "Crear taller" (título + archivo). Archivos en el bucket privado
+  // "talleres" (<módulo>/<slot>/<archivo>) y fila en la tabla workshops. Un HTML
+  // con la plantilla LEF se guarda además como datos (content) para verse con el
+  // diseño de la plataforma (LEFTaller.extract, lef-taller.js).
+  var RC_WS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+  var RC_SLOTS = ["Taller semana 1", "Taller semana 2", "Taller semana 3", "Taller semana 4", "Repaso del módulo"];
+  var RC_ACCEPT = ".html,.htm,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx";
+
+  function rcModsOf(S, lv) {
+    return S.mods.filter(function (m) { return String(m.level).split(".")[0] === lv; })
+      .map(function (m) { return { code: m.level, title: m.title }; });
+  }
+  function rcCount(n, one, many) { return n ? n + " " + (n === 1 ? one : many) : "Vacío"; }
+  function rcCrumbsTalleres(main, S) {
+    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Talleres", function () { rcTalleres(main, S); }]];
+  }
+
+  function rcTalleres(main, S) {
+    var body = rcPage(main, [["Recursos compartidos", function () { rcRoot(main, S); }]], "Talleres",
+      "Un taller por semana y el repaso de cada módulo. El estudiante los ve en Mis recursos → módulo → Talleres cuando paga el módulo.");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    q("workshops").select("id,module_level,slot").then(function (r) {
+      body.innerHTML = "";
+      if (r.error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Talleres (20260926060000_recursos_compartidos_talleres.sql).</div>')); return; }
+      S.ws = r.data || [];
+      var grid = h('<div class="rs-grid"></div>');
+      RC_WS_LEVELS.forEach(function (lv) {
+        var mods = rcModsOf(S, lv);
+        var n = S.ws.filter(function (w) { return w.module_level.split(".")[0] === lv; }).length;
+        grid.appendChild(rcCard({ tone: "violet", icon: "folder", title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
+          chip: n ? ["ok", rcCount(n, "taller", "talleres")] : ["soon", "Vacío"],
+          onOpen: function () { rcTalleresNivel(main, S, lv); } }));
+      });
+      body.appendChild(grid);
+    });
+  }
+
+  function rcTalleresNivel(main, S, lv) {
+    var body = rcPage(main, rcCrumbsTalleres(main, S), "Talleres " + lv, "Elige el módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    rcModsOf(S, lv).forEach(function (m) {
+      var n = S.ws.filter(function (w) { return w.module_level === m.code; }).length;
+      grid.appendChild(rcCard({ tone: "violet", icon: "folder", title: m.code, sub: m.title || "Módulo " + m.code,
+        chip: n ? ["ok", rcCount(n, "taller", "talleres")] : ["soon", "Vacío"],
+        onOpen: function () { rcTalleresModulo(main, S, lv, m); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcTalleresModulo(main, S, lv, m) {
+    var crumbs = rcCrumbsTalleres(main, S).concat([["Talleres " + lv, function () { rcTalleresNivel(main, S, lv); }]]);
+    var body = rcPage(main, crumbs, "Talleres " + m.code, m.title || "");
+    var grid = h('<div class="rs-grid"></div>');
+    RC_SLOTS.forEach(function (name, i) {
+      var n = S.ws.filter(function (w) { return w.module_level === m.code && w.slot === i + 1; }).length;
+      grid.appendChild(rcCard({ tone: "violet", icon: "edit", title: name, sub: i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo",
+        chip: n ? ["ok", rcCount(n, "taller", "talleres")] : ["soon", "Vacío"],
+        onOpen: function () { rcTalleresSlot(main, S, lv, m, i + 1); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcSafeName(name) {
+    var parts = String(name).split("."), ext = parts.length > 1 ? parts.pop().toLowerCase() : "";
+    var base = parts.join(".").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "taller";
+    return base + (ext ? "." + ext : "");
+  }
+
+  // Sube el archivo (y si es HTML con la plantilla LEF, extrae el taller).
+  function rcUploadWorkshop(file, mod, slot) {
+    var kind = window.LEFTaller.kind(file.name);
+    if (!kind) return Promise.reject(new Error("Ese tipo de archivo no se puede subir. Usa HTML, PDF, Word, PowerPoint o Excel."));
+    if (file.size > 20 * 1024 * 1024) return Promise.reject(new Error("El archivo pesa más de 20 MB."));
+    var path = mod + "/" + slot + "/" + Date.now() + "-" + rcSafeName(file.name);
+    var contentP = kind === "html" ? file.text().then(function (t) { return window.LEFTaller.extract(t, mod); }) : Promise.resolve(null);
+    return contentP.then(function (content) {
+      var type = kind === "html" ? "text/html; charset=utf-8" : (file.type || "application/octet-stream");
+      return sb.storage.from("talleres").upload(path, file, { contentType: type, upsert: false }).then(function (r) {
+        if (r.error) throw r.error;
+        return { file_path: path, file_name: file.name, file_type: kind, file_size: file.size, content: content };
+      });
+    });
+  }
+
+  function rcTalleresSlot(main, S, lv, m, slot) {
+    var name = RC_SLOTS[slot - 1];
+    var crumbs = rcCrumbsTalleres(main, S).concat([["Talleres " + lv, function () { rcTalleresNivel(main, S, lv); }], [m.code, function () { rcTalleresModulo(main, S, lv, m); }]]);
+    var here = crumbs.concat([[name, function () { rcTalleresSlot(main, S, lv, m, slot); }]]);
+    var body = rcPage(main, crumbs, name, m.code + (m.title ? " — " + m.title : "") + ". El estudiante lo ve en Mis recursos → " + m.code + " → Talleres → " + name + ".");
+    function reload() {
+      q("workshops").select("id,module_level,slot").then(function (r) { if (!r.error) S.ws = r.data || []; rcTalleresSlot(main, S, lv, m, slot); });
+    }
+    function wsForm(title, isEdit) {
+      return h("<div>" + field("Título del taller", '<input name="t" placeholder="Ej.: Greetings and verb to be" value="' + esc(title || "") + '">') +
+        field(isEdit ? "Reemplazar archivo (opcional)" : "Archivo del taller", '<input name="f" type="file" accept="' + RC_ACCEPT + '">') +
+        '<p class="pnl-sub" style="margin:-4px 0 0">HTML, PDF, Word, PowerPoint o Excel (máx. 20 MB). Si el HTML usa la plantilla de taller LEF ' +
+        '(el bloque “CONTENIDO DEL TALLER”, como el de A1.1 semana 1), se verá con el diseño de la plataforma; otro HTML se muestra tal cual.</p></div>');
+    }
+    var bar = h('<div class="pnl-toolbar" style="margin-bottom:16px"></div>');
+    bar.appendChild(rcBtn("Crear taller", "plus", "btn-dark", function () {
+      var b = wsForm("", false);
+      modal("Crear taller — " + m.code + " · " + name, b, function () {
+        var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
+        if (!t) throw new Error("Escribe el título del taller.");
+        if (!f) throw new Error("Elige el archivo del taller.");
+        return rcUploadWorkshop(f, m.code, slot).then(function (up) {
+          up.module_level = m.code; up.slot = slot; up.title = t;
+          return q("workshops").insert(up).then(function (r) {
+            if (r.error) { sb.storage.from("talleres").remove([up.file_path]); throw r.error; }
+            toast(up.content ? "Taller creado: se verá con el diseño de la plataforma." : up.file_type === "html" ? "Taller creado: el HTML no usa la plantilla LEF, se mostrará tal cual." : "Taller creado.");
+            reload();
+          });
+        });
+      });
+    }));
+    body.appendChild(bar);
+    var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
+    body.appendChild(list);
+    q("workshops").select("*").eq("module_level", m.code).eq("slot", slot).order("created_at").then(function (r) {
+      list.innerHTML = "";
+      if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Talleres.</div>')); bar.remove(); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay taller aquí. Usa “Crear taller”.</div>')); return; }
+      r.data.forEach(function (w) {
+        var row = h('<div class="rs-file rc-ws"><span class="rs-file__ic">' + rcIc(w.content ? "edit" : "file") + "</span>" +
+          '<span class="rs-file__t">' + esc(w.title) + "<small>" + esc(w.file_name) + "</small></span>" +
+          '<span class="rs-chip ' + (w.content ? "is-ok" : "is-soon") + '">' + esc(window.LEFTaller.label(w)) + "</span>" +
+          '<span class="rc-ws__acts"></span></div>');
+        var acts = row.querySelector(".rc-ws__acts");
+        acts.appendChild(rcBtn("Ver", "arrow", "btn-dark", function () {
+          window.LEFTaller.show(rcPage(main, here, w.title, window.LEFTaller.label(w) + " · " + w.file_name), w, sb.storage);
+        }));
+        acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
+          var b = wsForm(w.title, true);
+          modal("Editar taller", b, function () {
+            var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
+            if (!t) throw new Error("Escribe el título del taller.");
+            var upP = f ? rcUploadWorkshop(f, m.code, slot) : Promise.resolve(null);
+            return upP.then(function (up) {
+              var upd = up || {};
+              upd.title = t; upd.updated_at = new Date().toISOString();
+              return q("workshops").update(upd).eq("id", w.id).then(function (u) {
+                if (u.error) { if (up) sb.storage.from("talleres").remove([up.file_path]); throw u.error; }
+                if (up) sb.storage.from("talleres").remove([w.file_path]);
+                toast("Taller guardado."); reload();
+              });
+            });
+          });
+        }));
+        acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
+          confirmDelete("Eliminar taller", "Se eliminará “" + w.title + "” de " + m.code + " · " + name + ", con su archivo. Los estudiantes dejarán de verlo.", function () {
+            return q("workshops").delete().eq("id", w.id).then(function (u) {
+              if (u.error) throw u.error;
+              sb.storage.from("talleres").remove([w.file_path]);
+              toast("Taller eliminado."); reload();
+            });
+          });
+        }));
+        list.appendChild(row);
       });
     });
   }

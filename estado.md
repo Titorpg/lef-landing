@@ -41,7 +41,20 @@
 - Portal: Libros complementarios del nivel muestra todos con su título
   (`get_my_complementary_books`; si falta el SQL, usa el libro único de level_books).
 - SQL `20260926050000_recursos_compartidos_libros.sql`: APLICADO por el usuario (26 sep, "Listo").
-- Siguientes partes (las contará el usuario): talleres, recursos interactivos, otros.
+- **Parte 2 = Talleres** (26 sep): Talleres → A1…C1 (NO existe C2) → módulo → Taller semana
+  1–4 / Repaso (slot 1–5) → "Crear taller" (título + archivo HTML/PDF/Word/PPT/Excel ≤20 MB),
+  Ver / Editar (título, reemplazar archivo) / Eliminar. Archivos en bucket PRIVADO `talleres`
+  (<módulo>/<slot>/<archivo>), fila en `workshops`. HTML con la plantilla LEF ("const TALLER
+  = {…}") → `LEFTaller.extract` (assets/js/lef-taller.js, iframe sandbox) lo guarda como
+  `content` y se ve con el diseño LEF; otro HTML tal cual (iframe sandbox); PDF visor del
+  navegador; Office → visor de Microsoft (enlace firmado 1 h). Estudiante: solo módulo pagado
+  (`lef_my_paid_module` en RLS de tabla y bucket). Portal: si falta el SQL, usa la lista fija.
+- **SQL `20260926060000_recursos_compartidos_talleres.sql`**: pasado al usuario, SIN confirmar.
+- **Pendiente tras el SQL**: el usuario debe subir el HTML de A1.1 semana 1 en su carpeta (el
+  estudiante deja de verlo hasta entonces). Luego: borrar la función `student-taller`
+  (`npx supabase functions delete student-taller --project-ref cemrxcatbxbcipxmsnjf`), su
+  carpeta y RS_TALLER_READY / rsTallerOpen del portal.
+- Siguientes partes (las contará el usuario): recursos interactivos, otros.
 
 ### ✅ Hecho 26 sep — Talleres interactivos dentro del portal
 - **A1.1 · Taller semana 1** publicado (aprobado con capturas). El HTML del usuario se

@@ -1408,19 +1408,49 @@
     "A1.1": [1]
   };
 
+  // Talleres del módulo: los sube el admin en Recursos compartidos → Talleres
+  // (tabla workshops; el estudiante solo recibe los de módulos pagados). Mientras
+  // no se aplique ese SQL, se usa la lista fija de antes (RS_TALLER_READY).
   function rsTalleres(main, crumbs, c) {
     var body = rsPage(main, crumbs, "Talleres", "Un taller por semana y el repaso del módulo.");
     var here = crumbs.concat([["Talleres", function () { rsTalleres(main, crumbs, c); }]]);
-    var ready = RS_TALLER_READY[c.module_level] || [];
+    var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
+    body.appendChild(list);
+    sb.from("workshops").select("id,slot,title,file_path,file_name,file_type,content")
+      .eq("module_level", c.module_level).order("created_at").then(function (r) {
+        var legacy = !!r.error, ws = r.data || [];
+        list.innerHTML = "";
+        RS_TALLERES.forEach(function (t, i) {
+          var mine = ws.filter(function (w) { return w.slot === i + 1; });
+          var ok = legacy ? (RS_TALLER_READY[c.module_level] || []).indexOf(i + 1) >= 0 : mine.length > 0;
+          var row = h('<' + (ok ? 'button type="button"' : "div") + ' class="rs-file' + (ok ? " is-ready" : "") + '"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
+            '<span class="rs-file__t">' + esc(t) + "<small>" + (mine.length === 1 ? esc(mine[0].title) : (i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo")) + "</small></span>" +
+            (ok ? '<span class="rs-chip is-ok">' + (mine.length > 1 ? mine.length + " talleres" : "Disponible") + '</span><span class="rs-card__go" aria-hidden="true">' + mcIc("arrow") + "</span>"
+              : '<span class="rs-chip is-soon">Próximamente</span>') +
+            "</" + (ok ? "button" : "div") + ">");
+          if (ok) row.addEventListener("click", function () {
+            if (legacy) return rsTallerOpen(main, here, t, c.module_level, i + 1);
+            if (mine.length === 1) return rsWorkshopShow(main, here, mine[0]);
+            rsWorkshopList(main, here, t, mine);
+          });
+          list.appendChild(row);
+        });
+      });
+  }
+
+  function rsWorkshopShow(main, crumbs, w) {
+    window.LEFTaller.show(rsPage(main, crumbs, w.title), w, sb.storage);
+  }
+
+  function rsWorkshopList(main, crumbs, name, ws) {
+    var body = rsPage(main, crumbs, name);
+    var here = crumbs.concat([[name, function () { rsWorkshopList(main, crumbs, name, ws); }]]);
     var list = h('<div class="rs-files"></div>');
-    RS_TALLERES.forEach(function (t, i) {
-      var file = ready.indexOf(i + 1) >= 0;
-      var row = h('<' + (file ? 'button type="button"' : "div") + ' class="rs-file' + (file ? " is-ready" : "") + '"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
-        '<span class="rs-file__t">' + esc(t) + "<small>" + (i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo") + "</small></span>" +
-        (file ? '<span class="rs-chip is-ok">Disponible</span><span class="rs-card__go" aria-hidden="true">' + mcIc("arrow") + "</span>"
-          : '<span class="rs-chip is-soon">Próximamente</span>') +
-        "</" + (file ? "button" : "div") + ">");
-      if (file) row.addEventListener("click", function () { rsTallerOpen(main, here, t, c.module_level, i + 1); });
+    ws.forEach(function (w) {
+      var row = h('<button type="button" class="rs-file is-ready"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
+        '<span class="rs-file__t">' + esc(w.title) + "<small>" + esc(window.LEFTaller.label(w)) + "</small></span>" +
+        '<span class="rs-card__go" aria-hidden="true">' + mcIc("arrow") + "</span></button>");
+      row.addEventListener("click", function () { rsWorkshopShow(main, here, w); });
       list.appendChild(row);
     });
     body.appendChild(list);
@@ -1447,128 +1477,8 @@
     });
   }
 
-  // Motor del taller (misma lógica del HTML original del usuario, 26 sep 2026):
-  // opción ("choice") o escribir ("write"); cada parte se revisa completa (avisa
-  // si falta alguna respuesta), marca ✓/✗ con la explicación, y se puede
-  // reintentar. Barra de progreso por parte y puntaje final con mensaje.
-  // El contenido (preguntas y explicaciones) lo escribe LEF: trae <b> a propósito.
-  function rsTallerRender(main, body, T) {
-    var norm = function (s) { return String(s).toLowerCase().replace(/[’‘`´]/g, "'").replace(/[.!?]+$/, "").replace(/\s+/g, " ").trim(); };
-    var state = T.parts.map(function (p) {
-      return { checked: false, correct: 0, total: p.exercises.reduce(function (n, e) { return n + e.items.length; }, 0) };
-    });
-    var wrap = h('<div class="tw"></div>');
-    var hero = h('<div class="tw-hero"><span class="tw-hero__ic">' + mcIc("pencil") + "</span>" +
-      '<div class="tw-hero__main"><p class="tw-hero__k">' + esc(T.level) + " · " + esc(T.title) + "</p>" +
-      '<h2 class="tw-hero__t">' + esc(T.topic) + "</h2>" +
-      '<p class="tw-hero__how">Responde, revisa y vuelve a intentarlo las veces que quieras.' + (T.duration ? " Tiempo aproximado: " + esc(T.duration) + "." : "") + "</p>" +
-      '<div class="tw-prog" data-prog>' + T.parts.map(function () { return "<span></span>"; }).join("") + "</div>" +
-      '<p class="tw-prog__l" data-prog-l></p></div></div>');
-    wrap.appendChild(hero);
-    var prog = hero.querySelector("[data-prog]"), progL = hero.querySelector("[data-prog-l]");
-    var fin = h('<div class="tw-final" aria-live="polite" hidden><span class="tw-final__ic">' + mcIc("check") + '</span><div><div class="tw-final__big" data-fs></div><p data-fm></p></div></div>');
-
-    T.parts.forEach(function (part, pi) {
-      var sec = h('<section class="tw-part"><div class="tw-part__head"><span class="tw-part__n">Parte ' + (pi + 1) + "</span><h3>" + part.title + "</h3></div></section>");
-      part.exercises.forEach(function (ex, ei) {
-        var html = '<div class="tw-ex">';
-        if (ex.reading) html += '<div class="tw-reading">' + ex.reading.map(function (p) { return "<p>" + p + "</p>"; }).join("") + "</div>";
-        html += '<p class="tw-ex__ins">' + ex.ins + '</p><p class="tw-ex__help">' + ex.help + "</p>";
-        ex.items.forEach(function (it, ii) {
-          html += '<div class="tw-item" data-e="' + ei + '" data-i="' + ii + '">' +
-            '<div class="tw-q"><span class="tw-q__n">' + (ii + 1) + '.</span><span class="tw-q__t">' + it.q + '</span><span class="tw-q__mark" aria-hidden="true"></span></div>';
-          if (ex.type === "choice") {
-            html += '<div class="tw-opts" role="group" aria-label="Opciones para la pregunta ' + (ii + 1) + '">' +
-              ex.options.map(function (o) { return '<button type="button" class="tw-opt" data-v="' + esc(o) + '">' + esc(o) + "</button>"; }).join("") + "</div>";
-          } else {
-            html += '<input class="tw-write" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta ' + (ii + 1) + '" placeholder="Escribe aquí">';
-          }
-          html += '<div class="tw-why"></div></div>';
-        });
-        sec.appendChild(h(html + "</div>"));
-      });
-      var act = h('<div class="tw-acts"><button type="button" class="btn btn-dark" data-act="check">Revisar respuestas</button>' +
-        '<span class="tw-score" aria-live="polite"></span><span class="tw-err" aria-live="polite"></span></div>');
-      sec.appendChild(act);
-      wrap.appendChild(sec);
-
-      sec.addEventListener("click", function (e) {
-        var opt = e.target.closest(".tw-opt");
-        if (opt && !state[pi].checked) {
-          opt.parentElement.querySelectorAll(".tw-opt").forEach(function (b) { b.classList.remove("is-sel"); });
-          opt.classList.add("is-sel");
-          act.querySelector(".tw-err").textContent = "";
-          return;
-        }
-        var btn = e.target.closest("[data-act]");
-        if (!btn) return;
-        if (btn.dataset.act === "check") checkPart(pi, sec, act); else resetPart(pi, sec, act);
-      });
-      sec.addEventListener("input", function () { act.querySelector(".tw-err").textContent = ""; });
-    });
-    wrap.appendChild(fin);
-    body.appendChild(wrap);
-
-    function answerOf(el, ex) {
-      if (ex.type === "choice") { var s = el.querySelector(".tw-opt.is-sel"); return s ? s.dataset.v : ""; }
-      return el.querySelector(".tw-write").value;
-    }
-
-    function checkPart(pi, sec, act) {
-      var part = T.parts[pi];
-      var items = [].slice.call(sec.querySelectorAll(".tw-item"));
-      var missing = items.filter(function (el) { return !answerOf(el, part.exercises[el.dataset.e]).trim(); }).length;
-      if (missing) {
-        act.querySelector(".tw-err").textContent = missing === 1 ? "Te falta 1 respuesta. Complétala antes de revisar." : "Te faltan " + missing + " respuestas. Complétalas antes de revisar.";
-        return;
-      }
-      var ok = 0;
-      items.forEach(function (el) {
-        var ex = part.exercises[el.dataset.e], it = ex.items[el.dataset.i];
-        var val = answerOf(el, ex);
-        var good = ex.type === "choice" ? val === it.a : it.a.map(norm).indexOf(norm(val)) >= 0;
-        el.classList.add(good ? "is-ok" : "is-bad");
-        el.querySelector(".tw-q__mark").innerHTML = mcIc(good ? "check" : "x");
-        if (!good) el.querySelector(".tw-why").innerHTML = (ex.type === "choice" ? "Respuesta correcta: <b>" + esc(it.a) + "</b>. " : "Respuesta correcta: ") + it.why;
-        el.querySelectorAll(".tw-opt,.tw-write").forEach(function (x) { x.disabled = true; });
-        if (good) ok++;
-      });
-      state[pi].checked = true; state[pi].correct = ok;
-      act.querySelector(".tw-score").textContent = ok + " de " + items.length + " correctas";
-      var b = act.querySelector("[data-act]");
-      b.dataset.act = "reset"; b.textContent = "Intentar de nuevo"; b.className = "btn btn-ghost";
-      updateProgress();
-    }
-
-    function resetPart(pi, sec, act) {
-      sec.querySelectorAll(".tw-item").forEach(function (el) {
-        el.classList.remove("is-ok", "is-bad");
-        el.querySelector(".tw-q__mark").innerHTML = "";
-        el.querySelector(".tw-why").innerHTML = "";
-        el.querySelectorAll(".tw-opt").forEach(function (o) { o.classList.remove("is-sel"); o.disabled = false; });
-        var w = el.querySelector(".tw-write"); if (w) { w.value = ""; w.disabled = false; }
-      });
-      state[pi].checked = false; state[pi].correct = 0;
-      act.querySelector(".tw-score").textContent = "";
-      var b = act.querySelector("[data-act]");
-      b.dataset.act = "check"; b.textContent = "Revisar respuestas"; b.className = "btn btn-dark";
-      updateProgress();
-    }
-
-    function updateProgress() {
-      var done = state.filter(function (s) { return s.checked; }).length;
-      [].slice.call(prog.children).forEach(function (s, i) { s.classList.toggle("is-done", state[i].checked); });
-      progL.textContent = done + " de " + state.length + " partes revisadas";
-      if (done === state.length) {
-        var c = state.reduce(function (n, s) { return n + s.correct; }, 0), t = state.reduce(function (n, s) { return n + s.total; }, 0);
-        var pct = Math.round(c / t * 100), M = T.messages || {};
-        fin.querySelector("[data-fs]").innerHTML = c + "/" + t + " <small>" + pct + "%</small>";
-        fin.querySelector("[data-fm]").textContent = pct >= 90 ? M.high : pct >= 70 ? M.mid : M.low;
-        fin.hidden = false;
-      } else fin.hidden = true;
-    }
-    updateProgress();
-  }
+  // El motor del taller vive en lef-taller.js (lo usan el portal y el panel).
+  function rsTallerRender(main, body, T) { window.LEFTaller.render(body, T); }
 
   function rsInteractivos(main, crumbs) {
     var body = rsPage(main, crumbs, "Recursos interactivos", "Actividades para practicar a tu ritmo.");
