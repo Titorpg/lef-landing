@@ -905,8 +905,18 @@
     refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
     book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/>',
     video: '<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
-    check: '<path d="M20 6 9 17l-5-5"/>'
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'
   };
+  // Logo de Google Meet (el de Classroom) para el recuadro de la reunión.
+  var MEET_LOGO = '<svg class="meet-card__logo" viewBox="0 0 87.5 72" aria-hidden="true">' +
+    '<path fill="#00832d" d="M49.5 36l8.53 9.75 11.47 7.33 2-17.02-2-16.64-11.69 6.44z"/>' +
+    '<path fill="#0066da" d="M0 51.5V66c0 3.315 2.685 6 6 6h14.5l3-10.96-3-9.54-9.95-3z"/>' +
+    '<path fill="#e94235" d="M20.5 0L0 20.5l10.55 3 9.95-3 2.95-9.41z"/>' +
+    '<path fill="#2684fc" d="M20.5 20.5H0v31h20.5z"/>' +
+    '<path fill="#00ac47" d="M82.6 8.68L69.5 19.42v33.66l13.16 10.79c1.97 1.54 4.85.135 4.85-2.37V11c0-2.535-2.945-3.925-4.91-2.32zM49.5 36v15.5h-29V72h43c3.315 0 6-2.685 6-6V53.08z"/>' +
+    '<path fill="#ffba00" d="M63.5 0h-43v20.5h29V36l20-16.57V6c0-3.315-2.685-6-6-6z"/></svg>';
   function mcIc(name) {
     return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       (MC_ICONS[name] || "") + "</svg>";
@@ -1013,18 +1023,18 @@
     return (m.description ? '<p class="agenda__desc">' + esc(m.description) + "</p>" : "") +
       (html || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>');
   }
-  function shortDate(ymd) {
-    var d = new Date(ymd + "T12:00:00");
-    return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
-  }
 
   // "Clase de hoy" por horario (pedido del usuario, 24–25 sep 2026): la clase
   // n.º N del ciclo (solo días del horario) muestra la agenda DAY N. Agenda y
   // botón de Meet se abren 10 min antes de la hora de la clase; el Meet se
   // quita a la hora de fin y la agenda sigue hasta medianoche (luego pasa a
-  // "Agendas anteriores"). Un día "Sin clase" muestra el motivo. La
+  // "Clases anteriores"). Un día "Sin clase" muestra el motivo. La
   // función student-classroom decide y NO entrega agenda ni Meet fuera de hora;
   // aquí solo se pinta y se vuelve a consultar sola cuando cambia el estado.
+  // Diseño tipo Classroom (pedido del usuario, 25 sep 2026): barra superior
+  // con el módulo; a la izquierda el recuadro de Meet (botón amarillo cuando
+  // la reunión está abierta, gris y deshabilitado cuando no) y el recuadro
+  // "Clases anteriores" (abre la lista como una carpeta); al centro, la agenda.
   var todayTimers = [];
   function clearTodayTimers() { todayTimers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); todayTimers = []; }
   function hmToMin(s) { var p = String(s || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
@@ -1075,8 +1085,11 @@
         '<span class="today-hero__num">' + todayD.getDate() + "</span>" +
         '<span class="today-hero__dm">' + esc(todayD.toLocaleDateString("es-CO", { weekday: "long" })) + " · " + esc(todayD.toLocaleDateString("es-CO", { month: "long" })) + "</span></div>" +
         '<div class="today-hero__info">' +
-        (g.module_level ? '<p class="today-hero__mod">' + esc(g.module_level + " — " + g.module_title) + "</p>" : "") +
-        (timeTxt ? '<p class="today-hero__meta">' + mcIc("clock") + esc(timeTxt) + (g.teacher ? " · " + esc(g.teacher) : "") + "</p>" : "") +
+        (g.module_level ? '<span class="today-hero__k">Tu módulo</span><p class="today-hero__mod">' + esc(g.module_level + " — " + g.module_title) + "</p>" : "") +
+        ((timeTxt || g.teacher) ? '<div class="today-hero__chips">' +
+          (timeTxt ? '<span class="today-hero__chip">' + mcIc("clock") + "<span>" + esc(timeTxt) + "</span></span>" : "") +
+          (g.teacher ? '<span class="today-hero__chip">' + mcIc("user") + "<span>Profesor: " + esc(g.teacher) + "</span></span>" : "") +
+          "</div>" : "") +
         (pill ? '<span class="today-pill is-' + state + '"><i></i>' + esc(pill) + "</span>" : "") +
         "</div></div>"));
 
@@ -1096,6 +1109,44 @@
         return;
       }
 
+      // Cuadrícula tipo Classroom: Meet y Clases anteriores a la izquierda,
+      // la agenda del día al centro (en celular: Meet, agenda, anteriores).
+      var grid = h('<div class="today-grid"></div>');
+      var col = h('<div class="today-main"></div>');
+      grid.appendChild(meetCard());
+      grid.appendChild(col);
+      grid.appendChild(prevCard());
+      box.appendChild(grid);
+
+      // El botón se ve siempre: amarillo y activo solo mientras la reunión
+      // está abierta (10 min antes hasta la hora de fin, con enlace); el
+      // resto del tiempo, gris y sin poder tocarse, con el motivo debajo.
+      function meetCard() {
+        var on = !!(cur && cur.phase === "en_curso" && cur.meet_url), note;
+        if (on) note = nowMin() < hmToMin(cur.start) ? "Tu clase empieza a las " + t12(cur.start) : "Clase en curso · termina a las " + t12(cur.end);
+        else if (d.before_cycle) note = "Se activará el día de tu primera clase.";
+        else if (!cur) note = "Hoy no hay reunión: no tienes clase.";
+        else if (cur.phase === "antes") note = "Se activa a las " + t12(cur.opens_at) + ", 10 minutos antes de tu clase.";
+        else if (cur.phase === "en_curso") note = "Tu profesor aún no ha configurado el enlace de la reunión. Escríbele o espera un momento.";
+        else note = "La reunión terminó a las " + t12(cur.end);
+        return h('<section class="meet-card' + (on ? " is-on" : "") + '">' +
+          '<div class="meet-card__head">' + MEET_LOGO + "<span>Meet</span></div>" +
+          (on ? '<a class="meet-card__btn" href="' + esc(cur.meet_url) + '" target="_blank" rel="noopener">Unirse</a>'
+              : '<button type="button" class="meet-card__btn" disabled>Unirse</button>') +
+          '<p class="meet-card__note">' + esc(note) + "</p></section>");
+      }
+
+      function prevCard() {
+        var n = 0;
+        (d.previous || []).forEach(function (p) { n += (p.agendas || []).length; });
+        var card = h('<section class="prev-card"><h3>Clases anteriores</h3>' +
+          "<p>" + (n ? "Repasa las agendas de las clases que ya tuviste, de la más reciente a la más antigua."
+                     : "Aquí irán quedando las agendas de las clases que ya tuviste, para que las repases cuando quieras.") + "</p>" +
+          '<button type="button" class="prev-card__all"' + (n ? "" : " disabled") + ">Ver todo" + (n ? " (" + n + ")" : "") + "</button></section>");
+        card.querySelector("button").addEventListener("click", function () { renderPastClasses(main, d.previous || []); });
+        return card;
+      }
+
       // fmtTime ya termina en "p.m.": no se le agrega otro punto.
       var dot = g.start_time ? "" : ".";
       var nextTxt = d.next_class ? "<strong>" + esc(longYmd(d.next_class)) + (g.start_time ? " a las " + esc(fmtTime(g.start_time)) : "") + "</strong>" : "";
@@ -1106,18 +1157,18 @@
         var rb = h('<button type="button" class="btn btn-dark">' + mcIc("book") + "<span>Ir a Mis recursos</span></button>");
         rb.addEventListener("click", function () { go("recursos"); });
         bc.appendChild(rb);
-        box.appendChild(bc);
+        col.appendChild(bc);
       } else if (d.cancel && !cur) {
-        box.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>Hoy no hay clase</h2>" +
+        col.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>Hoy no hay clase</h2>" +
           '<div class="today-reason"><span>Motivo</span><strong>' + esc(d.cancel.reason) + "</strong>" + (d.cancel.details ? "<p>" + esc(d.cancel.details) + "</p>" : "") + "</div>" +
           "<p>Tu profesor se pondrá en contacto contigo para acordar cuándo recuperarán esta clase; la nueva fecha aparecerá en tu calendario." +
           (nextTxt ? " Tu próxima clase es el " + nextTxt + dot : "") + "</p></div>"));
       } else if (!cur) {
-        box.appendChild(empty("calx", "Hoy no tienes clase",
-          (nextTxt ? "Tu próxima clase es el " + nextTxt : "Revisa tu horario en Mi curso") +
-          ((d.previous || []).length ? " — mientras tanto, puedes repasar las agendas anteriores." : ".")));
+        col.appendChild(empty("calx", "Hoy no tienes clase",
+          (nextTxt ? "Tu próxima clase es el " + nextTxt + dot : "Revisa tu horario en Mi curso.") +
+          ((d.previous || []).length ? " Mientras tanto, puedes repasar lo visto en Clases anteriores." : "")));
       } else {
-        slots.forEach(function (s) { box.appendChild(slotBlock(s)); });
+        slots.forEach(function (s) { col.appendChild(slotBlock(s)); });
       }
 
       function slotBlock(s) {
@@ -1135,7 +1186,8 @@
           return wrap;
         }
         // En curso (desde 10 min antes) o terminada: la agenda del día sigue
-        // visible hasta medianoche; el botón de la reunión solo en curso.
+        // visible hasta medianoche; el botón de la reunión (recuadro de Meet)
+        // solo se activa en curso.
         if (!s.agenda.length) {
           wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está en Classroom", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
         }
@@ -1146,47 +1198,11 @@
             '<a class="btn btn-ghost btn-sm" href="' + esc(a.alternateLink) + '" target="_blank" rel="noopener">' + mcIc("ext") + "<span>Classroom</span></a></header>" +
             '<div class="agenda__body">' + mcPost(a) + "</div></article>"));
         });
-        var meet;
-        if (s.phase === "en_curso" && s.meet_url) {
-          var sub = nowMin() < hmToMin(s.start) ? "Tu clase empieza a las " + t12(s.start) : "Tu clase está en curso · termina a las " + t12(s.end);
-          meet = h('<a class="today-meet is-on" href="' + esc(s.meet_url) + '" target="_blank" rel="noopener">' +
-            '<span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Únete a la reunión</strong>' +
-            "<small>" + esc(sub) + "</small></span>" + mcIc("arrow") + "</a>");
-        } else if (s.phase === "en_curso") {
-          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>Reunión no disponible</strong>' +
-            "<small>Tu profesor aún no ha configurado el enlace de la reunión. Escríbele o espera un momento.</small></span></div>");
-        } else {
-          meet = h('<div class="today-meet"><span class="today-meet__ic">' + mcIc("video") + '</span><span class="today-meet__t"><strong>La reunión terminó</strong>' +
-            "<small>La clase terminó a las " + esc(t12(s.end)) + " Tu agenda sigue disponible aquí hasta el final del día; mañana la encontrarás en Agendas anteriores.</small></span></div>");
+        if (s.phase === "terminada") {
+          wrap.appendChild(h('<p class="today-note">' + mcIc("clock") + "<span>La clase terminó a las " + esc(t12(s.end)) +
+            " Esta agenda sigue aquí hasta el final del día; desde mañana la encontrarás en <strong>Clases anteriores</strong>.</span></p>"));
         }
-        wrap.appendChild(meet);
         return wrap;
-      }
-
-      var prev = d.previous || [];
-      if (prev.length) {
-        box.appendChild(h('<h2 class="today-sec">Agendas anteriores</h2>'));
-        prev.forEach(function (p) {
-          p.agendas.forEach(function (a) {
-            var item = h('<div class="cls-day"></div>');
-            var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
-              '<div style="min-width:0"><div style="font-weight:600">' + esc(a.title || ("Agenda DAY " + p.day)) + "</div>" +
-              '<span style="font-size:12.5px;color:var(--grafito)">Clase del ' + esc(p.seen_on ? shortDate(p.seen_on) : "—") + "</span></div>" +
-              '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
-            var panel = h('<div class="cls-day__body" hidden></div>');
-            var toggle = function () {
-              var open = panel.hidden;
-              panel.hidden = !open;
-              row.setAttribute("aria-expanded", open ? "true" : "false");
-              item.classList.toggle("is-open", open);
-              if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = '<div class="cls-post">' + mcPost(a) + "</div>"; }
-            };
-            row.addEventListener("click", toggle);
-            row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
-            item.appendChild(row); item.appendChild(panel);
-            box.appendChild(item);
-          });
-        });
       }
 
       // Se vuelve a consultar sola cuando se abre la agenda, empieza o termina la clase.
@@ -1200,6 +1216,47 @@
       box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>" + esc(CLASS_MSG.error[1]) +
         "</h2><p>" + esc(CLASS_MSG.error[2]) + "</p></div>"));
     });
+  }
+
+  // "Clases anteriores" como una carpeta dentro de Clase de hoy: la lista de
+  // agendas ya vistas (la más reciente primero), en acordeón como las ve el
+  // profesor en el Planificador, cada una con la fecha de la clase encima.
+  function renderPastClasses(main, previous) {
+    clearTodayTimers();
+    main.innerHTML = "";
+    var back = h('<button type="button" class="resource-back">&larr; Clase de hoy</button>');
+    back.addEventListener("click", function () { renderClassToday(main); });
+    main.appendChild(back);
+    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:4px">Clases anteriores</h1>'));
+    main.appendChild(h('<p class="past-intro">Las agendas de las clases que ya tuviste, de la más reciente a la más antigua. Toca una para abrirla.</p>'));
+    var list = h('<div class="past-list"></div>');
+    previous.forEach(function (p) {
+      (p.agendas || []).forEach(function (a) {
+        var when = p.seen_on ? longYmd(p.seen_on) : "";
+        var item = h('<div class="past-item">' +
+          '<p class="past-item__date">' + mcIc("cal") + "<span>" + (when ? "Clase del " + esc(when) : "Clase n.º " + esc(String(p.day))) + "</span></p></div>");
+        var acc = h('<div class="cls-day"></div>');
+        var row = h('<div class="resource-row" tabindex="0" role="button" aria-expanded="false">' +
+          '<div style="min-width:0"><div style="font-weight:600">' + esc(a.title || ("Agenda DAY " + p.day)) + "</div>" +
+          '<span style="font-size:12.5px;color:var(--grafito)">Clase n.º ' + esc(String(p.day)) + " · agenda DAY " + esc(String(p.day)) + "</span></div>" +
+          '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
+        var panel = h('<div class="cls-day__body" hidden></div>');
+        var toggle = function () {
+          var open = panel.hidden;
+          panel.hidden = !open;
+          row.setAttribute("aria-expanded", open ? "true" : "false");
+          acc.classList.toggle("is-open", open);
+          if (open && !panel.dataset.filled) { panel.dataset.filled = "1"; panel.innerHTML = '<div class="cls-post">' + mcPost(a) + "</div>"; }
+        };
+        row.addEventListener("click", toggle);
+        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+        acc.appendChild(row); acc.appendChild(panel);
+        item.appendChild(acc);
+        list.appendChild(item);
+      });
+    });
+    main.appendChild(list);
+    window.scrollTo(0, 0);
   }
 
   /* ---------- Mis recursos ---------- */

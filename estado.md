@@ -12,7 +12,10 @@
 - **Mi curso / Clase de hoy** con un estudiante que ya pagó: código y botón "Unirme"
   (`?cjc=`) con Gmail PERSONAL (depende de la configuración del Workspace de LEF);
   10 min antes de la clase se abren agenda (DAY N) y Meet; el Meet se quita a la
-  hora de fin; la agenda sigue hasta medianoche y luego pasa a "Agendas anteriores".
+  hora de fin; la agenda sigue hasta medianoche y luego pasa a "Clases anteriores".
+  Diseño tipo Classroom (25 sep): recuadro de Meet a la izquierda (botón amarillo
+  activo / gris deshabilitado) y recuadro "Clases anteriores" → "Ver todo" abre la
+  lista como carpeta, con la fecha de cada clase encima; agenda del día al centro.
 - **iPhone**: archivo de Drive privado dentro de "Clase de hoy" (Safari no pasa la
   sesión de Google al visor incrustado → debería bastar "Abrir en Google Drive").
 - **"Conectar con Google Classroom"** (Planificador) tras encender la verificación de
@@ -50,7 +53,7 @@
   - Clase n.º N del ciclo (contando SOLO los días del horario desde el inicio del
     ciclo; `lef_session_number`) = agenda "DAY N" del tema del módulo.
   - Agenda y Meet se abren 10 min antes; el Meet se quita a la hora de fin; la agenda
-    sigue hasta medianoche y luego pasa a "Agendas anteriores" (= días anteriores).
+    sigue hasta medianoche y luego pasa a "Clases anteriores" (= días anteriores).
     El servidor no entrega agenda ni Meet fuera de esa ventana. El portal se
     refresca solo en cada cambio (`refresh_in`).
   - Antes del ciclo: "Tu ciclo aún no empieza" + botón a Mis recursos (libro).
