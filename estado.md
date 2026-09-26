@@ -18,8 +18,9 @@
   cambio de módulo por error, libros complementarios por nivel. (Claude no puede leer producción para verificarlo.)
 
 ### ✅ Hecho 26 sep — Mis recursos por carpetas (aprobado con capturas)
-- Mis recursos → carpetas de nivel (solo los niveles del estudiante) + "Libros
-  complementarios" (al mismo nivel que A1…C1; un libro por nivel SOLO para A2, B1, B2 y C1
+- Mis recursos → carpetas de nivel (solo los niveles del estudiante); DENTRO de cada nivel
+  la carpeta "Libros complementarios" junto a sus módulos (corregido 26 sep; antes iba al
+  mismo nivel que A1…C1; un libro por nivel SOLO para A2, B1, B2 y C1
   — el A1 NO tiene, y un estudiante solo de A1 no ve la carpeta; se abre con cualquier
   módulo pagado del nivel) → módulos del nivel (candado si no está pagado) → Libro de
   estudio (libro + workbook, `heyzine_url`) · Talleres (semana 1–4 + Repaso) · Recursos

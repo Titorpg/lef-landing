@@ -1237,8 +1237,8 @@
   /* ---------- Mis recursos ---------- */
   // Carpetas dentro de carpetas (pedido del usuario, 26 sep 2026), con la misma
   // mecánica del Planificador del profesor:
-  //   Mis recursos → niveles (A1…C1) + "Libros complementarios"
-  //   Nivel        → sus módulos
+  //   Mis recursos → niveles (A1…C1)
+  //   Nivel        → "Libros complementarios" (menos A1) + sus módulos
   //   Módulo       → Libro de estudio · Talleres · Recursos interactivos
   // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
   // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
@@ -1335,33 +1335,32 @@
         sub: n + (n === 1 ? " módulo" : " módulos") + " · " + L.mods.map(function (m) { return m.module_level; }).join(", "),
         onOpen: function () { rsLevel(main, M, L); } }));
     });
-    var withBook = M.levels.filter(function (L) { return RS_BOOK_LEVELS.indexOf(L.code) >= 0; });
-    var open = withBook.filter(function (L) { return L.open; });
-    if (withBook.length) grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !open.length,
-      sub: open.length ? "Uno por nivel · " + open.map(function (L) { return L.code; }).join(", ") : "Se abre cuando pagues tu primer módulo del nivel.",
-      onOpen: function () { if (open.length) rsComp(main, M); else go("facturacion"); } }));
     body.appendChild(grid);
   }
 
-  function rsComp(main, M) {
-    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Libros complementarios",
-      "Un libro para todo el nivel. Se abre con tu primer módulo pagado de ese nivel.");
+  // Carpeta "Libros complementarios" DENTRO de cada nivel (junto a sus módulos;
+  // corrección del usuario, 26 sep 2026). Solo A2, B1, B2 y C1: el A1 no tiene.
+  function rsComp(main, M, L) {
+    var crumbs = [["Mis recursos", function () { rsRoot(main, M); }], ["Nivel " + L.code, function () { rsLevel(main, M, L); }]];
+    var body = rsPage(main, crumbs, "Libros complementarios", "Un libro para todo el nivel " + L.code + ".");
     var grid = h('<div class="rs-grid"></div>');
-    M.levels.filter(function (L) { return L.open && RS_BOOK_LEVELS.indexOf(L.code) >= 0; }).forEach(function (L) {
-      grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libro complementario " + L.code, sub: "Para todo el nivel " + L.code,
-        chip: L.bookUrl ? null : ["soon", "Próximamente"],
-        onOpen: function () {
-          var b = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }], ["Libros complementarios", function () { rsComp(main, M); }]],
-            "Libro complementario " + L.code);
-          rsViewer(b, L.bookUrl, "Libro complementario — " + L.code);
-        } }));
-    });
+    grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libro complementario " + L.code, sub: "Para todo el nivel " + L.code,
+      chip: L.bookUrl ? null : ["soon", "Próximamente"],
+      onOpen: function () {
+        var b = rsPage(main, crumbs.concat([["Libros complementarios", function () { rsComp(main, M, L); }]]), "Libro complementario " + L.code);
+        rsViewer(b, L.bookUrl, "Libro complementario — " + L.code);
+      } }));
     body.appendChild(grid);
   }
 
   function rsLevel(main, M, L) {
-    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Nivel " + L.code, "Elige un módulo.");
+    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Nivel " + L.code, "Elige un módulo o los libros complementarios del nivel.");
     var grid = h('<div class="rs-grid"></div>');
+    if (RS_BOOK_LEVELS.indexOf(L.code) >= 0) {
+      grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !L.open,
+        sub: L.open ? "Para todo el nivel " + L.code : "Se abre cuando pagues tu primer módulo del nivel.",
+        onOpen: function () { if (L.open) rsComp(main, M, L); else go("facturacion"); } }));
+    }
     L.mods.forEach(function (c) {
       var locked = !c.module_paid;
       grid.appendChild(rsCard({ tone: "blue", icon: "folder", title: c.module_level, sub: c.module_title, locked: locked,
