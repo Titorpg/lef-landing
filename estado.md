@@ -10,17 +10,30 @@
   piden el código de la clase. (La acción `info` de `student-classroom` queda sin uso.)
 
 ### SQL — confirmar
+- **`20260926040000_libros_complementarios_por_nivel.sql`** (tabla `level_books` +
+  `get_my_level_books()`): pasado al usuario el 26 sep, SIN confirmar. Si en Académico →
+  Módulos → "Libros complementarios por nivel" sale el aviso rojo "Falta aplicar…",
+  no está aplicado.
 - `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
-  el usuario NO confirmó haberlo aplicado. Si en Académico → Módulos → Editar la casilla
-  "Libro complementario" sale gris/deshabilitada, falta aplicarlo.
+  YA NO HACE FALTA — el libro complementario pasó a ser por nivel; la columna queda sin uso.
 - Aplicados 26 sep (confirmados por el usuario): festivos, cobro al asignar módulo,
   cambio de módulo por error. (Claude no puede leer producción para verificarlo.)
 
-### Pendiente: dónde mostrar el libro complementario
-- Cada módulo tiene 1 libro principal (`heyzine_url`, en Mis recursos → Libro de estudio) y 1
-  complementario (`complementary_book_url`, ya se guarda desde Académico → Módulos → Editar).
-  El usuario decidirá más adelante dónde se despliega (portal del estudiante, Recursos del
-  profesor, etc.) — hoy no se muestra en ningún sitio.
+### ✅ Hecho 26 sep — Mis recursos por carpetas (aprobado con capturas)
+- Mis recursos → carpetas de nivel (solo los niveles del estudiante) + "Libros
+  complementarios" (al mismo nivel que A1…C1; un libro por nivel, se abre con cualquier
+  módulo pagado del nivel) → módulos del nivel (candado si no está pagado) → Libro de
+  estudio (libro + workbook, `heyzine_url`) · Talleres (semana 1–4 + Repaso) · Recursos
+  interactivos (Vocabulario, Gramática, Listening, Reading).
+- Admin: Académico → Módulos → botón "Libros complementarios por nivel".
+
+### Pendiente del usuario: contenido de Talleres e Interactivos
+- **Talleres**: HTML interactivos ya hechos (solo texto). Por ahora los sube Claude desde
+  aquí; la idea es que cada profesor suba los suyos, o si son iguales para todos, un solo
+  sitio para todos. NO definido → hoy salen "Próximamente". Ojo: archivos en el repo =
+  públicos; si deben ser solo para quien pagó, ir a Storage privado de Supabase.
+- **Recursos interactivos**: contenido sin definir (el mapa dice 3 vocab, 3 gramática,
+  2 listening, 2 reading) → hoy vacíos, "Próximamente".
 
 ### Verificar en la plataforma (hecho 26 sep, sin prueba en producción)
 - **Festivos**: calendario de octubre → lunes 12 en naranja; clase de ese día tachada
@@ -63,8 +76,6 @@
 ### Contenido / decisiones pendientes del usuario
 - **Libros Heyzine**: cargados A1.1 → B1.1 (módulos 1–7, verificado en BD 23 sep).
   Faltan **B1.2, B1.3, B2.1, B2.2, B2.3** y **C1.1, C1.2, C1.3** (el usuario pasa enlaces).
-- **Talleres / Recursos interactivos / Materiales** (portal → Mis recursos): sin
-  definir; el usuario debe contar qué es cada uno, quién lo sube y si va por módulo.
 - **Classroom — materiales sin tema** (caen en "Otros materiales"): en A1
   "CAN AND COULD SITUATIONS- DAY 13", en A2 "WARM UP - DAY 5". El usuario les asigna
   su tema en Classroom y pasan solos a su módulo.

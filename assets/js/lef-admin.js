@@ -2621,18 +2621,11 @@
             }).catch(function (e) { toast(friendly(e), "err"); });
           }));
           cell.appendChild(btn("Editar", "btn-ghost", function () {
-            var hasCb = Object.prototype.hasOwnProperty.call(m, "complementary_book_url");
             var b = h("<div>" + field("Título (en inglés)", '<input name="t" value="' + esc(m.title) + '">') +
               field("Descripción (en español)", '<textarea name="d" rows="3">' + esc(m.description) + "</textarea>") +
-              field("Libro principal — URL en Heyzine (opcional)", '<input name="hz" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(m.heyzine_url || "") + '">') +
-              '<p class="pnl-sub" style="margin:-4px 0 0">El estudiante lo ve embebido en "Mis recursos" → este módulo → Libro de estudio. Déjalo vacío si todavía no hay libro para este módulo.</p>' +
-              // Libro complementario (26 sep 2026): por ahora solo se guarda el
-              // enlace; dónde se muestra se decide más adelante. Si la columna
-              // aún no existe en la BD, la casilla se ve deshabilitada.
-              '<div style="margin-top:14px">' + field("Libro complementario (opcional)", '<input name="cb" placeholder="https://heyzine.com/flip-book/xxxxx.html"' +
-                (hasCb ? ' value="' + esc(m.complementary_book_url || "") + '"' : " disabled") + ">") + "</div>" +
-              '<p class="pnl-sub" style="margin:-4px 0 0">' + (hasCb ? "Segundo libro del módulo. Por ahora solo queda guardado; más adelante se mostrará a los estudiantes."
-                : "Esta casilla se activa cuando se aplique la actualización de la base de datos.") + "</p>" +
+              field("Libro de estudio — URL en Heyzine (opcional)", '<input name="hz" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(m.heyzine_url || "") + '">') +
+              '<p class="pnl-sub" style="margin:-4px 0 0">Libro + workbook del módulo. El estudiante lo ve en "Mis recursos" → nivel → este módulo → Libro de estudio. Déjalo vacío si todavía no hay libro. ' +
+              'El libro complementario es de todo el nivel: se carga con el botón "Libros complementarios por nivel".</p>' +
               "</div>");
             modal("Editar módulo " + m.level, b, function () {
               var upd = {
@@ -2640,14 +2633,42 @@
                 description: b.querySelector("[name=d]").value.trim(),
                 heyzine_url: b.querySelector("[name=hz]").value.trim() || null
               };
-              if (hasCb) upd.complementary_book_url = b.querySelector("[name=cb]").value.trim() || null;
               return q("modules").update(upd).eq("id", m.id).then(function (u) { if (u.error) throw u.error; toast("Guardado."); acModulos(box); });
             });
           }));
           t.body.appendChild(tr);
         });
-        box.innerHTML = ""; box.appendChild(t.wrap);
+        box.innerHTML = "";
+        var bar = h('<div class="pnl-toolbar" style="margin-bottom:12px"></div>');
+        bar.appendChild(btn("Libros complementarios por nivel", "btn-ghost", editLevelBooks));
+        box.appendChild(bar);
+        box.appendChild(t.wrap);
       });
+  }
+
+  // Libro complementario: uno por NIVEL (26 sep 2026). El estudiante lo ve en
+  // "Mis recursos" → Libros complementarios cuando tiene pagado cualquier
+  // módulo de ese nivel.
+  function editLevelBooks() {
+    q("level_books").select("level,complementary_book_url").then(function (r) {
+      if (r.error) {
+        toast("Falta aplicar en Supabase la actualización de los libros por nivel (20260926040000_libros_complementarios_por_nivel.sql).", "err");
+        return;
+      }
+      var cur = {};
+      (r.data || []).forEach(function (x) { cur[x.level] = x.complementary_book_url || ""; });
+      var levels = ["A1", "A2", "B1", "B2", "C1"];
+      var b = h("<div>" + '<p class="pnl-sub" style="margin:0 0 12px">Un libro para todo el nivel. El estudiante lo ve en "Mis recursos" → Libros complementarios en cuanto paga cualquier módulo de ese nivel. Déjalo vacío si aún no hay libro.</p>' +
+        levels.map(function (lv) {
+          return field("Nivel " + lv + " — URL en Heyzine", '<input name="' + lv + '" placeholder="https://heyzine.com/flip-book/xxxxx.html" value="' + esc(cur[lv] || "") + '">');
+        }).join("") + "</div>");
+      modal("Libros complementarios por nivel", b, function () {
+        var rows = levels.map(function (lv) {
+          return { level: lv, complementary_book_url: b.querySelector('[name="' + lv + '"]').value.trim() || null, updated_at: new Date().toISOString() };
+        });
+        return q("level_books").upsert(rows).then(function (u) { if (u.error) throw u.error; toast("Libros complementarios guardados."); });
+      });
+    });
   }
 
   function acProfesores(box) {

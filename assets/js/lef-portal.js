@@ -907,7 +907,16 @@
     video: '<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+    books: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    abc: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+    grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
+    headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
+    read: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>'
   };
   // Logo de Google Meet (el de Classroom) para el recuadro de la reunión.
   var MEET_LOGO = '<svg class="meet-card__logo" viewBox="0 0 87.5 72" aria-hidden="true">' +
@@ -1225,88 +1234,190 @@
   }
 
   /* ---------- Mis recursos ---------- */
-  // Navegación en tres niveles dentro de la misma pestaña (sin router): lista
-  // de módulos -> categorías del módulo -> contenido de la categoría. Cada
-  // nivel se pinta encima del anterior y trae su propio botón para volver.
-  var RESOURCE_CATEGORIES = [
-    { id: "libro", label: "Libro de estudio" },
-    { id: "talleres", label: "Talleres" },
-    { id: "interactivos", label: "Recursos interactivos" }
+  // Carpetas dentro de carpetas (pedido del usuario, 26 sep 2026), con la misma
+  // mecánica del Planificador del profesor:
+  //   Mis recursos → niveles (A1…C1) + "Libros complementarios"
+  //   Nivel        → sus módulos
+  //   Módulo       → Libro de estudio · Talleres · Recursos interactivos
+  // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
+  // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
+  // tampoco entrega su libro). El libro complementario es de TODO el nivel y se
+  // abre con cualquier módulo pagado de ese nivel (get_my_level_books).
+  // Talleres e interactivos todavía no tienen contenido: se muestran vacíos.
+  var RS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+  var RS_TALLERES = ["Taller semana 1", "Taller semana 2", "Taller semana 3", "Taller semana 4", "Repaso del módulo"];
+  var RS_INTERACTIVOS = [
+    { label: "Vocabulario", icon: "abc" },
+    { label: "Gramática", icon: "grammar" },
+    { label: "Listening", icon: "headph" },
+    { label: "Reading", icon: "file" }
   ];
 
-  function renderResourceCategory(main, course, cat) {
-    main.innerHTML = "";
-    var back = h('<button type="button" class="resource-back">&larr; ' + esc(course.module_level) + " — " + esc(course.module_title) + "</button>");
-    back.addEventListener("click", function () { renderResourceModule(main, course); });
-    main.appendChild(back);
-    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:14px">' + esc(cat.label) + "</h1>"));
+  function rsModel(rows, books) {
+    var byLevel = {};
+    rows.forEach(function (c) {
+      var code = String(c.module_level || "").split(".")[0];
+      if (RS_LEVELS.indexOf(code) < 0) return;
+      var L = byLevel[code] = byLevel[code] || { code: code, byMod: {} };
+      // Si repitió el módulo, manda la inscripción pagada (vienen de la más reciente a la más antigua).
+      var prev = L.byMod[c.module_level];
+      if (!prev || (!prev.module_paid && c.module_paid)) L.byMod[c.module_level] = c;
+    });
+    var urls = {};
+    (books || []).forEach(function (b) { urls[b.level] = b.complementary_book_url; });
+    var levels = RS_LEVELS.filter(function (k) { return byLevel[k]; }).map(function (k) {
+      var L = byLevel[k];
+      L.mods = Object.keys(L.byMod).sort(function (a, b) { return a.localeCompare(b, "es", { numeric: true }); })
+        .map(function (m) { return L.byMod[m]; });
+      L.open = L.mods.some(function (m) { return m.module_paid; });
+      L.bookUrl = urls[k] || null;
+      return L;
+    });
+    return { levels: levels };
+  }
 
-    if (cat.id === "libro" && course.module_heyzine_url) {
-      var frame = h(
-        '<div class="resource-frame-wrap">' +
-        '<iframe src="' + esc(course.module_heyzine_url) + '" allowfullscreen loading="lazy" title="Libro de estudio — ' + esc(course.module_level) + '"></iframe>' +
-        "</div>"
-      );
-      main.appendChild(frame);
-    } else {
-      main.appendChild(h('<div class="pnl-alert ok">Todavía no hay contenido cargado aquí — LEF lo agregará pronto.</div>'));
+  // Tarjeta de carpeta: color e ícono según lo que contiene.
+  function rsCard(o) {
+    var el = h('<button type="button" class="rs-card is-' + o.tone + (o.locked ? " is-locked" : "") + '">' +
+      '<span class="rs-card__top"><span class="rs-card__ic">' + mcIc(o.icon) + "</span>" +
+      '<span class="rs-card__go" aria-hidden="true">' + mcIc(o.locked ? "lock" : "arrow") + "</span></span>" +
+      '<span class="rs-card__t">' + esc(o.title) + "</span>" +
+      (o.sub ? '<span class="rs-card__s">' + esc(o.sub) + "</span>" : "") +
+      (o.chip ? '<span class="rs-chip is-' + o.chip[0] + '">' + esc(o.chip[1]) + "</span>" : "") +
+      "</button>");
+    el.addEventListener("click", o.onOpen);
+    return el;
+  }
+
+  // Página de una carpeta: ruta (Mis recursos › A1 › A1.1), título y contenido.
+  function rsPage(main, crumbs, title, sub) {
+    main.innerHTML = "";
+    if (crumbs.length) {
+      var nav = h('<nav class="rs-crumbs" aria-label="Ruta"></nav>');
+      crumbs.forEach(function (c) {
+        var a = h('<button type="button" class="rs-crumbs__a">' + esc(c[0]) + "</button>");
+        a.addEventListener("click", c[1]);
+        nav.appendChild(a);
+        nav.appendChild(h('<span class="rs-crumbs__sep" aria-hidden="true">›</span>'));
+      });
+      nav.appendChild(h('<span class="rs-crumbs__here">' + esc(title) + "</span>"));
+      main.appendChild(nav);
+    }
+    main.appendChild(h('<h1 class="pnl-h">' + esc(title) + "</h1>"));
+    if (sub) main.appendChild(h('<p class="pnl-sub">' + esc(sub) + "</p>"));
+    var body = h('<div class="rs-body"></div>');
+    main.appendChild(body);
+    return body;
+  }
+
+  function rsEmpty(title, text) {
+    return h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("folder") + "</span><h2>" + esc(title) + "</h2><p>" + esc(text) + "</p></div>");
+  }
+
+  function rsViewer(body, url, title) {
+    if (!url) { body.appendChild(rsEmpty("Todavía no hay libro aquí", "LEF lo agregará pronto.")); return; }
+    body.appendChild(h('<div class="resource-frame-wrap"><iframe src="' + esc(url) + '" allowfullscreen loading="lazy" title="' + esc(title) + '"></iframe></div>'));
+  }
+
+  function rsRoot(main, M) {
+    var body = rsPage(main, [], "Mis recursos", "Material de estudio de los niveles y módulos que has tomado o estás tomando.");
+    if (!M.levels.length) {
+      body.appendChild(rsEmpty("Aún no tienes recursos", "Cuando empieces tu primer módulo, aquí verás su material."));
+      return;
+    }
+    var grid = h('<div class="rs-grid"></div>');
+    M.levels.forEach(function (L) {
+      var n = L.mods.length;
+      grid.appendChild(rsCard({ tone: "blue", icon: "folder", title: "Nivel " + L.code,
+        sub: n + (n === 1 ? " módulo" : " módulos") + " · " + L.mods.map(function (m) { return m.module_level; }).join(", "),
+        onOpen: function () { rsLevel(main, M, L); } }));
+    });
+    var open = M.levels.filter(function (L) { return L.open; });
+    grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libros complementarios", locked: !open.length,
+      sub: open.length ? "Uno por nivel · " + open.map(function (L) { return L.code; }).join(", ") : "Se abre cuando pagues tu primer módulo.",
+      onOpen: function () { if (open.length) rsComp(main, M); else go("facturacion"); } }));
+    body.appendChild(grid);
+  }
+
+  function rsComp(main, M) {
+    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Libros complementarios",
+      "Un libro para todo el nivel. Se abre con tu primer módulo pagado de ese nivel.");
+    var grid = h('<div class="rs-grid"></div>');
+    M.levels.filter(function (L) { return L.open; }).forEach(function (L) {
+      grid.appendChild(rsCard({ tone: "amber", icon: "books", title: "Libro complementario " + L.code, sub: "Para todo el nivel " + L.code,
+        chip: L.bookUrl ? null : ["soon", "Próximamente"],
+        onOpen: function () {
+          var b = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }], ["Libros complementarios", function () { rsComp(main, M); }]],
+            "Libro complementario " + L.code);
+          rsViewer(b, L.bookUrl, "Libro complementario — " + L.code);
+        } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rsLevel(main, M, L) {
+    var body = rsPage(main, [["Mis recursos", function () { rsRoot(main, M); }]], "Nivel " + L.code, "Elige un módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    L.mods.forEach(function (c) {
+      var locked = !c.module_paid;
+      grid.appendChild(rsCard({ tone: "blue", icon: "folder", title: c.module_level, sub: c.module_title, locked: locked,
+        chip: locked ? ["warn", "Pendiente de pago"] : c.enrollment_status === "Completed" ? ["done", "Culminado"] : ["ok", "En curso"],
+        onOpen: function () { if (locked) go("facturacion"); else rsModule(main, M, L, c); } }));
+    });
+    body.appendChild(grid);
+    if (L.mods.some(function (c) { return !c.module_paid; })) {
+      body.appendChild(h('<p class="rs-note">' + mcIc("lock") + "<span>El módulo con candado se abre cuando pagues su mensualidad.</span></p>"));
     }
   }
 
-  function renderResourceModule(main, course) {
-    main.innerHTML = "";
-    var back = h('<button type="button" class="resource-back">&larr; Mis recursos</button>');
-    back.addEventListener("click", function () { renderResources(main); });
-    main.appendChild(back);
-    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">' + esc(course.module_level) + " — " + esc(course.module_title) + "</h1>"));
-    main.appendChild(h('<p class="pnl-sub">Elige qué quieres ver.</p>'));
+  function rsModule(main, M, L, c) {
+    var crumbs = [["Mis recursos", function () { rsRoot(main, M); }], ["Nivel " + L.code, function () { rsLevel(main, M, L); }]];
+    var name = c.module_level + " — " + c.module_title;
+    var body = rsPage(main, crumbs, name, "Elige qué quieres ver.");
+    var inner = crumbs.concat([[c.module_level, function () { rsModule(main, M, L, c); }]]);
+    var grid = h('<div class="rs-grid"></div>');
+    grid.appendChild(rsCard({ tone: "ink", icon: "read", title: "Libro de estudio", sub: "Libro + workbook",
+      chip: c.module_heyzine_url ? null : ["soon", "Próximamente"],
+      onOpen: function () { rsViewer(rsPage(main, inner, "Libro de estudio"), c.module_heyzine_url, "Libro de estudio — " + c.module_level); } }));
+    grid.appendChild(rsCard({ tone: "violet", icon: "pencil", title: "Talleres", sub: "4 semanas + repaso del módulo",
+      onOpen: function () { rsTalleres(rsPage(main, inner, "Talleres", "Un taller por semana y el repaso del módulo.")); } }));
+    grid.appendChild(rsCard({ tone: "green", icon: "spark", title: "Recursos interactivos", sub: "Vocabulario, gramática, listening y reading",
+      onOpen: function () { rsInteractivos(main, inner); } }));
+    body.appendChild(grid);
+  }
 
-    RESOURCE_CATEGORIES.forEach(function (cat) {
-      var row = h(
-        '<div class="resource-row" tabindex="0" role="button">' +
-        "<span>" + esc(cat.label) + "</span>" +
-        '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span>' +
-        "</div>"
-      );
-      row.addEventListener("click", function () { renderResourceCategory(main, course, cat); });
-      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
-      main.appendChild(row);
+  function rsTalleres(body) {
+    var list = h('<div class="rs-files"></div>');
+    RS_TALLERES.forEach(function (t, i) {
+      list.appendChild(h('<div class="rs-file is-violet"><span class="rs-file__ic">' + mcIc("file") + "</span>" +
+        '<span class="rs-file__t">' + esc(t) + '<small>' + (i < 4 ? "Semana " + (i + 1) + " del módulo" : "Al final del módulo") + "</small></span>" +
+        '<span class="rs-chip is-soon">Próximamente</span></div>'));
     });
+    body.appendChild(list);
+  }
+
+  function rsInteractivos(main, crumbs) {
+    var body = rsPage(main, crumbs, "Recursos interactivos", "Actividades para practicar a tu ritmo.");
+    var here = crumbs.concat([["Recursos interactivos", function () { rsInteractivos(main, crumbs); }]]);
+    var grid = h('<div class="rs-grid"></div>');
+    RS_INTERACTIVOS.forEach(function (it) {
+      grid.appendChild(rsCard({ tone: "green", icon: it.icon, title: it.label, chip: ["soon", "Próximamente"],
+        onOpen: function () {
+          rsPage(main, here, it.label).appendChild(rsEmpty("Todavía no hay actividades aquí", "LEF las agregará pronto."));
+        } }));
+    });
+    body.appendChild(grid);
   }
 
   function renderResources(main) {
-    sb.rpc("get_my_course").then(function (r) {
-      if (r.error) throw r.error;
-      // El acceso lo decide el pago (module_paid, calculado en la base de datos),
-      // no la etiqueta de estado: sin pago, el módulo sale bloqueado y lleva a
-      // Facturación — la base de datos tampoco entrega el enlace del libro.
-      var rows = (r.data || []);
-      main.innerHTML = '<h1 class="pnl-h">Mis recursos</h1><p class="pnl-sub">Material de estudio de los cursos que has tomado o estás tomando.</p>';
-
-      if (!rows.length) {
-        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes un curso activo o culminado. Cuando empieces uno, aquí verás su material.</div>'));
-        return;
-      }
-
-      rows.forEach(function (c) {
-        var locked = !c.module_paid;
-        var tag = locked ? " · pendiente de pago" : c.enrollment_status === "Completed" ? " · culminado" : "";
-        var row = h(
-          '<div class="resource-row' + (locked ? " resource-row--locked" : "") + '" tabindex="0" role="button">' +
-          '<div><div class="lvl-tag" style="margin-bottom:2px">' + esc(c.module_level) + "</div>" +
-          '<span style="font-size:13.5px;color:var(--grafito)">' + esc(c.module_title + tag) + "</span>" +
-          (locked ? '<div class="muted" style="font-size:12.5px;margin-top:2px">El libro y los recursos se activan cuando pagues tu mensualidad.</div>' : "") +
-          "</div>" +
-          '<span class="resource-row__chevron" aria-hidden="true">' + (locked ? "🔒" : "&rsaquo;") + "</span>" +
-          "</div>"
-        );
-        row.addEventListener("click", function () {
-          if (locked) location.hash = "facturacion";
-          else renderResourceModule(main, c);
-        });
-        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
-        main.appendChild(row);
-      });
+    main.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([
+      sb.rpc("get_my_course"),
+      // Si la base de datos aún no tiene los libros por nivel, la carpeta sale igual, sin libro.
+      sb.rpc("get_my_level_books").then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; })
+    ]).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      rsRoot(main, rsModel(res[0].data || [], res[1]));
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tus recursos: ' + esc(e.message) + "</div>";
     });

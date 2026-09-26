@@ -1075,3 +1075,59 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(46,78,158,.12)
 .lcal-note.is-holiday small{margin-top:6px;font-size:12.5px;color:#7c2d12;}
 .lcal-desc.is-holiday{background:#fff6f0;border-color:#fed7c3;}
 .lcal-desc.is-holiday .lcal-ic{color:#c2410c;}
+/* ---- Mis recursos (portal, 26 sep 2026): carpetas como tarjetas flotantes.
+   Color + ícono por tipo: nivel/módulo azul, libro negro, talleres violeta,
+   interactivos verde, libros complementarios ámbar. ---- */
+.rs-crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;margin-bottom:10px;font-size:13.5px;}
+.rs-crumbs__a{all:unset;cursor:pointer;color:var(--azul);font-weight:600;}
+.rs-crumbs__a:hover{text-decoration:underline;}
+.rs-crumbs__sep{color:var(--plata);}
+.rs-crumbs__here{color:var(--grafito);}
+.rs-body{margin-top:18px;}
+.rs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:14px;}
+.rs-card{min-width:0;}
+.rs-card{--c:var(--azul);--cbg:#eaf0fb;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;gap:4px;
+  text-align:left;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--niebla);border-radius:16px;
+  padding:18px 18px 16px;box-shadow:var(--card-shadow);cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;}
+.rs-card::before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:var(--c);opacity:.85;}
+.rs-card:hover,.rs-card:focus-visible{transform:translateY(-2px);box-shadow:var(--card-shadow-hover);border-color:#dcdcd8;outline:none;}
+.rs-card:focus-visible{border-color:var(--c);}
+.rs-card__top{display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:10px;}
+.rs-card__ic{width:46px;height:46px;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;background:var(--cbg);color:var(--c);}
+.rs-card__ic .mc-ic{width:23px;height:23px;}
+.rs-card__go{color:var(--plata);transition:color .15s,transform .15s;}
+.rs-card__go .mc-ic{width:18px;height:18px;}
+.rs-card:hover .rs-card__go{color:var(--c);transform:translateX(2px);}
+.rs-card__t{font-size:17px;font-weight:600;line-height:1.25;}
+.rs-card__s{font-size:13px;color:var(--grafito);line-height:1.4;}
+.rs-card .rs-chip{margin-top:8px;}
+.rs-card.is-blue{--c:var(--azul);--cbg:#eaf0fb;}
+.rs-card.is-ink{--c:var(--ink);--cbg:#efefec;}
+.rs-card.is-violet{--c:#5b4bc4;--cbg:#efedfd;}
+.rs-card.is-green{--c:#1f7a5a;--cbg:#e3f4ec;}
+.rs-card.is-amber{--c:#b26a00;--cbg:#fdf1dc;}
+.rs-card.is-locked{background:#fafaf8;--c:#b5b5b1;--cbg:#efefec;}
+.rs-card.is-locked .rs-card__t{color:var(--grafito);}
+.rs-card.is-locked:hover .rs-card__go{transform:none;}
+.rs-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;}
+.rs-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
+.rs-chip.is-ok{background:var(--ok-bg);color:var(--ok);}
+.rs-chip.is-done{background:#eaf0fb;color:var(--azul);}
+.rs-chip.is-warn{background:var(--warn-bg);color:var(--warn);}
+.rs-chip.is-soon{background:#f1f1ee;color:var(--grafito);}
+.rs-note{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;color:var(--grafito);}
+.rs-note .mc-ic{width:15px;height:15px;flex:none;}
+.rs-files{display:flex;flex-direction:column;gap:10px;}
+.rs-file{--c:#5b4bc4;--cbg:#efedfd;display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;background:#fff;border:1px solid var(--niebla);border-radius:14px;
+  padding:14px 16px;box-shadow:var(--card-shadow);border-left:4px solid var(--c);}
+.rs-file__ic{flex:none;width:40px;height:40px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;background:var(--cbg);color:var(--c);}
+.rs-file__ic .mc-ic{width:20px;height:20px;}
+.rs-file__t{flex:1;min-width:0;display:flex;flex-direction:column;font-weight:600;font-size:15px;}
+.rs-file__t small{font-weight:400;font-size:12.5px;color:var(--grafito);}
+@media(max-width:520px){
+  .rs-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .rs-card{padding:14px 14px 13px;}
+  .rs-card__ic{width:40px;height:40px;border-radius:11px;}
+  .rs-card__t{font-size:15.5px;}
+  .rs-card__s{font-size:12.5px;}
+}
