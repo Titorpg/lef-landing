@@ -1115,8 +1115,8 @@
     var suggested = curEnr ? null : suggestNextModule(mods, completed, modById);
     var note = curEnr
       ? (curEnr.status === "Active"
-        ? "Si eliges otro módulo, el actual (" + (curEnr.modules ? curEnr.modules.level : "") + ", ya pagado) queda como <strong>completado</strong> y se crea la inscripción nueva pendiente de pago."
-        : "Si eliges otro módulo, la inscripción pendiente de pago se cambia a ese módulo (si tenía grupo asignado, se libera).")
+        ? "Si eliges otro módulo, el actual (" + (curEnr.modules ? curEnr.modules.level : "") + ", ya pagado) queda como <strong>completado</strong> y se crea la inscripción nueva pendiente de pago, con su mensualidad en Pagos (a nombre del mismo pagador de la anterior)."
+        : "Si eliges otro módulo, la inscripción pendiente de pago y su mensualidad se cambian a ese módulo (si tenía grupo asignado, se libera).")
       : (s ? "Hoy no tiene módulo en curso. Elige el siguiente para inscribirlo" + (suggested ? " (el sugerido es el que sigue a lo que ya cursó)" : "") + ", o déjalo sin módulo." : "");
     var b = h("<div>" +
       field("Nombre completo del estudiante", '<input name="n" value="' + esc(s ? s.full_name : "") + '">') +

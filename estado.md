@@ -2,6 +2,13 @@
 
 ## 📌 PENDIENTES VIGENTES (actualizado 25 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
+### ⚠️ Aplicar en Supabase (SQL Editor) — cobro al asignar módulo (26 sep)
+- `supabase/migrations/20260926020000_cobro_al_asignar_modulo.sql`: Estudiantes → Editar → módulo
+  ahora crea también la mensualidad (antes solo la inscripción: caso "Liam", pago pendiente sin
+  nada en Facturación). "Generar pago" ya no duplica. Al aplicarlo, las inscripciones pendientes
+  sin mensualidad reciben la suya (pagador = el de su última mensualidad o el estudiante).
+  Probado en Postgres local.
+
 ### ⚠️ Aplicar en Supabase (SQL Editor) — libro complementario (26 sep)
 - `supabase/migrations/20260926010000_libro_complementario.sql`: columna `modules.complementary_book_url`.
   Hasta aplicarlo, la casilla "Libro complementario" de Académico → Módulos → Editar sale deshabilitada.
