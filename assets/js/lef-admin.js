@@ -2666,7 +2666,7 @@
     var box = h('<div><p class="muted">Cargando…</p></div>');
     modal("Grupos activos — " + t.full_name, box, null, "Cerrar", false, true);
     Promise.all([
-      q("groups").select("*,modules(level,title),schedules(days,start_time,end_time,cycles(name,status))")
+      q("groups").select("*,modules(level,title),schedules(days,start_time,end_time,cycles(name,status,start_date,end_date))")
         .eq("teacher_id", t.id).eq("active", true).order("created_at", { ascending: false }),
       q("enrollments").select("group_id,students(full_name)").not("status", "in", "(Cancelled,Completed)")
     ]).then(function (res) {
@@ -2685,7 +2685,7 @@
         box.appendChild(h(
           '<div class="pnl-table-wrap" style="padding:14px 16px;margin-bottom:12px">' +
           '<p style="font-weight:600;margin-bottom:6px">' + esc(g.modules ? g.modules.level + " · " + g.modules.title : "—") + '</p>' +
-          '<p class="pnl-sub" style="margin-bottom:4px">Ciclo: ' + esc(sc && sc.cycles ? sc.cycles.name : "—") + '</p>' +
+          '<p class="pnl-sub" style="margin-bottom:4px">Ciclo: ' + esc(sc ? cycleDates(sc.cycles) : "—") + '</p>' +
           '<p class="pnl-sub" style="margin-bottom:4px">Horario: ' + esc(sc ? days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time) : "—") + '</p>' +
           '<p class="pnl-sub" style="margin-bottom:4px">Cupo: ' + est.length + "/" + g.capacity + '</p>' +
           '<p class="pnl-sub">Estudiantes: ' + (est.length ? esc(est.join(", ")) : "—") + "</p>" +
@@ -2696,6 +2696,15 @@
   }
 
   /* ---- Ciclos ---- */
+  // Fechas exactas del ciclo ("29 Sep – 29 Oct 2026"): el nombre ("Sep-Oct 2026")
+  // no distingue dos ciclos que empiezan y terminan en los mismos meses.
+  function cycleDates(c) {
+    if (!c) return "—";
+    if (!c.start_date || !c.end_date) return c.name || "—";
+    var s = c.start_date.split("-"), e = c.end_date.split("-");
+    var ini = (+s[2]) + " " + MONTHS_ABBR[+s[1] - 1], fin = (+e[2]) + " " + MONTHS_ABBR[+e[1] - 1] + " " + e[0];
+    return (s[0] === e[0] ? ini : ini + " " + s[0]) + " – " + fin;
+  }
   function periodLabel(sVal, eVal) {
     if (!sVal || !eVal) return "";
     var s = sVal.split("-"), e = eVal.split("-");
@@ -2772,7 +2781,7 @@
         }));
         cell.appendChild(btn("Finalizar ahora", "btn-ghost", function () {
           var b = h("<div>" +
-            '<p class="pnl-sub" style="margin-bottom:8px">Vas a cerrar el ciclo <strong>' + esc(c.name) + "</strong> antes de su fecha de fin (" + date(c.end_date) + ").</p>" +
+            '<p class="pnl-sub" style="margin-bottom:8px">Vas a cerrar el ciclo <strong>' + esc(cycleDates(c)) + "</strong> antes de su fecha de fin (" + date(c.end_date) + ").</p>" +
             '<p class="pnl-sub" style="margin-bottom:10px">Los estudiantes activos quedan con su módulo <strong>completado</strong>, los pendientes de pago quedan con la inscripción cancelada, todos quedan sin módulo, y se <strong>eliminan</strong> los grupos, los horarios y el ciclo. No se puede deshacer.</p>' +
             field("Escribe FINALIZAR para confirmar", '<input name="confirm" autocomplete="off" placeholder="FINALIZAR">') +
             "</div>");
@@ -2837,7 +2846,7 @@
   function groupDesc(g) {
     var s = g.schedules;
     return (g.modules ? g.modules.level : "Grupo") + " · " + days(s.days) + " " + time(s.start_time) + "–" + time(s.end_time) +
-      (s.cycles && s.cycles.name ? " (ciclo " + s.cycles.name + ")" : "");
+      (s.cycles ? " (ciclo " + cycleDates(s.cycles) + ")" : "");
   }
   // Aviso en líneas de texto (sirve para el recuadro del modal y para errores).
   // extra: líneas propias de cada pantalla (qué hacer para seguir).
@@ -2860,7 +2869,7 @@
   function acHorarios(box) {
     box.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
-      q("schedules").select("*,cycles(name,status),modules(level,title,active)").order("created_at", { ascending: false }),
+      q("schedules").select("*,cycles(name,status,start_date,end_date),modules(level,title,active)").order("created_at", { ascending: false }),
       q("cycles").select("id,name,status,start_date,end_date"), activeModules(),
       q("groups").select(GROUP_CONFLICT_SELECT)
     ]).then(function (res) {
@@ -2887,7 +2896,7 @@
       box.appendChild(add);
       add.querySelector("button").onclick = function () {
         var b = h("<div>" +
-          field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
+          field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '">' + esc(cycleDates(c)) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
           field("Módulo", moduleSelect("m", modules, modules[0] && modules[0].id)) +
           field("Días", '<div>' + DOW.map(function (d) { return '<label style="display:inline-flex;gap:4px;margin:0 8px 6px 0;font-size:13px"><input type="checkbox" style="width:auto" value="' + d + '">' + DAY_ES[d] + "</label>"; }).join("") + "</div>") +
           field("Hora inicio", '<input name="s" type="time" value="18:00">') + field("Hora fin", '<input name="e" type="time" value="19:00">') + "</div>");
@@ -2905,7 +2914,7 @@
         var modTxt = s.modules ? s.modules.level + " · " + s.modules.title + (s.modules.active ? "" : " (módulo inactivo)") : "—";
         var estadoTxt = s.active ? '<span class="badge ok">activo</span>'
           : '<span class="badge neutral">inactivo' + (s.deactivated_by_module ? " · por módulo" : "") + "</span>";
-        var tr = h("<tr><td>" + esc(s.cycles ? s.cycles.name : "—") + "</td><td>" + esc(modTxt) +
+        var tr = h("<tr><td style=\"white-space:nowrap\">" + esc(cycleDates(s.cycles)) + "</td><td>" + esc(modTxt) +
           "</td><td>" + esc(days(s.days)) + "</td><td>" + esc(time(s.start_time) + "–" + time(s.end_time)) +
           "</td><td>" + estadoTxt +
           '</td><td class="acts"></td></tr>');
@@ -2920,7 +2929,7 @@
         }));
         cell.appendChild(btn("Editar", "btn-ghost", function () {
           var b = h("<div>" +
-            field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '"' + (c.id === s.cycle_id ? " selected" : "") + ">" + esc(c.name) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
+            field("Ciclo", '<select name="c">' + cycles.map(function (c) { return '<option value="' + c.id + '"' + (c.id === s.cycle_id ? " selected" : "") + ">" + esc(cycleDates(c)) + (c.status !== "Open" ? " (cerrado)" : "") + "</option>"; }).join("") + "</select>") +
             field("Módulo", moduleSelect("m", modules, s.module_id)) +
             field("Días", '<div>' + DOW.map(function (d) { return '<label style="display:inline-flex;gap:4px;margin:0 8px 6px 0;font-size:13px"><input type="checkbox" style="width:auto" value="' + d + '"' + ((s.days || []).indexOf(d) !== -1 ? " checked" : "") + ">" + DAY_ES[d] + "</label>"; }).join("") + "</div>") +
             field("Hora inicio", '<input name="s" type="time" value="' + esc((s.start_time || "").slice(0, 5)) + '">') + field("Hora fin", '<input name="e" type="time" value="' + esc((s.end_time || "").slice(0, 5)) + '">') + "</div>");
@@ -2980,7 +2989,7 @@
         }
         var b = h("<div>" +
           field("Horario", '<select name="s">' + openScheds.map(function (s) {
-            return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time) + "–" + time(s.end_time)) + "</option>";
+            return '<option value="' + s.id + '" data-mod="' + s.module_id + '">' + esc((s.modules ? s.modules.level : "") + " · " + days(s.days) + " " + time(s.start_time) + "–" + time(s.end_time) + " · ciclo " + cycleDates(s.cycles)) + "</option>";
           }).join("") + "</select>") +
           field("Profesor", '<select name="t">' + teachers.map(function (t) { return '<option value="' + t.id + '">' + esc(t.full_name) + "</option>"; }).join("") + "</select>") +
           field("Cupo", '<input name="c" type="number" min="1" max="8" value="8">') +
@@ -3030,7 +3039,7 @@
         var sc = g.schedules;
         var estadoTxt = g.active ? '<span class="badge ok">activo</span>'
           : '<span class="badge neutral">inactivo' + (g.deactivated_by_module ? " · por módulo" : "") + "</span>";
-        var tr = h("<tr><td>" + esc(g.modules ? g.modules.level + " · " + g.modules.title : "—") + "</td><td>" + esc(sc && sc.cycles ? sc.cycles.name : "—") +
+        var tr = h("<tr><td>" + esc(g.modules ? g.modules.level + " · " + g.modules.title : "—") + "</td><td style=\"white-space:nowrap\">" + esc(sc ? cycleDates(sc.cycles) : "—") +
           "</td><td>" + esc(sc ? days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time) : "—") + "</td><td>" + esc(g.teachers ? g.teachers.full_name : "—") +
           "</td><td>" + g.capacity + '</td><td style="font-weight:600">' + (counts[g.id] || 0) + "</td><td>" + estadoTxt +
           '</td><td class="acts"></td></tr>');

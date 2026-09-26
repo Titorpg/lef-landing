@@ -1070,3 +1070,8 @@ input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px rgba(46,78,158,.12)
   .mk-form{grid-template-columns:1fr;gap:0;}
   .meet-edit__row{flex-direction:column;}
 }
+/* Botón de WhatsApp (mismo de la página pública: verde con el ícono en blanco) */
+.btn-whatsapp{background:#25D366;color:#fff;border-color:#25D366;padding:12px 22px;font-size:15px;border-radius:999px;text-decoration:none;
+  box-shadow:0 8px 18px rgba(37,211,102,.3);}
+.btn-whatsapp:hover{background:#1fbe5b;box-shadow:0 12px 24px rgba(37,211,102,.4);}
+.btn-whatsapp img.icn-inline{width:20px;height:20px;flex:none;filter:brightness(0) invert(1);}

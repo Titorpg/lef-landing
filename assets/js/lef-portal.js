@@ -348,9 +348,9 @@
 
       // 5) Contacto
       main.appendChild(h(
-        '<div class="home-help"><div><strong>¿Tienes dudas sobre tus clases o tus pagos?</strong>' +
-        '<p class="muted" style="font-size:13.5px;margin-top:2px">Escríbenos por WhatsApp y te respondemos lo antes posible.</p></div>' +
-        '<a class="btn btn-dark btn-sm" target="_blank" rel="noopener" href="https://wa.me/' + WHATSAPP_NUMBER + '">Escribir a LEF</a></div>'
+        '<div class="home-help"><strong>¿Tienes dudas sobre tus clases o tus pagos?</strong>' +
+        '<a class="btn btn-whatsapp" target="_blank" rel="noopener" href="https://wa.me/' + WHATSAPP_NUMBER + '">' +
+        '<img src="assets/icon-whatsapp-black.png" alt="" class="icn-inline">Escríbenos por WhatsApp</a></div>'
       ));
     }).catch(function (e) {
       main.innerHTML = '<div class="pnl-alert err">No pudimos cargar tu inicio: ' + esc((e && e.message) || e) + "</div>";
