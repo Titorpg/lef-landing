@@ -1,100 +1,74 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (actualizado 26 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (cierre 26 sep 2026, noche — esta lista manda sobre notas viejas de abajo)
 
-### ✅ Resuelto 26 sep — sin botón "Unirme a la clase" (Mi curso)
-- El usuario probó con un estudiante que NO está en la clase de Classroom: ve la agenda
-  y entra al Meet sin problema. Se quitó de Mi curso el botón "Unirme a la clase", el
-  código para copiar y "✓ Ya estás en la clase"; la tarjeta ("Tu clase") queda con
-  módulo, profesor, horario y el botón "Clase de hoy". Los mensajes de estado ya no
-  piden el código de la clase. (La acción `info` de `student-classroom` queda sin uso.)
+### Lo siguiente (el usuario lo explica por partes y confirma cada una)
+- **Recursos compartidos → próxima parte**: "Otros recursos" u otra sección que el usuario
+  describa. Mismo patrón que las partes hechas (carpetas nivel → módulo, "Atrás", capturas
+  antes/después para aprobar, SQL que pega el usuario).
 
-### SQL — confirmar
-- `20260926040000_libros_complementarios_por_nivel.sql` (tabla `level_books` +
-  `get_my_level_books()`, sin A1): APLICADO por el usuario el 26 sep, sin errores.
-- `20260926010000_libro_complementario.sql` (columna `modules.complementary_book_url`):
-  YA NO HACE FALTA — el libro complementario pasó a ser por nivel; la columna queda sin uso.
-- Aplicados 26 sep (confirmados por el usuario): festivos, cobro al asignar módulo,
-  cambio de módulo por error, libros complementarios por nivel. (Claude no puede leer producción para verificarlo.)
+### Pendiente del usuario (probar / subir)
+- **Subir el taller de A1.1 semana 1** en Recursos compartidos → Talleres → A1 → A1.1 →
+  Taller semana 1 → "Crear taller" con su HTML (debe salir "Taller interactivo"). Hasta
+  entonces el estudiante ve "Próximamente" (el SQL de talleres ya está aplicado).
+  → Cuando confirme que lo ve un estudiante con A1.1 pagado: **borrar la versión vieja**
+  (`npx supabase functions delete student-taller --project-ref cemrxcatbxbcipxmsnjf`,
+  carpeta `supabase/functions/student-taller`, su bloque en `supabase/config.toml`, y en
+  lef-portal.js `RS_TALLER_READY`, `rsTallerOpen` y la rama `legacy` de `rsTalleres`).
+- **Ver con un profesor** el ícono de nivel (globo A1…C1) en el Planificador y en Recursos de
+  la clase → Libro de trabajo (no se pudo maquetar: depende del Google del profesor).
+- **Probar con un estudiante con módulo pagado**: Libro de estudio con título, Libros
+  complementarios (A1 incluido), Talleres y Ejercicios por habilidad (abrir un PDF y un
+  Word para confirmar el visor de Office con el enlace firmado).
+- **Libros Heyzine**: cargados A1.1 → B1.1. Faltan **B1.2, B1.3, B2.1, B2.2, B2.3, C1.1,
+  C1.2, C1.3** → ahora se cargan en Recursos compartidos → Libros → Libros principales.
 
-### ✅ Hecho 26 sep — Mis recursos por carpetas (aprobado con capturas)
-- Mis recursos → carpetas de nivel (solo los niveles del estudiante); DENTRO de cada nivel
-  la carpeta "Libros complementarios" junto a sus módulos (corregido 26 sep; antes iba al
-  mismo nivel que A1…C1; un libro por nivel SOLO para A2, B1, B2 y C1
-  — el A1 NO tiene, y un estudiante solo de A1 no ve la carpeta; se abre con cualquier
-  módulo pagado del nivel) → módulos del nivel (candado si no está pagado) → Libro de
-  estudio (libro + workbook, `heyzine_url`) · Talleres (semana 1–4 + Repaso) · Recursos
-  interactivos (Vocabulario, Gramática, Listening, Reading).
-- **Botón "Atrás"** (26 sep, pedido del usuario): barra fija bajo el encabezado con "Atrás"
-  (vuelve UNA carpeta) + la ruta, en Mis recursos (estudiante) y en el Planificador
-  (profesor). Clase CSS `.fold-bar` / `.fold-back`.
-- Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
-  módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
+### SQL — todo lo del 26 sep está aplicado
+- Festivos, cobro al asignar módulo, cambio de módulo por error, libros complementarios por
+  nivel (level_books, ya reemplazado), Recursos compartidos: libros (`20260926050000`),
+  talleres (`20260926060000`, tabla verificada), ejercicios (`20260926070000`, tabla
+  verificada) y libro complementario A1 (`20260926080000`).
+- `20260926010000_libro_complementario.sql` (modules.complementary_book_url) NUNCA se
+  aplicó y ya NO hace falta. `level_books` y `get_my_level_books()` quedan sin uso (el portal
+  solo los usa si falla `get_my_complementary_books`); se pueden borrar más adelante.
 
-### ⚠ CAMBIO 26 sep (tarde): el A1 SÍ lleva libros complementarios (antes no). Habilitado en
-  portal (RS_BOOK_LEVELS) y admin (RC_BOOK_LEVELS). SQL `20260926080000_libro_complementario_a1.sql`
-  (constraint + orden) APLICADO por el usuario (26 sep). Notas de abajo que digan "el A1 no tiene" quedan viejas.
-
-### ✅ Hecho 26 sep — Recursos compartidos de las clases (parte 1: Libros)
-- Pestaña nueva del admin "Recursos compartidos de las clases" (se construye POR PARTES,
-  el usuario explica cada una y confirma). Parte 1 = **Libros**:
-  Libros → Libros principales → nivel → módulo (título opcional + link, Editar; libro
-  desplegado abajo; `modules.heyzine_url` + `modules.book_title`) · Libros complementarios
-  → A2/B1/B2/C1 → VARIOS con título + link (Agregar, Editar, Eliminar;
-  `level_complementary_books`). Académico → Módulos → Editar ya no tiene libros.
-- Portal: Libros complementarios del nivel muestra todos con su título
-  (`get_my_complementary_books`; si falta el SQL, usa el libro único de level_books).
-- SQL `20260926050000_recursos_compartidos_libros.sql`: APLICADO por el usuario (26 sep, "Listo").
-- **Parte 2 = Talleres** (26 sep): Talleres → A1…C1 (NO existe C2) → módulo → Taller semana
-  1–4 / Repaso (slot 1–5) → "Crear taller" (título + archivo HTML/PDF/Word/PPT/Excel ≤20 MB),
-  Ver / Editar (título, reemplazar archivo) / Eliminar. Archivos en bucket PRIVADO `talleres`
-  (<módulo>/<slot>/<archivo>), fila en `workshops`. HTML con la plantilla LEF ("const TALLER
-  = {…}") → `LEFTaller.extract` (assets/js/lef-taller.js, iframe sandbox) lo guarda como
-  `content` y se ve con el diseño LEF; otro HTML tal cual (iframe sandbox); PDF visor del
-  navegador; Office → visor de Microsoft (enlace firmado 1 h). Estudiante: solo módulo pagado
-  (`lef_my_paid_module` en RLS de tabla y bucket). Portal: si falta el SQL, usa la lista fija.
-- **SQL `20260926060000_recursos_compartidos_talleres.sql`**: pasado al usuario, SIN confirmar.
-- **Pendiente tras el SQL**: el usuario debe subir el HTML de A1.1 semana 1 en su carpeta (el
-  estudiante deja de verlo hasta entonces). Luego: borrar la función `student-taller`
-  (`npx supabase functions delete student-taller --project-ref cemrxcatbxbcipxmsnjf`), su
-  carpeta y RS_TALLER_READY / rsTallerOpen del portal.
-- **Molde de talleres** (26 sep): `assets/plantillas/taller-molde-lef.html` (el taller del usuario
-  con modulo/tiempo/mensajes dentro del bloque TALLER) + `instrucciones-taller.txt` (pasos y texto
-  para pedírselo a una IA). Enlaces en "Crear taller". Decisión: todos los talleres con el molde;
-  conversión automática con IA (opción B) queda para después si llegan HTML de otras fuentes.
-- **Parte 3 = Ejercicios por habilidad** (26 sep; antes "Recursos interactivos", renombrado
-  también en el portal y en Recursos de la clase del profesor): → A1…C1 → módulo →
-  Vocabulario / Gramática / Listening / Reading (título con la cantidad, ej. "Vocabulario (3)")
-  → "Crear actividad" (varias). Tabla `skill_activities` (columna skill), bucket privado
-  `ejercicios` (<módulo>/<habilidad>/<archivo>), mismo molde y visor (lef-taller.js).
-  Estudiante: módulo → Ejercicios por habilidad → 4 carpetas con cantidad → tarjetas → ejercicio.
-- SQL `20260926070000_recursos_compartidos_ejercicios.sql`: APLICADO (26 sep; la tabla responde en producción).
-- Ícono de nivel (globo A1…C1) también en el Planificador (niveles y módulos) y en Recursos de
-  la clase → Libro de trabajo (profesor). Sin maqueta: falta que el usuario lo vea con un profesor.
-- Siguientes partes (las contará el usuario): otros recursos.
-
-### ✅ Hecho 26 sep — Talleres interactivos dentro del portal
-- **A1.1 · Taller semana 1** publicado (aprobado con capturas). El HTML del usuario se
-  pasó a contenido (`supabase/functions/student-taller/talleres/A1.1-semana-1.json`) y el
-  portal lo dibuja con su diseño (motor `rsTallerRender` en lef-portal.js, misma lógica:
-  opción/escribir, revisar por parte, ✓/✗ con explicación, reintentar, progreso, puntaje
-  final con 3 mensajes). NO guarda respuestas ni puntaje (igual que el original).
-- **Solo quien pagó el módulo**: la función `student-taller` (verify_jwt) entrega el
-  contenido tras comprobar con get_my_course() que ese módulo está pagado. Nada público.
-- **Agregar otro taller**: pasar el HTML a .json (bloque TALLER + level, week, duration,
-  messages high/mid/low) en esa carpeta + import y clave "módulo/n" en index.ts de la
-  función (n: 1–4 semanas, 5 repaso) + número en RS_TALLER_READY (lef-portal.js) →
-  `npx supabase functions deploy student-taller --project-ref cemrxcatbxbcipxmsnjf` y Vercel.
-- Probado en producción: sin sesión / sin usuario / taller inexistente → rechaza. Falta
-  que el usuario lo abra con un estudiante que tenga A1.1 pagado.
-
-### Pendiente del usuario: resto de Talleres e Interactivos
-- **Talleres**: HTML interactivos ya hechos (solo texto). Por ahora los sube Claude desde
-  aquí; la idea es que cada profesor suba los suyos, o si son iguales para todos, un solo
-  sitio para todos. NO definido → hoy salen "Próximamente". Ojo: archivos en el repo =
-  públicos; si deben ser solo para quien pagó, ir a Storage privado de Supabase.
-- **Recursos interactivos**: contenido sin definir (el mapa dice 3 vocab, 3 gramática,
-  2 listening, 2 reading) → hoy vacíos, "Próximamente".
+### ✅ Hecho el 26 sep (resumen; el detalle está en git log)
+- **Mi curso**: sin botón "Unirme a la clase" ni código de Classroom (el estudiante ve agenda
+  y Meet sin estar en la clase; probado por el usuario). Enlaces de Meet de todas las clases
+  cargados en otra sesión (datos, no código): los profesores ya no los pegan.
+- **Mis recursos (estudiante)** por carpetas: niveles del estudiante → dentro de cada nivel
+  "Libros complementarios" (TODOS los niveles, A1 incluido desde la tarde del 26 sep; varios
+  libros con título; se abre con cualquier módulo pagado del nivel) + sus módulos (candado
+  si no está pagado) → Libro de estudio (título del libro) · Talleres (semana 1–4 + Repaso) ·
+  Ejercicios por habilidad (Vocabulario / Gramática / Listening / Reading con cantidad).
+- **Botón "Atrás"** fijo (vuelve una carpeta) + ruta, en Mis recursos, Planificador y
+  Recursos compartidos (`.fold-bar` / `.fold-back`).
+- **Ícono de nivel**: globo de conversación con el nivel (A1…C1) y destellos dorados, fondo
+  arena y franja dorada (`tone: "lvl"`, `lvlIc()`), en todas las carpetas de nivel y módulo
+  (portal, Recursos compartidos, Planificador, Recursos de la clase).
+- **Pestaña "Recursos compartidos"** (admin): 
+  1. **Libros** → Libros principales (nivel → módulo: título opcional + link, Editar;
+     `modules.heyzine_url` + `modules.book_title`) · Libros complementarios (A1…C1: varios
+     con título + link; Agregar / Editar / Eliminar; `level_complementary_books`).
+     Académico → Módulos → Editar ya no tiene libros.
+  2. **Talleres** → A1…C1 (NO existe C2) → módulo → semana 1–4 / Repaso → "Crear taller"
+     (título + HTML/PDF/Word/PPT/Excel ≤20 MB) · Ver / Editar / Eliminar. Tabla `workshops`,
+     bucket privado `talleres` (<módulo>/<slot>/<archivo>).
+  3. **Ejercicios por habilidad** (antes "Recursos interactivos", renombrado en todo lado) →
+     A1…C1 → módulo → 4 habilidades con cantidad → "Crear actividad" (varias). Tabla
+     `skill_activities` (columna skill), bucket privado `ejercicios`
+     (<módulo>/<habilidad>/<archivo>).
+  - Acceso: admin todo, profesor lee, estudiante solo módulos pagados (`lef_my_paid_module`
+    en las reglas de tablas y buckets).
+- **Motor de talleres** `assets/js/lef-taller.js` (portal + admin): `render` (diseño LEF),
+  `extract` (lee un HTML hecho con el molde en un iframe aislado y lo guarda como `content`),
+  `show` (interactivo → diseño LEF; otro HTML → tal cual en iframe sandbox; PDF → visor del
+  navegador; Word/PPT/Excel → visor de Microsoft con enlace firmado de 1 h + Descargar).
+  No guarda respuestas ni puntaje del estudiante.
+- **Molde de talleres**: `assets/plantillas/taller-molde-lef.html` (módulo, tiempo y mensajes
+  finales dentro del bloque TALLER) + `instrucciones-taller.txt` (pasos + texto para pedírselo
+  a una IA). Enlaces en "Crear taller" y "Crear actividad". Decisión del usuario: todo taller
+  con el molde; la conversión automática con IA de HTML ajenos queda para después.
 
 ### Verificar en la plataforma (hecho 26 sep, sin prueba en producción)
 - **Festivos**: calendario de octubre → lunes 12 en naranja; clase de ese día tachada
@@ -146,7 +120,6 @@
 - Los estudiantes pueden ver todas las agendas y el Meet desde la app de Classroom
   (el admin del Workspace no oculta el Meet ni el código): se les pedirá entrar
   siempre por LEF. LEF solo controla lo que muestra LEF.
-- SQL: ver "SQL — confirmar" arriba (solo falta confirmar el del libro complementario).
 
 ### Hecho 26 sep 2026
 - **Clase de hoy estilo Classroom** (25–26 sep): barra superior más grande (módulo,
