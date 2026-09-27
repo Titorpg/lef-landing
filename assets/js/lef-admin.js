@@ -1629,12 +1629,12 @@
   // Pedido del usuario (26 sep 2026): el lugar donde viven los recursos que no
   // cambian según el profesor. Se construye por partes; la primera es Libros:
   //   Libros → Libros principales → nivel → módulo → libro (título + link, Editar)
-  //          → Libros complementarios → nivel (A2…C1, el A1 no tiene) → varios
+  //          → Libros complementarios → nivel (A1…C1) → varios
   //            libros con título + link (Agregar, Editar, Eliminar)
   // El estudiante los ve en "Mis recursos" solo si pagó (get_my_course /
   // get_my_complementary_books). Mismas carpetas y botón "Atrás" que el portal.
   var RC_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
-  var RC_BOOK_LEVELS = ["A2", "B1", "B2", "C1"];
+  var RC_BOOK_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
   var RC_ICONS = {
     folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
     books: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/>',
@@ -1734,7 +1734,7 @@
     var grid = h('<div class="rs-grid"></div>');
     grid.appendChild(rcCard({ tone: "blue", icon: "read", title: "Libros principales", sub: "Uno por módulo · " + withBook + " de " + S.mods.length + " cargados",
       onOpen: function () { rcPrincipales(main, S); } }));
-    grid.appendChild(rcCard({ tone: "amber", icon: "books", title: "Libros complementarios", sub: "Varios por nivel, desde A2",
+    grid.appendChild(rcCard({ tone: "amber", icon: "books", title: "Libros complementarios", sub: "Varios por nivel",
       onOpen: function () { rcComplementarios(main, S); } }));
     body.appendChild(grid);
   }
@@ -1822,7 +1822,7 @@
 
   function rcComplementarios(main, S) {
     var crumbs = rcCrumbsLibros(main, S);
-    var body = rcPage(main, crumbs, "Libros complementarios", "Libros para todo el nivel. El A1 no tiene.");
+    var body = rcPage(main, crumbs, "Libros complementarios", "Libros para todo el nivel.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
     q("level_complementary_books").select("level").then(function (r) {
       body.innerHTML = "";

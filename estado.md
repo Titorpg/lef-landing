@@ -31,6 +31,10 @@
 - Admin: el libro complementario se carga en Académico → Módulos → Editar del PRIMER
   módulo de cada nivel (A2.1, B1.1, B2.1, C1.1); se guarda en `level_books`.
 
+### ⚠ CAMBIO 26 sep (tarde): el A1 SÍ lleva libros complementarios (antes no). Habilitado en
+  portal (RS_BOOK_LEVELS) y admin (RC_BOOK_LEVELS). SQL `20260926080000_libro_complementario_a1.sql`
+  (constraint + orden) pasado al usuario. Notas de abajo que digan "el A1 no tiene" quedan viejas.
+
 ### ✅ Hecho 26 sep — Recursos compartidos de las clases (parte 1: Libros)
 - Pestaña nueva del admin "Recursos compartidos de las clases" (se construye POR PARTES,
   el usuario explica cada una y confirma). Parte 1 = **Libros**:

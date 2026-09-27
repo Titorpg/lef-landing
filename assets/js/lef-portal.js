@@ -1238,17 +1238,17 @@
   // Carpetas dentro de carpetas (pedido del usuario, 26 sep 2026), con la misma
   // mecánica del Planificador del profesor:
   //   Mis recursos → niveles (A1…C1)
-  //   Nivel        → "Libros complementarios" (menos A1) + sus módulos
+  //   Nivel        → "Libros complementarios" + sus módulos
   //   Módulo       → Libro de estudio · Talleres · Ejercicios por habilidad
   // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
   // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
   // tampoco entrega su libro). El libro complementario es de TODO el nivel y se
   // abre con cualquier módulo pagado de ese nivel (get_my_complementary_books;
-  // varios libros con título, los carga el admin en Recursos compartidos). El A1
-  // NO tiene libro complementario: un estudiante solo de A1 no ve esa carpeta.
+  // varios libros con título, los carga el admin en Recursos compartidos). Todos
+  // los niveles, A1 incluido (26 sep 2026).
   // Talleres y Ejercicios por habilidad los sube el admin en Recursos compartidos.
   var RS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
-  var RS_BOOK_LEVELS = ["A2", "B1", "B2", "C1"];
+  var RS_BOOK_LEVELS = ["A1", "A2", "B1", "B2", "C1"];   // el A1 también desde el 26 sep (antes no)
   var RS_TALLERES = ["Taller semana 1", "Taller semana 2", "Taller semana 3", "Taller semana 4", "Repaso del módulo"];
 
   function rsModel(rows, books) {
@@ -1350,7 +1350,7 @@
   }
 
   // Carpeta "Libros complementarios" DENTRO de cada nivel (junto a sus módulos;
-  // corrección del usuario, 26 sep 2026). Solo A2, B1, B2 y C1: el A1 no tiene.
+  // corrección del usuario, 26 sep 2026). Todos los niveles, A1 incluido.
   function rsComp(main, M, L) {
     var crumbs = [["Mis recursos", function () { rsRoot(main, M); }], ["Nivel " + L.code, function () { rsLevel(main, M, L); }]];
     var body = rsPage(main, crumbs, "Libros complementarios", "Libros para todo el nivel " + L.code + ".");
