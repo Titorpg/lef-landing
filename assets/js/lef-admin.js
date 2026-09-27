@@ -735,7 +735,7 @@
       function toMk() { var t = main.querySelector("[data-mk]"); if (t && t.children.length) t.scrollIntoView({ behavior: "smooth" }); else location.hash = "calendario"; }
       var alerts = [];
       if (toReview) alerts.push(["warn", "Tienes <strong>" + rcCount(toReview, "examen de validación", "exámenes de validación") + "</strong> por revisar.", "Revisar", function () { exOpenGroup(null); }]);
-      if (pendingMk) alerts.push(["warn", "Tienes <strong>" + rcCount(pendingMk, "clase", "clases") + "</strong> por reprogramar.", "Ver", toMk]);
+      // Sin aviso de "clases por reprogramar": el recuadro de abajo ya lo muestra (pedido del usuario).
       alerts.forEach(function (a) {
         var el = h('<div class="home-alert home-alert--' + a[0] + '"><span>' + a[1] + '</span><button type="button" class="btn btn-sm btn-dark">' + esc(a[2]) + "</button></div>");
         el.querySelector("button").addEventListener("click", a[3]);
