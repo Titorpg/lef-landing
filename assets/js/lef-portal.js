@@ -330,6 +330,7 @@
             '<div class="news-card__body">' +
             '<div class="news-card__meta"><span class="news-cat ' + cat.cls + '">' + esc(cat.label) + "</span>" +
             (n.pinned ? '<span class="news-pin">📌 Fijado</span>' : "") +
+            (n.kind === "exam_result" ? '<span class="news-mine">Solo para ti</span>' : "") +
             (isNew ? '<span class="news-new">Nuevo</span>' : "") +
             (n.module_level ? '<span class="news-mod">Módulo ' + esc(n.module_level) + "</span>" : "") + "</div>" +
             "<h3>" + esc(n.title) + "</h3>" +
@@ -372,6 +373,7 @@
       '<p class="news-card__date">' + esc(date(n.publish_at)) + "</p>" +
       '<div class="news-modal__body">' + esc(n.body || "") + "</div>" +
       (link ? '<a class="btn btn-blue btn-sm" style="margin-top:14px" target="_blank" rel="noopener" href="' + esc(link) + '">' + esc(n.link_label || "Ver más") + "</a>" : "") +
+      (n.kind === "exam_result" && n.ref_id ? '<button type="button" class="btn btn-blue btn-sm" style="margin-top:14px" data-exam-detail>Ver detalle</button>' : "") +
       "</div>"
     );
     bg.appendChild(box);
@@ -379,6 +381,8 @@
     function close() { bg.remove(); }
     bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
     box.querySelector("[data-close]").addEventListener("click", close);
+    var det = box.querySelector("[data-exam-detail]");
+    if (det) det.addEventListener("click", function () { close(); renderExamResult(document.querySelector(".pnl-main"), n.ref_id); });
   }
 
   /* ---------- Facturación ---------- */
@@ -821,7 +825,7 @@
       '<p class="pnl-sub">Tus clases y lo que tu profesor y LEF programen para ti.</p>';
     var box = h("<div></div>");
     main.appendChild(box);
-    window.LEFCalendar.mount(box, { sb: sb, role: "student" });
+    window.LEFCalendar.mount(box, { sb: sb, role: "student", onExam: function () { go("clase-hoy"); } });
   }
 
   function renderCourse(main, opts) {
@@ -1250,13 +1254,14 @@
 
     sb.rpc("get_my_exam", { p_assignment: assignmentId }).then(function (r) {
       if (r.error) throw r.error;
-      var x = r.data, secs = (x.sections || []).filter(function (s) { return (s.items || []).some(function (it) { return it.type === "choice"; }); });
+      var x = r.data, secs = (x.sections || []).filter(function (s) { return (s.items || []).some(function (it) { return it.type === "choice" || it.type === "text"; }); });
       var draft = examDraft(assignmentId) || {};
       var answers = draft.answers || {}, cur = Math.min(draft.section || 0, secs.length - 1);
       var totalQ = 0;
-      secs.forEach(function (s) { s.items.forEach(function (it) { if (it.type === "choice") totalQ++; }); });
+      secs.forEach(function (s) { s.items.forEach(function (it) { if (it.type === "choice" || it.type === "text") totalQ++; }); });
       function save() { examSaveDraft(assignmentId, { answers: answers, section: cur }); }
-      function answered() { return Object.keys(answers).length; }
+      function has(id) { var v = answers[id]; return v != null && String(v).trim() !== ""; }
+      function answered() { return Object.keys(answers).filter(has).length; }
 
       box.innerHTML = "";
       box.appendChild(h('<header class="exm-head"><span class="exm-head__k">Examen de validación · ' + esc(x.module_level) + "</span>" +
@@ -1285,6 +1290,20 @@
         stage.appendChild(sec);
         s.items.forEach(function (it) {
           if (it.type === "heading") { stage.appendChild(h('<p class="exm-note">' + esc(it.text) + "</p>")); return; }
+          if (it.type === "text") {
+            // Pregunta abierta: la escribe el estudiante y la califica el profesor.
+            var tq = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend>" +
+              '<textarea class="exm-text" rows="4" maxlength="4000" placeholder="Escribe tu respuesta aquí"></textarea>' +
+              '<p class="exm-text__note">Esta respuesta la califica tu profesor.</p></fieldset>');
+            var ta = tq.querySelector("textarea");
+            ta.value = answers[it.id] || "";
+            ta.addEventListener("input", function () {
+              if (ta.value.trim()) answers[it.id] = ta.value; else delete answers[it.id];
+              save(); paintProgress(); tq.classList.remove("is-missing");
+            });
+            stage.appendChild(tq);
+            return;
+          }
           if (it.type !== "choice") return;
           var idx = it.options.map(function (_, i) { return i; });
           if (it.shuffle) idx = examShuffle(idx, assignmentId + it.id);
@@ -1311,7 +1330,7 @@
         var last = cur === secs.length - 1;
         var next = h('<button type="button" class="btn ' + (last ? "btn-blue" : "btn-dark") + '">' + (last ? "Enviar examen" : "Siguiente") + "</button>");
         next.addEventListener("click", function () {
-          var missing = [].slice.call(stage.querySelectorAll(".exm-q")).filter(function (f) { return answers[f.getAttribute("data-q")] == null; });
+          var missing = [].slice.call(stage.querySelectorAll(".exm-q")).filter(function (f) { return !has(f.getAttribute("data-q")); });
           missing.forEach(function (f) { f.classList.add("is-missing"); });
           if (missing.length) {
             nav.querySelector(".exm-nav__err").textContent = missing.length === 1 ? "Te falta responder 1 pregunta de esta sección." : "Te faltan " + missing.length + " preguntas de esta sección.";
@@ -1369,6 +1388,57 @@
       box.innerHTML = "";
       var d = h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>No pudimos abrir el examen</h2><p>" + esc(examErr(e)) + "</p></div>");
       box.appendChild(d);
+    });
+  }
+
+  // Examen corregido (desde la novedad del resultado → "Ver detalle"): sus
+  // respuestas, la correcta cuando se equivocó, y "Descargar evaluación" en PDF
+  // para que no se pierda cuando la novedad se quite al empezar otro módulo.
+  function renderExamResult(main, submissionId) {
+    clearTodayTimers();
+    main.innerHTML = "";
+    window.scrollTo(0, 0);
+    var back = h('<button type="button" class="resource-back">&larr; Inicio</button>');
+    back.addEventListener("click", function () { if (location.hash === "#inicio") renderHome(main); else go("inicio"); });
+    main.appendChild(back);
+    var box = h('<div class="exm"><p class="muted">Cargando tu evaluación…</p></div>');
+    main.appendChild(box);
+    sb.rpc("get_my_exam_result", { p_submission: submissionId }).then(function (r) {
+      if (r.error) throw r.error;
+      var d = r.data, num = window.LEFExam.num;
+      var pct = d.max_score ? Math.round(100 * d.score / d.max_score) : 0;
+      box.innerHTML = "";
+      box.appendChild(h('<header class="exm-head"><span class="exm-head__k">Tu evaluación · ' + esc(d.module_level) + "</span>" +
+        "<h1>" + esc(d.title) + "</h1>" +
+        '<div class="exm-chips">' + (d.teacher_name ? "<span>" + mcIc("user") + "Revisó: " + esc(d.teacher_name) + "</span>" : "") +
+        "<span>" + mcIc("cal") + "Presentado el " + esc(date(d.submitted_at)) + "</span></div>" +
+        '<div class="ex-total" style="margin-top:14px"><div class="ex-total__n"><strong>' + num(d.score) + "</strong><span>/" + num(d.max_score) + " puntos</span></div>" +
+        '<div class="ex-total__m"><span>' + pct + "% · " + d.correct_count + " de " + d.total_count + ' respuestas correctas</span><div class="ex-bar is-big"><i style="width:' + pct + '%"></i></div></div></div>' +
+        (d.sections_result || []).map(function (s) {
+          var p = s.max ? Math.round(100 * s.score / s.max) : 0;
+          return '<div class="ex-sec"><div class="ex-sec__top"><strong>' + esc(s.title) + "</strong><span>" + s.correct + " de " + s.total + " correctas · " +
+            num(s.score) + "/" + num(s.max) + ' pts</span></div><div class="ex-bar"><i style="width:' + p + '%"></i></div></div>';
+        }).join("") +
+        '<p class="exm-sec__ins" style="margin-top:10px">En verde, la respuesta correcta; en rojo, la que marcaste cuando te equivocaste.</p></header>'));
+      box.appendChild(window.LEFExam.render(d.content, d.answers || {}, d.manual || {}, { who: "Tu respuesta" }));
+      var foot = h('<div class="exm-nav"><p class="exm-nav__err" aria-live="polite"></p></div>');
+      var dl = h('<button type="button" class="btn btn-blue">' + mcIc("file") + "<span>Descargar evaluación</span></button>");
+      dl.addEventListener("click", function () {
+        dl.disabled = true;
+        foot.querySelector(".exm-nav__err").textContent = "";
+        window.LEFExam.pdf({
+          title: d.title, module: d.module_level, student: d.student_name, teacher: d.teacher_name, group: d.group_label,
+          submitted: date(d.submitted_at), approved: d.approved_at ? date(d.approved_at) : "",
+          score: d.score, max: d.max_score, correct: d.correct_count, total: d.total_count,
+          sectionsResult: d.sections_result, content: d.content, answers: d.answers, manual: d.manual
+        }).catch(function (e) { foot.querySelector(".exm-nav__err").textContent = examErr(e); })
+          .then(function () { dl.disabled = false; });
+      });
+      foot.appendChild(dl);
+      box.appendChild(foot);
+    }).catch(function (e) {
+      box.innerHTML = "";
+      box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>No pudimos abrir tu evaluación</h2><p>" + esc(examErr(e)) + "</p></div>"));
     });
   }
 

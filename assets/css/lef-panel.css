@@ -1340,3 +1340,94 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
   .exm-head,.exm-sec,.exm-q{padding:16px;}
   .exam-banner .btn{width:100%;}
 }
+/* ---- Examen de validación, ronda 2 (27 sep 2026): revisión del profesor y examen
+   corregido (lef-examen.js), en panel y portal. Verde = correcta, rojo = la que
+   marcó mal, ámbar = pregunta abierta por calificar. ---- */
+.rs-chip.is-info{background:#eaf0fb;color:var(--azul);}
+.rs-chip.is-violet{background:#efedfd;color:#5b4bc4;}
+.rs-file.ex-row.is-violet{--c:#5b4bc4;--cbg:#efedfd;}
+.ex-note{font-size:13.5px;color:var(--grafito);background:#f7f6f2;border-radius:12px;padding:10px 14px;margin:14px 0 0;}
+.ex-detail__acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.ex-q__open{margin:8px 0 0;font-size:13px;color:var(--plata);}
+.news-mine{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:#eaf0fb;color:var(--azul);font-size:11px;font-weight:600;}
+.exm-text{width:100%;min-height:96px;resize:vertical;padding:12px 14px;border:1px solid var(--niebla);border-radius:12px;font:inherit;font-size:15px;clear:both;display:block;}
+.exm-text:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px #eaf0fb;}
+.exm-text__note{font-size:12.5px;color:var(--plata);margin:6px 2px 0;}
+.exr{display:flex;flex-direction:column;gap:14px;margin-top:14px;max-width:820px;}
+.exr-sec{background:#fff;border:1px solid var(--niebla);border-radius:16px;box-shadow:var(--card-shadow);padding:18px 20px;}
+.exr-sec__top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+.exr-sec__k{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--azul);}
+.exr-sec h2{font-size:18px;font-weight:600;margin:2px 0 0;color:var(--ink);}
+.exr-sec__pts{font-size:12.5px;font-weight:600;padding:4px 11px;border-radius:999px;background:#f5f7fb;color:var(--azul);white-space:nowrap;}
+.exr-sec__ins{color:var(--grafito);margin:6px 0 0;font-size:14px;}
+.exr-passage{margin:10px 0 0;}
+.exr-passage summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--azul);}
+.exr-head{font-weight:600;color:var(--azul);margin:16px 0 4px;}
+.exr-q{border-top:1px solid var(--niebla);padding:14px 0 4px;margin-top:10px;}
+.exr-q__top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.exr-q__t{margin:0;font-weight:500;color:var(--ink);white-space:pre-line;}
+.exr-badge{flex:none;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap;}
+.exr-q.is-ok .exr-badge{background:var(--ok-bg);color:var(--ok);}
+.exr-q.is-bad .exr-badge{background:var(--bad-bg);color:var(--bad);}
+.exr-q.is-open .exr-badge{background:var(--warn-bg);color:var(--warn);}
+.exr-opts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.exr-opts li{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--niebla);border-radius:11px;font-size:14.5px;}
+.exr-opt__dot{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid #c9c9c4;}
+.exr-opt__t{flex:1;min-width:0;}
+.exr-opts li.is-correct{border-color:#9fd3b2;background:var(--ok-bg);}
+.exr-opts li.is-correct .exr-opt__dot{border-color:var(--ok);background:var(--ok);}
+.exr-opts li.is-wrong{border-color:#e6bcbc;background:var(--bad-bg);}
+.exr-opts li.is-wrong .exr-opt__dot{border-color:var(--bad);background:var(--bad);}
+.exr-tag{flex:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:#fff;color:var(--grafito);border:1px solid var(--niebla);}
+.exr-tag.is-ok{color:var(--ok);border-color:#9fd3b2;}
+.exr-open{margin-top:10px;background:#f7f6f2;border-radius:12px;padding:12px 14px;}
+.exr-open__k{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--plata);}
+.exr-open p{margin:4px 0 0;white-space:pre-wrap;color:var(--ink);}
+.exr-grade{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--grafito);}
+.exr-grade input{width:96px;padding:8px 10px;border:1px solid var(--niebla);border-radius:10px;font:inherit;}
+.exr-grade input:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px #eaf0fb;}
+.exr-sum{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#fff;border:1px solid var(--niebla);
+  border-left:5px solid var(--azul);border-radius:16px;box-shadow:var(--card-shadow);padding:14px 18px;max-width:820px;}
+.exr-sum__n{display:flex;align-items:baseline;gap:4px;}
+.exr-sum__n strong{font-size:28px;line-height:1;color:var(--ink);}
+.exr-sum__n span{font-size:13px;color:var(--grafito);}
+.exr-sum__t{flex:1;min-width:160px;display:flex;flex-direction:column;font-size:13.5px;color:var(--grafito);}
+.exr-sum__open{color:var(--warn);font-weight:600;}
+.exr-sum__acts .btn[disabled]{opacity:.5;cursor:not-allowed;}
+@media(max-width:520px){.exr-sec{padding:14px;}.exr-q__top{flex-direction:column;}.exr-sum{gap:10px;}}
+/* Inicio del profesor: misma portada del estudiante con foto de profesora en clase en línea. */
+.home-hero--teacher{background:linear-gradient(100deg,rgba(16,16,16,.84) 0%,rgba(16,16,16,.55) 55%,rgba(46,78,158,.25) 100%),
+  url("../inicio/hero-profesor.jpg") center 12%/cover no-repeat;}
+/* Mis grupos y Estudiantes del profesor (27 sep 2026): tarjetas flotantes como el portal. */
+.tg-grid,.tst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:14px;}
+.tg-card,.tst-card{background:#fff;border:1px solid var(--niebla);border-radius:16px;box-shadow:var(--card-shadow);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0;}
+.tg-card{border-top:3px solid #d9a52b;}
+.tg-card__top{display:flex;align-items:center;gap:12px;}
+.tg-card .rs-card__ic{width:52px;height:52px;border-radius:14px;background:#f6efe0;flex:none;}
+.tg-card__t{display:flex;flex-direction:column;min-width:0;}
+.tg-card__t strong{font-size:16px;color:#1b2a5e;}
+.tg-card__t span{font-size:13px;color:var(--grafito);}
+.tg-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.tg-chips span{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f3f3f0;font-size:12.5px;color:var(--carbon);}
+.tg-chips .mc-ic{width:14px;height:14px;}
+.tg-cap__top{display:flex;justify-content:space-between;font-size:13px;color:var(--grafito);margin-bottom:6px;}
+.tg-cap__top strong{color:var(--ink);}
+.tg-toggle{align-self:flex-start;}
+.tg-names{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;}
+.tg-names li{padding:4px 10px;border-radius:999px;background:#eaf0fb;color:var(--azul);font-size:12.5px;}
+.tg-names li.muted{background:none;color:var(--plata);padding:0;}
+.tst-card__top{display:flex;align-items:center;gap:12px;}
+.tst-av{flex:none;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#eaf0fb;color:var(--azul);font-weight:700;font-size:15px;}
+.tst-card__who{flex:1;min-width:0;display:flex;flex-direction:column;}
+.tst-card__who strong{font-size:15.5px;color:var(--ink);overflow-wrap:anywhere;}
+.tst-card__who span{font-size:12.5px;color:var(--plata);}
+.tst-mod{flex:none;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;color:#fff;background:var(--c,#2e4e9e);}
+.tst-line{margin:0;font-size:13.5px;color:var(--grafito);}
+.tst-contact{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px;}
+.tst-contact a{color:var(--azul);text-decoration:none;overflow-wrap:anywhere;}
+.tst-contact a:hover{text-decoration:underline;}
+.tst-notes{border-top:1px solid var(--niebla);padding-top:10px;}
+.tst-notes summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink);}
+.tst-notes textarea{width:100%;margin-top:8px;resize:vertical;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--niebla);border-radius:10px;}
+.tst-notes__row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;}
+.exr ~ .ex-note,.ex-note{max-width:820px;}

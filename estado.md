@@ -39,6 +39,28 @@
   and enable RLS" mete líneas y rompe el script) y NO pegar líneas larguísimas (el JSON en una
   sola línea llegó cortado): partir en renglones cortos.
 
+### Exámenes de validación — ronda 2 (27 sep 2026, SQL `20260927030000_examenes_revision_calendario.sql`)
+- **SQL aplicado el 27 sep** por el usuario con un script desde su terminal (Management API; pegar en el
+  SQL Editor desde el teléfono seguía llegando cambiado). Verificado en BD (columnas y get_teacher_news).
+- **Calendario**: al estudiante, evento "Examen de validación" el día que abre (botón "Ir a Clase de
+  hoy"); al profesor, "Revisión de exámenes pendiente" el día que cierra (botón "Ir a revisar").
+  Se calculan de la programación en `get_my_calendar` (no se guardan): si cambian las fechas, se mueven.
+- **Revisión obligatoria**: "Revisar respuestas" → el examen con lo que marcó (verde/rojo) y las
+  preguntas abiertas (`type: "text"`) con casilla de puntos → "Confirmar calificación"
+  (`teacher_review_exam`, estado `revisado`) → recién ahí "Dar OK y enviar". "Ver respuestas"
+  siempre disponible (explicarle al estudiante). Vista compartida en `assets/js/lef-examen.js`.
+- **Estudiante**: la novedad del resultado va primera, con imagen (`noticia-examen-resultado.jpg`),
+  "Solo para ti" y botón "Ver detalle" → examen corregido + "Descargar evaluación" (PDF con jsPDF
+  de cdnjs). Se quita cuando tiene ACTIVO (pagado) un módulo posterior (`get_my_announcements`).
+- **Profesor**: pestaña "Dashboard" → **"Inicio"** con el diseño del Inicio del estudiante (portada
+  `hero-profesor.jpg`, avisos, tarjetas Mis grupos / Clases por reprogramar / Exámenes por revisar,
+  y "Tus novedades" = `get_teacher_news`, calculadas, con botón "Ir a revisar"). Mis grupos y
+  Estudiantes pasaron de tablas a tarjetas flotantes.
+- **Orden de resultados**: admin → módulo → ciclo → grupo (de todos los profesores); profesor → solo
+  sus grupos + carpeta "Anteriores" (ciclos pasados). Cada resultado guarda su ciclo; los "No
+  presentó" se guardan de verdad al soltar el grupo (trigger `enrollments_exam_no_show_trg`).
+- Novedades automáticas (resultado del estudiante y las del profesor) NO salen en Novedades del admin.
+
 ### Lo siguiente (el usuario lo explica por partes y confirma cada una)
 - **Recursos compartidos → próxima parte**: "Otros recursos" u otra sección que el usuario
   describa. Mismo patrón que las partes hechas (carpetas nivel → módulo, "Atrás", capturas

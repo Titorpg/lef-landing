@@ -371,7 +371,8 @@
     ));
     var wrap = h('<div class="pnl-wrap"><nav class="pnl-nav"></nav><main class="pnl-main"></main></div>');
     var nav = wrap.querySelector(".pnl-nav");
-    allowed.forEach(function (s) { nav.appendChild(h('<a href="#' + s.id + '">' + esc(s.label) + "</a>")); });
+    // El profesor ve "Inicio" (mismo diseño que el Inicio del estudiante); el admin, "Dashboard".
+    allowed.forEach(function (s) { nav.appendChild(h('<a href="#' + s.id + '">' + esc(s.id === "dashboard" && ME.role === "teacher" ? "Inicio" : s.label) + "</a>")); });
     app.appendChild(wrap);
     app.querySelector("[data-logout]").onclick = function () { sb.auth.signOut().then(boot); };
 
@@ -698,40 +699,119 @@
 
   // Dashboard propio del profesor: solo sus grupos, nada del resto del
   // colegio (pagos, otros módulos, etc. — eso es del admin).
+  // Inicio del PROFESOR (pedido del usuario, 27 sep 2026): el mismo diseño del
+  // Inicio del estudiante (portada con foto, avisos, tarjetas y novedades), con
+  // lo suyo: Mis grupos · Clases por reprogramar · Exámenes por revisar, y sus
+  // novedades temporales (get_teacher_news: revisión de exámenes pendiente). Las
+  // novedades de LEF para estudiantes no le aparecen.
   function secDashboardTeacher(main) {
-    head(main, "Dashboard", "Resumen de tus grupos.");
-    var mkBox = h("<div></div>"); main.appendChild(mkBox);
-    if (ME.teacher_id) renderPendingMakeups(mkBox);
+    main.innerHTML = '<p class="muted">Cargando…</p>';
     if (!ME.teacher_id) {
-      main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
+      main.innerHTML = '<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>';
       return;
     }
-    loadMyGroups().then(function (d) {
-      var groups = d.groups;
-      if (!groups.length) {
-        main.appendChild(statRow([["Cursos asignados", 0], ["Grupos activos", 0], ["Estudiantes asignados", 0], ["Cupos disponibles", 0]]));
-        main.appendChild(h('<div class="pnl-alert ok" style="margin-top:16px">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
-        return;
-      }
-      var countByGroup = {}, uniqueStudents = {}, mods = {};
-      d.enrollments.forEach(function (e) {
-        countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
-        uniqueStudents[e.student_id] = true;
-      });
-      groups.forEach(function (g) { if (g.modules) mods[g.modules.id] = true; });
-      var cupos = groups.reduce(function (sum, g) { return sum + Math.max(g.capacity - (countByGroup[g.id] || 0), 0); }, 0);
+    Promise.all([
+      loadMyGroups(),
+      rpc("get_my_pending_makeups").catch(function () { return []; }),
+      rpc("get_teacher_news").catch(function () { return []; }),
+      rpc("exam_results", {}).catch(function () { return []; })
+    ]).then(function (res) {
+      var d = res[0], groups = d.groups, mk = res[1] || [], news = res[2] || [], ex = res[3] || [];
+      var students = {};
+      d.enrollments.forEach(function (e) { students[e.student_id] = true; });
+      var nStudents = Object.keys(students).length;
+      var pendingMk = mk.filter(function (r) { return !r.makeup_id; }).length;
+      var toReview = ex.filter(function (r) { return r.group_active && (r.state === "pendiente" || r.state === "revisado"); }).length;
+      main.innerHTML = "";
 
-      main.appendChild(statRow([
-        ["Cursos asignados", Object.keys(mods).length],
-        ["Grupos activos", groups.length],
-        ["Estudiantes asignados", Object.keys(uniqueStudents).length],
-        ["Cupos disponibles", cupos]
-      ]));
-    }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+      var today = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+      main.appendChild(h('<section class="home-hero home-hero--teacher"><div class="home-hero__txt">' +
+        '<p class="home-hero__date">' + esc(today.charAt(0).toUpperCase() + today.slice(1)) + "</p>" +
+        "<h1>¡Hola, " + esc(String(ME.full_name || "").trim().split(/\s+/)[0] || "profe") + "!</h1>" +
+        '<p class="home-hero__sub">' + (groups.length
+          ? "Tienes <strong>" + rcCount(groups.length, "grupo activo", "grupos activos") + "</strong> y <strong>" + rcCount(nStudents, "estudiante", "estudiantes") + "</strong>."
+          : "Todavía no tienes grupos asignados — el admin te los asigna desde Académico → Grupos.") + "</p></div></section>"));
+
+      function toMk() { var t = main.querySelector("[data-mk]"); if (t && t.children.length) t.scrollIntoView({ behavior: "smooth" }); else location.hash = "calendario"; }
+      var alerts = [];
+      if (toReview) alerts.push(["warn", "Tienes <strong>" + rcCount(toReview, "examen de validación", "exámenes de validación") + "</strong> por revisar.", "Revisar", function () { exOpenGroup(null); }]);
+      if (pendingMk) alerts.push(["warn", "Tienes <strong>" + rcCount(pendingMk, "clase", "clases") + "</strong> por reprogramar.", "Ver", toMk]);
+      alerts.forEach(function (a) {
+        var el = h('<div class="home-alert home-alert--' + a[0] + '"><span>' + a[1] + '</span><button type="button" class="btn btn-sm btn-dark">' + esc(a[2]) + "</button></div>");
+        el.querySelector("button").addEventListener("click", a[3]);
+        main.appendChild(el);
+      });
+
+      var first = groups[0] ? exGroupLabel(groups[0]) : "";
+      var cards = h('<div class="home-cards"></div>');
+      [["Mis grupos", '<div class="home-card__big">' + groups.length + '</div><div class="home-card__line">' + rcCount(nStudents, "estudiante", "estudiantes") + " en total</div>" +
+          (first ? '<div class="home-card__line muted">' + esc(first) + (groups.length > 1 ? " y " + (groups.length - 1) + " más" : "") + "</div>" : ""),
+        "Ver mis grupos", function () { location.hash = "misgrupos"; }],
+       ["Clases por reprogramar", '<div class="home-card__big ' + (pendingMk ? "home-card__big--warn" : "home-card__big--ok") + '">' + (pendingMk || "Al día") + "</div>" +
+          '<div class="home-card__line">' + (pendingMk ? (pendingMk === 1 ? "clase sin fecha de reposición" : "clases sin fecha de reposición") : "No tienes clases pendientes por reprogramar") + "</div>",
+        "Ver clases", toMk],
+       ["Exámenes por revisar", '<div class="home-card__big ' + (toReview ? "home-card__big--warn" : "home-card__big--ok") + '">' + (toReview || "Al día") + "</div>" +
+          '<div class="home-card__line">' + (toReview ? "resultados esperando tu revisión y tu OK" : "No tienes exámenes pendientes por revisar") + "</div>",
+        "Ir a exámenes", function () { exOpenGroup(null); }]
+      ].forEach(function (c) {
+        var card = h('<div class="home-card"><div class="home-card__k">' + esc(c[0]) + "</div>" + c[1] +
+          '<button type="button" class="link home-card__go">' + esc(c[2]) + " →</button></div>");
+        card.querySelector(".home-card__go").addEventListener("click", c[3]);
+        cards.appendChild(card);
+      });
+      main.appendChild(cards);
+
+      var mkBox = h("<div data-mk></div>");
+      main.appendChild(mkBox);
+      renderPendingMakeups(mkBox);
+
+      main.appendChild(h('<div class="home-sec"><h2 class="pnl-h">Tus novedades</h2></div>'));
+      if (!news.length) {
+        main.appendChild(h('<div class="home-empty">Por ahora no tienes novedades. Cuando programes un examen de validación, aquí verás su revisión pendiente.</div>'));
+      } else {
+        var grid = h('<div class="news-grid"></div>');
+        news.forEach(function (n) {
+          var excerpt = (n.body || "").length > 160 ? n.body.slice(0, 157).trim() + "…" : (n.body || "");
+          var card = h('<article class="news-card" tabindex="0" role="button">' +
+            (n.image_url ? '<div class="news-card__img"><img src="' + esc(n.image_url) + '" alt="" loading="lazy"></div>' : "") +
+            '<div class="news-card__body"><div class="news-card__meta"><span class="news-cat cat-academico">Académico</span>' +
+            (n.to_review ? '<span class="news-mine">' + n.to_review + " por calificar</span>" : "") + "</div>" +
+            "<h3>" + esc(n.title) + "</h3>" +
+            '<p class="news-card__date">Grupo ' + esc(n.group_label) + " · " + esc(date(n.opens_on)) + " → " + esc(date(n.closes_on)) + "</p>" +
+            '<p class="news-card__excerpt">' + esc(excerpt) + "</p>" +
+            '<span class="news-card__more">Leer más →</span></div></article>');
+          var open = function () { teacherNews(n); };
+          card.addEventListener("click", open);
+          card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+          grid.appendChild(card);
+        });
+        main.appendChild(grid);
+      }
+    }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
-  // "Mis grupos" (solo profesor): el detalle de cada grupo que el admin le
-  // configuró, con la lista de estudiantes inscritos a un clic.
+  // Novedad del profesor abierta (mismo recuadro que las del estudiante).
+  function teacherNews(n) {
+    var bg = h('<div class="pnl-modal-bg"></div>');
+    var box = h('<div class="pnl-modal news-modal">' +
+      '<button type="button" class="pay-modal__close" data-close aria-label="Cerrar">×</button>' +
+      (n.image_url ? '<img class="news-modal__img" src="' + esc(n.image_url) + '" alt="">' : "") +
+      '<div class="news-card__meta"><span class="news-cat cat-academico">Académico</span></div>' +
+      '<h3 class="news-modal__title">' + esc(n.title) + "</h3>" +
+      '<p class="news-card__date">Grupo ' + esc(n.group_label) + " · " + esc(date(n.opens_on)) + " → " + esc(date(n.closes_on)) + "</p>" +
+      '<div class="news-modal__body">' + esc(n.body || "") + "</div>" +
+      '<button type="button" class="btn btn-blue btn-sm" style="margin-top:14px" data-go>Ir a revisar</button></div>');
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    box.querySelector("[data-close]").addEventListener("click", close);
+    box.querySelector("[data-go]").addEventListener("click", function () { close(); exOpenGroup(n.group_id); });
+  }
+
+  // "Mis grupos" (solo profesor): cada grupo que el admin le configuró como
+  // tarjeta flotante (27 sep 2026: mismo lenguaje visual del portal), con su
+  // horario, el cupo y la lista de estudiantes a un clic.
   function secMisGrupos(main) {
     head(main, "Mis grupos", "Los grupos que el admin te asignó.");
     if (!ME.teacher_id) {
@@ -741,38 +821,34 @@
     loadMyGroups().then(function (d) {
       var groups = d.groups;
       if (!groups.length) {
-        main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+        main.appendChild(h('<div class="home-empty">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
         return;
       }
-      var countByGroup = {}, namesByGroup = {};
+      var namesByGroup = {};
       d.enrollments.forEach(function (e) {
-        countByGroup[e.group_id] = (countByGroup[e.group_id] || 0) + 1;
         (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
       });
+      var grid = h('<div class="tg-grid"></div>');
       groups.forEach(function (g) {
-        var sc = g.schedules;
-        var card = h(
-          '<div class="pnl-table-wrap" style="padding:18px 20px;margin-bottom:14px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">' +
-          "<div><p style=\"font-weight:700;font-size:15px\">" + (g.modules ? esc(g.modules.level + " · " + g.modules.title) : "—") + "</p>" +
-          '<p class="muted" style="font-size:13px">' + (sc ? esc(days(sc.days) + " " + time(sc.start_time) + "–" + time(sc.end_time)) : "Sin horario asignado") + "</p></div>" +
-          '<span class="badge neutral">' + (countByGroup[g.id] || 0) + " / " + g.capacity + " estudiantes</span>" +
-          "</div>" +
-          '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:10px" data-toggle>Ver estudiantes</button>' +
-          '<div class="muted" style="font-size:13px;margin-top:8px" data-list hidden></div>' +
-          "</div>"
-        );
-        var names = namesByGroup[g.id] || [];
-        var toggleBtn = card.querySelector("[data-toggle]");
-        var listEl = card.querySelector("[data-list]");
-        toggleBtn.addEventListener("click", function () {
-          var show = listEl.hidden;
-          listEl.hidden = !show;
-          toggleBtn.textContent = show ? "Ocultar estudiantes" : "Ver estudiantes";
-          if (show) listEl.textContent = names.length ? names.join(", ") : "Sin estudiantes inscritos todavía.";
+        var sc = g.schedules, names = (namesByGroup[g.id] || []).slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
+        var n = names.length, pct = Math.min(100, Math.round(100 * n / (g.capacity || 1)));
+        var card = h('<article class="tg-card">' +
+          '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(g.modules ? g.modules.level : "") + "</span>" +
+          '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
+          "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
+          (sc ? '<div class="tg-chips"><span>' + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span></div>" : "") +
+          '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
+          '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
+          '<button type="button" class="btn btn-sm btn-ghost tg-toggle">Ver estudiantes</button>' +
+          '<ul class="tg-names" hidden>' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul></article>");
+        var btnT = card.querySelector(".tg-toggle"), list = card.querySelector(".tg-names");
+        btnT.addEventListener("click", function () {
+          list.hidden = !list.hidden;
+          btnT.textContent = list.hidden ? "Ver estudiantes" : "Ocultar estudiantes";
         });
-        main.appendChild(card);
+        grid.appendChild(card);
       });
+      main.appendChild(grid);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
@@ -868,7 +944,7 @@
         var cols = isAdminView
           ? ["Nombre", "Documento", "Módulo", "Inscripción", "WhatsApp", "Correo", "Ciudad", "Cuenta portal", "Acciones"]
           : ["Nombre", "Documento", "Módulo", "WhatsApp", "Correo", "Ciudad", "Anotaciones"];
-        var t = tableWrap(cols);
+        var t = tableWrap(cols), tGrid = h('<div class="tst-grid"></div>');
         var visibleStudents = isAdminView ? (res[0].data || []) : (res[0].data || []).filter(function (s) { return myStudentIds[s.id]; });
         visibleStudents.forEach(function (s) {
           var prof = profByStudent[s.id];
@@ -908,25 +984,25 @@
           cell.appendChild(btn("Editar", "btn-ghost", function () { editStudent(s, enr || null, mods, doneByStudent[s.id] || {}); }));
           cell.appendChild(btn("Eliminar", "btn-danger", function () { deleteStudent(s, prof); }));
         } else {
-          tr = h([
-            "<tr><td>", esc(s.full_name), "</td>",
-            "<td>", esc((s.doc_type || "") + " " + (s.doc_number || "—")), "</td>",
-            "<td>", modColorDot, esc(modLabel), "</td>",
-            "<td>", esc(s.whatsapp), '</td><td class="wrap">', esc(s.email), "</td>",
-            "<td>", esc(s.city || "—"), "</td>",
-            '<td style="min-width:220px"></td></tr>'
-          ].join(""));
-          var noteCell = tr.children[6];
-          var noteBox = h(
-            '<div>' +
-            '<textarea rows="2" style="width:100%;resize:vertical;font:inherit;padding:6px 8px;border:1px solid var(--niebla);border-radius:8px">' +
-            esc(noteByStudent[s.id] || "") + "</textarea>" +
-            '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">' +
-            '<button class="btn btn-sm btn-ghost" data-save-note>Guardar</button>' +
-            '<span class="muted" data-note-msg style="font-size:12px"></span>' +
-            "</div></div>"
-          );
-          noteCell.appendChild(noteBox);
+          // Profesor (27 sep 2026): una tarjeta flotante por estudiante, con el
+          // mismo lenguaje visual del portal, en vez de la tabla.
+          tr = null;
+          var ini = String(s.full_name || "?").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
+          var wa = String(s.whatsapp || "").replace(/\D/g, "");
+          if (wa.length === 10) wa = "57" + wa;
+          var noteBox = h('<article class="tst-card">' +
+            '<div class="tst-card__top"><span class="tst-av">' + esc(ini) + '</span><div class="tst-card__who"><strong>' + esc(s.full_name) + "</strong>" +
+            "<span>" + esc(((s.doc_type || "") + " " + (s.doc_number || "")).trim() || "Sin documento") + "</span></div>" +
+            (enr && enr.modules ? '<span class="tst-mod" style="--c:' + modColor(enr.modules.module_number) + '">' + esc(enr.modules.level) + "</span>" : "") + "</div>" +
+            '<p class="tst-line">' + esc(modLabel) + "</p>" +
+            '<ul class="tst-contact">' +
+            (wa ? '<li><a href="https://wa.me/' + wa + '" target="_blank" rel="noopener">WhatsApp · ' + esc(s.whatsapp) + "</a></li>" : "") +
+            (s.email ? '<li><a href="mailto:' + esc(s.email) + '">' + esc(s.email) + "</a></li>" : "") +
+            (s.city ? "<li>" + esc(s.city) + "</li>" : "") + "</ul>" +
+            '<details class="tst-notes"' + (noteByStudent[s.id] ? " open" : "") + "><summary>Mis anotaciones</summary>" +
+            '<textarea rows="3" placeholder="Cómo va, qué reforzar, acuerdos…">' + esc(noteByStudent[s.id] || "") + "</textarea>" +
+            '<div class="tst-notes__row"><button class="btn btn-sm btn-dark" data-save-note>Guardar</button><span class="muted" data-note-msg></span></div></details></article>');
+          tGrid.appendChild(noteBox);
           noteBox.querySelector("[data-save-note]").addEventListener("click", function () {
             var msg = noteBox.querySelector("[data-note-msg]");
             if (!ME.teacher_id) { msg.textContent = "Tu cuenta no está vinculada a un profesor — pide al admin que la revise."; return; }
@@ -941,9 +1017,13 @@
             }).catch(function (e) { msg.textContent = friendly(e); });
           });
         }
-        t.body.appendChild(tr);
+        if (tr) t.body.appendChild(tr);
       });
-        if (!visibleStudents.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía' + (isAdminView ? '. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).' : " asignados.") + "</td></tr>"));
+        if (!isAdminView) {
+          main.appendChild(visibleStudents.length ? tGrid : h('<div class="home-empty">Todavía no tienes estudiantes asignados.</div>'));
+          return;
+        }
+        if (!visibleStudents.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
         main.appendChild(t.wrap);
       });
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
@@ -1645,6 +1725,7 @@
     spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
     abc: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
     grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
     exam: '<path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',
     headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'
   };
@@ -2214,96 +2295,182 @@
     });
   }
 
-  // ---------- Parte 4: Examen de validación (27 sep 2026) ----------
-  // Admin: Examen de validación → nivel → módulo → el examen (Ver examen) y la
-  // lista de resultados de todos los grupos (Ver detalle / Borrar respuesta).
-  // Profesor: Recursos de la clase → Exámenes de validación → su grupo →
-  // Programar (franja de días) · resultados · "Dar OK" (novedad + correo).
-  // Tablas validation_exams / exam_assignments / exam_submissions y funciones
-  // de 20260927020000_examenes_validacion.sql.
+  // ---------- Parte 4: Examen de validación (27 sep 2026; ronda 2 el mismo día) ----------
+  // Admin: Examen de validación → nivel → módulo → "Ver examen" (con la clave) y
+  // Resultados → ciclo → grupo (de todos los profesores) → estudiantes.
+  // Profesor: Recursos de la clase → Exámenes de validación → SOLO sus grupos
+  // (actuales, y "Anteriores" por ciclo). Flujo: programar → el estudiante lo
+  // envía → "Revisar respuestas" (califica las abiertas y confirma) → "Dar OK y
+  // enviar" (novedad + correo). "Ver respuestas" sirve siempre para explicarle al
+  // estudiante en qué se equivocó. El examen corregido lo dibuja lef-examen.js.
+  // Tablas y funciones: 20260927020000 y 20260927030000.
   var EX_STATE = {
-    pendiente: ["warn", "Por revisar"], aprobado: ["ok", "Resultado enviado"],
-    no_presento: ["bad", "No presentó"], abierto: ["done", "Puede presentarlo"], programado: ["soon", "Programado"]
+    pendiente: ["warn", "Por revisar"], revisado: ["violet", "Revisado · falta el OK"], aprobado: ["ok", "Resultado enviado"],
+    no_presento: ["bad", "No presentó"], abierto: ["info", "Puede presentarlo"], programado: ["soon", "Programado"]
   };
+  var EX_TONE = { pendiente: "is-warn", revisado: "is-violet", aprobado: "is-ok", no_presento: "is-bad", abierto: "is-info", programado: "is-muted" };
+  var EX_GOTO = null; // grupo a abrir al llegar desde el calendario o una novedad
   function exChip(state) { var s = EX_STATE[state] || ["soon", state]; return '<span class="rs-chip is-' + s[0] + '">' + esc(s[1]) + "</span>"; }
   function exNum(n) { return n == null ? "—" : String(Math.round(Number(n) * 100) / 100); }
   function exToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }); }
   function exAddDays(ymd, n) { var d = new Date(ymd + "T12:00:00"); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); }
   function exStats(content) {
-    var q = 0, pts = 0, secs = (content && content.sections) || [];
-    secs.forEach(function (s) { (s.items || []).forEach(function (it) { if (it.type === "choice") { q++; pts += Number(it.points || 1); } }); });
-    return { questions: q, points: pts, sections: secs.length };
+    var q = 0, pts = 0, open = 0, secs = (content && content.sections) || [];
+    secs.forEach(function (s) {
+      (s.items || []).forEach(function (it) {
+        if (it.type === "choice" || it.type === "text") { q++; pts += Number(it.points || 1); if (it.type === "text") open++; }
+      });
+    });
+    return { questions: q, points: pts, sections: secs.length, open: open };
   }
   function exGroupLabel(g) {
     var sc = g.schedules || {};
     return (g.modules ? g.modules.level : "") + (sc.days ? " · " + days(sc.days).split(" ").join(" · ") : "") + (sc.start_time ? " · " + time(sc.start_time) : "");
   }
+  function exCycleLabel(r) {
+    if (!r.cycle_start) return r.cycle_name || "Sin ciclo";
+    var f = function (d) { return new Date(d + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", ""); };
+    return "Ciclo " + f(r.cycle_start) + " – " + f(r.cycle_end) + " " + String(r.cycle_end).slice(0, 4);
+  }
+  // Agrupa filas por ciclo (más reciente primero) y dentro por grupo.
+  function exByCycle(rows) {
+    var map = {}, out = [];
+    rows.forEach(function (r) {
+      var k = (r.cycle_start || "0000") + "|" + (r.cycle_name || "");
+      if (!map[k]) { map[k] = { key: k, label: exCycleLabel(r), start: r.cycle_start || "", rows: [] }; out.push(map[k]); }
+      map[k].rows.push(r);
+    });
+    return out.sort(function (a, b) { return a.start < b.start ? 1 : -1; });
+  }
+  function exByGroup(rows) {
+    var map = {}, out = [];
+    rows.forEach(function (r) {
+      var k = (r.group_id || "") + "|" + (r.group_label || "");
+      if (!map[k]) { map[k] = { key: k, label: r.group_label || "Grupo", teacher: r.teacher_name || "", rows: [] }; out.push(map[k]); }
+      map[k].rows.push(r);
+    });
+    return out;
+  }
+  function exPend(rows) { return rows.filter(function (r) { return r.state === "pendiente" || r.state === "revisado"; }).length; }
   function exCrumbs(main, S) { return rcHome(main, S).concat([["Examen de validación", function () { rcExamenes(main, S); }]]); }
 
-  // Tarjeta de un resultado (admin y profesor). acts: botones extra.
-  function exResultRow(r, showGroup, acts) {
+  // Tarjeta de un resultado. acts: botones.
+  function exResultRow(r, showTeacher, acts) {
     var sub = [];
-    if (showGroup && r.group_label) sub.push(r.group_label);
-    if (showGroup && r.teacher_name) sub.push("Prof. " + r.teacher_name);
-    if (r.submitted_at) sub.push("Presentado el " + date(r.submitted_at));
+    if (showTeacher && r.teacher_name) sub.push("Prof. " + r.teacher_name);
+    if (r.submitted_at && r.state !== "no_presento") sub.push("Presentado el " + date(r.submitted_at));
     else if (r.closes_on) sub.push((r.state === "no_presento" ? "Se cerró el " : "Hasta el ") + date(r.closes_on));
-    var tone = { pendiente: "is-warn", aprobado: "is-ok", no_presento: "is-bad", abierto: "is-info", programado: "is-muted" }[r.state] || "";
-    var row = h('<div class="rs-file ex-row ' + tone + '"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
+    var row = h('<div class="rs-file ex-row ' + (EX_TONE[r.state] || "") + '"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
       '<span class="rs-file__t">' + esc(r.student_name) + "<small>" + esc(sub.join(" · ")) + "</small></span>" +
-      (r.submission_id ? '<span class="ex-score"><span><strong>' + exNum(r.score) + "</strong>/" + exNum(r.max_score) + "</span><small>" + r.correct_count + " de " + r.total_count + " correctas</small></span>" : "") +
+      (r.submission_id && r.state !== "no_presento" ? '<span class="ex-score"><span><strong>' + exNum(r.score) + "</strong>/" + exNum(r.max_score) + "</span><small>" +
+        r.correct_count + " de " + r.total_count + " correctas</small></span>" : "") +
       exChip(r.state) + '<span class="rc-ws__acts"></span></div>');
     var box = row.querySelector(".rc-ws__acts");
     (acts || []).forEach(function (a) { if (a) box.appendChild(a); });
     return row;
   }
 
-  // "Ver detalle": todo lo del resultado, para el profesor y para el reporte final.
-  function exDetail(r, extraBtn) {
-    var pct = r.max_score ? Math.round(100 * r.score / r.max_score) : 0;
+  // "Ver detalle". ctx.grade = puede calificar (profesor del grupo, grupo actual).
+  // ctx.review(r) / ctx.view(r) / ctx.approve(r).
+  function exDetail(r, ctx) {
+    ctx = ctx || {};
+    var sent = r.submission_id && r.state !== "no_presento";
+    var pct = sent && r.max_score ? Math.round(100 * r.score / r.max_score) : 0;
     var secs = (r.sections || []).map(function (s) {
       var p = s.max ? Math.round(100 * s.score / s.max) : 0;
       return '<div class="ex-sec"><div class="ex-sec__top"><strong>' + esc(s.title) + "</strong><span>" + s.correct + " de " + s.total + " correctas · " +
-        exNum(s.score) + "/" + exNum(s.max) + ' pts</span></div><div class="ex-bar"><i style="width:' + p + '%"></i></div></div>';
+        exNum(s.score) + "/" + exNum(s.max) + " pts" + (s.open ? " · " + s.open + " por calificar" : "") +
+        '</span></div><div class="ex-bar"><i style="width:' + p + '%"></i></div></div>';
     }).join("");
     var info = [
       ["Estudiante", r.student_name], ["Examen", r.exam_title], ["Módulo", r.module_level],
-      ["Grupo", r.group_label || "—"], ["Profesor", r.teacher_name || "—"],
-      ["Presentado", r.submitted_at ? new Date(r.submitted_at).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" }) : "—"],
+      ["Grupo", r.group_label || "—"], ["Profesor", r.teacher_name || "—"], ["Ciclo", exCycleLabel(r)],
+      ["Presentado", sent && r.submitted_at ? new Date(r.submitted_at).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" }) : "—"],
       ["Franja", r.opens_on ? date(r.opens_on) + " → " + date(r.closes_on) + (r.individual ? " (solo para este estudiante)" : "") : "—"],
+      ["Revisado", r.reviewed_at ? date(r.reviewed_at) : "—"],
       ["Estado", (EX_STATE[r.state] || [0, r.state])[1] + (r.approved_at ? " · " + date(r.approved_at) : "")]
     ];
+    var note = r.state === "pendiente" && ctx.grade ? "Revisa las respuestas y confirma la calificación; después podrás darle OK para enviarle su resultado."
+      : r.state === "revisado" && ctx.grade ? "Calificación confirmada. Dale OK para enviarle el resultado a su Inicio y avisarle por correo." : "";
     var b = h('<div class="ex-detail">' +
-      (r.submission_id
+      (sent
         ? '<div class="ex-total"><div class="ex-total__n"><strong>' + exNum(r.score) + "</strong><span>/" + exNum(r.max_score) + " puntos</span></div>" +
           '<div class="ex-total__m"><span>' + pct + "% · " + r.correct_count + " de " + r.total_count + ' respuestas correctas</span><div class="ex-bar is-big"><i style="width:' + pct + '%"></i></div></div></div>' +
           '<h4 class="ex-h4">Por sección</h4>' + secs
         : '<div class="pnl-alert ok">' + (r.state === "no_presento" ? "No presentó el examen en la franja programada." : "Todavía no ha enviado el examen.") + "</div>") +
+      (note ? '<p class="ex-note">' + esc(note) + "</p>" : "") +
+      '<div class="ex-detail__acts"></div>' +
       '<dl class="ex-info">' + info.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl></div>");
-    var m = modal("Resultado — " + r.student_name, b, extraBtn ? extraBtn.fn : null, extraBtn ? extraBtn.label : "Cerrar", false, true);
-    if (!extraBtn) {
-      var row = document.querySelector(".pnl-modal-bg:last-child .row");
-      if (row) { row.querySelector("[data-x]").remove(); row.querySelector("[data-s]").onclick = m.close; }
-    }
+    var m = modal("Resultado — " + r.student_name, b, function () {}, "Cerrar", false, true);
+    var row = document.querySelector(".pnl-modal-bg:last-child .row [data-x]");
+    if (row) row.remove();
+    var acts = b.querySelector(".ex-detail__acts");
+    function act(label, icon, cls, fn) { acts.appendChild(rcBtn(label, icon, cls, function () { m.close(); fn(r); })); }
+    if (sent && ctx.grade && (r.state === "pendiente" || r.state === "revisado")) act(r.state === "pendiente" ? "Revisar respuestas" : "Revisar de nuevo", "edit", r.state === "pendiente" ? "btn-blue" : "btn-ghost", ctx.review);
+    if (sent && ctx.grade && r.state === "revisado") act("Dar OK y enviar", "arrow", "btn-blue", ctx.approve);
+    if (sent && ctx.view && !(ctx.grade && r.state === "pendiente")) act("Ver respuestas", "read", "btn-dark", ctx.view);
+    if (!acts.children.length) acts.remove();
     return m;
+  }
+
+  // El examen del estudiante con sus respuestas. editable = el profesor califica.
+  function exAnswers(main, crumbs, r, editable, onDone) {
+    var body = rcPage(main, crumbs, "Respuestas de " + r.student_name, r.exam_title + " · " + r.module_level + " · " + (EX_STATE[r.state] || [0, r.state])[1]);
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([
+      q("exam_submissions").select("answers,manual,status").eq("id", r.submission_id),
+      q("validation_exams").select("content").eq("id", r.exam_id)
+    ]).then(function (res) {
+      if (res[0].error) throw res[0].error;
+      if (res[1].error) throw res[1].error;
+      var sub = (res[0].data || [])[0], x = (res[1].data || [])[0];
+      if (!sub || !x) throw new Error("No se encontró el examen.");
+      body.innerHTML = "";
+      var sum = h('<div class="exr-sum"><div class="exr-sum__n"><strong data-s>—</strong><span data-m></span></div>' +
+        '<div class="exr-sum__t"><span data-c></span><span class="exr-sum__open" data-o></span></div><span class="exr-sum__acts"></span></div>');
+      body.appendChild(sum);
+      var manual = sub.manual || {}, open = 0;
+      var paintSum = function (m, t) {
+        manual = m; open = t.open;
+        sum.querySelector("[data-s]").textContent = exNum(t.score);
+        sum.querySelector("[data-m]").textContent = "/" + exNum(t.max) + " puntos";
+        sum.querySelector("[data-c]").textContent = t.correct + " de " + t.total + " correctas";
+        sum.querySelector("[data-o]").textContent = t.open ? t.open + (t.open === 1 ? " pregunta abierta" : " preguntas abiertas") + " por calificar" : "";
+        if (confirm) confirm.disabled = !!t.open;
+      };
+      var confirm = null;
+      if (editable) {
+        confirm = rcBtn("Confirmar calificación", "arrow", "btn-blue", function () {
+          confirm.disabled = true;
+          rpc("teacher_review_exam", { p_submission: r.submission_id, p_manual: manual }).then(function () {
+            toast("Calificación confirmada. Ya puedes darle OK para enviarle su resultado.");
+            onDone(r.submission_id);
+          }).catch(function (e) { confirm.disabled = false; toast(friendly(e), "err"); });
+        });
+        sum.querySelector(".exr-sum__acts").appendChild(confirm);
+        body.appendChild(h('<p class="ex-note">Las preguntas de opción múltiple ya están calificadas (verde = correcta, rojo = la que marcó mal). ' +
+          (exStats(x.content).open ? "Ponle los puntos a cada pregunta abierta y confirma." : "Este examen no tiene preguntas abiertas: revísalo y confirma.") + "</p>"));
+      }
+      body.appendChild(window.LEFExam.render(x.content, sub.answers || {}, manual, { editable: editable, who: "Respuesta del estudiante", onChange: paintSum }));
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
   // ---- Admin ----
   function rcExamenes(main, S) {
     var body = rcPage(main, rcHome(main, S), "Examen de validación",
-      "Un examen al final de cada módulo. El profesor lo programa para su grupo y el estudiante lo presenta en Clase de hoy; aquí ves el examen y los resultados de todos los grupos.");
+      "Un examen al final de cada módulo. El profesor lo programa para su grupo y el estudiante lo presenta en Clase de hoy; aquí ves el examen y los resultados de todos los grupos, por ciclo.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
-    Promise.all([q("validation_exams").select("id,module_level,title,is_test,content"), q("exam_submissions").select("exam_id,status")]).then(function (res) {
+    Promise.all([q("validation_exams").select("id,module_level,title,is_test,intro,content"), q("exam_submissions").select("exam_id,status")]).then(function (res) {
       body.innerHTML = "";
-      if (res[0].error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Exámenes de validación (20260927020000_examenes_validacion.sql).</div>')); return; }
+      if (res[0].error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Exámenes de validación.</div>')); return; }
       S.ex = res[0].data || []; S.exSubs = res[1].data || [];
       var grid = h('<div class="rs-grid"></div>');
       RC_WS_LEVELS.forEach(function (lv) {
         var mods = rcModsOf(S, lv);
         if (!mods.length) return;
         var n = S.ex.filter(function (x) { return x.module_level.split(".")[0] === lv; }).length;
-        var pend = S.exSubs.filter(function (s) { var x = S.ex.filter(function (e) { return e.id === s.exam_id; })[0]; return x && x.module_level.split(".")[0] === lv && s.status === "pendiente"; }).length;
         grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
-          chip: n ? ["ok", n + " de " + mods.length + (n === 1 ? " examen" : " exámenes") + (pend ? " · " + pend + " por revisar" : "")] : ["soon", "Sin exámenes"],
+          chip: n ? ["ok", n + " de " + mods.length + (n === 1 ? " examen" : " exámenes")] : ["soon", "Sin exámenes"],
           onOpen: function () { rcExamenesNivel(main, S, lv); } }));
       });
       body.appendChild(grid);
@@ -2315,12 +2482,21 @@
     var grid = h('<div class="rs-grid"></div>');
     rcModsOf(S, lv).forEach(function (m) {
       var x = S.ex.filter(function (e) { return e.module_level === m.code; })[0];
-      var n = x ? S.exSubs.filter(function (s) { return s.exam_id === x.id; }).length : 0;
+      var n = x ? S.exSubs.filter(function (s) { return s.exam_id === x.id && s.status !== "no_presento"; }).length : 0;
       grid.appendChild(rcCard({ tone: "lvl", badge: m.code, title: m.code, sub: m.title || "Módulo " + m.code,
-        chip: x ? (x.is_test ? ["warn", "Examen de prueba · " + rcCount(n, "resultado", "resultados")] : ["ok", "Con examen · " + rcCount(n, "resultado", "resultados")]) : ["soon", "Sin examen"],
+        chip: x ? [x.is_test ? "warn" : "ok", (x.is_test ? "Examen de prueba · " : "Con examen · ") + rcCount(n, "resultado", "resultados")] : ["soon", "Sin examen"],
         onOpen: function () { rcExamenModulo(main, S, lv, m); } }));
     });
     body.appendChild(grid);
+  }
+
+  function exExamCard(x, extra) {
+    var st = exStats(x.content);
+    var card = h('<div class="rs-file ex-exam"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
+      '<span class="rs-file__t">' + esc(x.title) + "<small>" + st.questions + " preguntas · " + exNum(st.points) + " puntos · " + st.sections + " secciones" +
+      (st.open ? " · " + st.open + " abiertas" : "") + (extra || "") + "</small></span>" +
+      (x.is_test ? '<span class="rs-chip is-warn">Examen de prueba</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+    return card;
   }
 
   function rcExamenModulo(main, S, lv, m) {
@@ -2332,39 +2508,66 @@
       body.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene examen de validación. Pronto podrás traerlo desde su Google Form con “Importar desde Google Forms”.</div>'));
       return;
     }
-    var st = exStats(x.content);
-    var card = h('<div class="rs-file ex-exam"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
-      '<span class="rs-file__t">' + esc(x.title) + "<small>" + st.questions + " preguntas · " + exNum(st.points) + " puntos · " + st.sections + " secciones</small></span>" +
-      (x.is_test ? '<span class="rs-chip is-warn">Examen de prueba</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+    var card = exExamCard(x);
     card.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver examen", "arrow", "btn-dark", function () { exPreview(main, here, x); }));
     body.appendChild(card);
-    body.appendChild(h('<h2 class="ex-h2">Resultados</h2>'));
-    var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
-    body.appendChild(list);
+    body.appendChild(h('<h2 class="ex-h2">Resultados por ciclo</h2>'));
+    var box = h('<div><p class="muted">Cargando…</p></div>');
+    body.appendChild(box);
     rpc("exam_results", { p_exam: x.id }).then(function (rows) {
-      list.innerHTML = "";
-      rows = (rows || []).slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); });
-      if (!rows.length) { list.appendChild(h('<div class="pnl-alert ok">Todavía ningún profesor ha programado este examen.</div>')); return; }
-      rows.forEach(function (r) {
-        list.appendChild(exResultRow(r, true, [
-          rcBtn("Ver detalle", "arrow", "btn-dark", function () { exDetail(r); }),
-          r.submission_id ? rcBtn("Borrar respuesta", "trash", "btn-ghost", function () {
-            promptReason("Borrar respuesta de " + r.student_name,
-              "Se borrará su examen enviado" + (r.state === "aprobado" ? " y la novedad con su resultado" : "") + ". Después su profesor se lo podrá volver a programar.",
-              "Borrar", function (reason) {
-                return rpc("admin_delete_exam_submission", { p_submission: r.submission_id, p_reason: reason }).then(function () {
-                  toast("Respuesta borrada. El profesor ya puede volver a programarle el examen.");
-                  rcExamenModulo(main, S, lv, m);
-                });
-              });
-          }) : null
-        ]));
+      box.innerHTML = "";
+      rows = rows || [];
+      if (!rows.length) { box.appendChild(h('<div class="pnl-alert ok">Todavía ningún profesor ha programado este examen.</div>')); return; }
+      var grid = h('<div class="rs-grid"></div>');
+      exByCycle(rows).forEach(function (cy) {
+        var groups = exByGroup(cy.rows), pend = exPend(cy.rows);
+        grid.appendChild(rcCard({ tone: "blue", icon: "cal", title: cy.label, sub: rcCount(groups.length, "grupo", "grupos") + " · " + rcCount(cy.rows.length, "estudiante", "estudiantes"),
+          chip: pend ? ["warn", pend + " por revisar"] : ["ok", "Al día"],
+          onOpen: function () { exAdminCycle(main, here, x, cy); } }));
       });
-    }).catch(function (e) { list.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+      box.appendChild(grid);
+    }).catch(function (e) { box.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
-  // Vista del examen con la clave (solo admin): así lo verá el estudiante, más
-  // la respuesta correcta en verde y los puntos de cada pregunta.
+  function exAdminCycle(main, crumbs, x, cy) {
+    var here = crumbs.concat([[cy.label, function () { exAdminCycle(main, crumbs, x, cy); }]]);
+    var body = rcPage(main, crumbs, cy.label, x.title + " · grupos de todos los profesores.");
+    var grid = h('<div class="rs-grid"></div>');
+    exByGroup(cy.rows).forEach(function (gr) {
+      var pend = exPend(gr.rows);
+      grid.appendChild(rcCard({ tone: "lvl", badge: x.module_level, title: gr.label, sub: gr.teacher ? "Prof. " + gr.teacher : "",
+        chip: pend ? ["warn", pend + " por revisar"] : ["ok", rcCount(gr.rows.length, "estudiante", "estudiantes")],
+        onOpen: function () { exAdminGroup(main, here, x, gr); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function exAdminGroup(main, crumbs, x, gr) {
+    var here = crumbs.concat([[gr.label, function () { exAdminGroup(main, crumbs, x, gr); }]]);
+    var body = rcPage(main, crumbs, gr.label, (gr.teacher ? "Prof. " + gr.teacher + " · " : "") + x.title);
+    var list = h('<div class="rs-files"></div>');
+    body.appendChild(list);
+    gr.rows.slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); }).forEach(function (r) {
+      var ctx = { view: function (rr) { exAnswers(main, here, rr, false); } };
+      list.appendChild(exResultRow(r, false, [
+        rcBtn("Ver detalle", "arrow", "btn-dark", function () { exDetail(r, ctx); }),
+        r.submission_id ? rcBtn("Borrar respuesta", "trash", "btn-ghost", function () {
+          promptReason("Borrar respuesta de " + r.student_name,
+            (r.state === "no_presento" ? "Se quitará el registro de “No presentó”" : "Se borrará su examen enviado" + (r.state === "aprobado" ? " y la novedad con su resultado" : "")) +
+            ". Después su profesor se lo podrá volver a programar.",
+            "Borrar", function (reason) {
+              return rpc("admin_delete_exam_submission", { p_submission: r.submission_id, p_reason: reason }).then(function () {
+                toast("Respuesta borrada. El profesor ya puede volver a programarle el examen.");
+                gr.rows = gr.rows.filter(function (y) { return y !== r; });
+                exAdminGroup(main, crumbs, x, gr);
+              });
+            });
+        }) : null
+      ]));
+    });
+  }
+
+  // Vista del examen con la clave (solo admin).
   function exPreview(main, crumbs, x) {
     var body = rcPage(main, crumbs, x.title, "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
     if (x.intro) body.appendChild(h('<p class="ex-intro">' + esc(x.intro) + "</p>"));
@@ -2375,6 +2578,11 @@
         (s.youtube ? '<div class="ex-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.youtube) + '" title="Audio" allowfullscreen loading="lazy"></iframe></div>' : "") + "</section>");
       (s.items || []).forEach(function (it) {
         if (it.type === "heading") { sec.appendChild(h('<p class="ex-pv__head">' + esc(it.text) + "</p>")); return; }
+        if (it.type === "text") {
+          sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" +
+            '<p class="ex-q__open">Pregunta abierta: la califica el profesor.</p></div>'));
+          return;
+        }
         var ok = it.correct || [];
         sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" +
           '<ul class="ex-q__opts">' + (it.options || []).map(function (o, i) {
@@ -2386,34 +2594,86 @@
   }
 
   // ---- Profesor: Recursos de la clase → Exámenes de validación ----
+  // Llega desde el calendario o una novedad: abre ese grupo.
+  function exOpenGroup(groupId) {
+    EX_GOTO = groupId || "__root__";
+    if (location.hash === "#recursos_clase") route(); else location.hash = "recursos_clase";
+  }
   function exTeacherCrumbs(main, S) {
     return [["Recursos de la clase", function () { rcClaseRoot(main, S); }], ["Exámenes de validación", function () { exTeacherRoot(main, S); }]];
   }
+  function exLoadTeacher(S) {
+    return Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,content"), rpc("exam_results", {}).catch(function () { return null; })])
+      .then(function (res) {
+        if (res[1].error || res[2] === null) throw new Error("Los exámenes de validación todavía no están activos en la plataforma.");
+        S.tg = res[0]; S.ex = res[1].data || []; S.exRows = res[2] || [];
+      });
+  }
   function exTeacherRoot(main, S) {
     var body = rcPage(main, [["Recursos de la clase", function () { rcClaseRoot(main, S); }]], "Exámenes de validación",
-      "Programa el examen de validación de cada grupo y revisa los resultados. Cuando das el OK, el estudiante recibe su resultado en su Inicio y un correo.");
+      "Programa el examen de validación de cada grupo y revisa los resultados. Cuando confirmas la calificación y das el OK, el estudiante recibe su resultado en su Inicio y un correo.");
     if (!ME.teacher_id) { body.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>')); return; }
     body.innerHTML = '<p class="muted">Cargando…</p>';
-    Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,content"), rpc("exam_results", {}).catch(function () { return null; })]).then(function (res) {
+    exLoadTeacher(S).then(function () {
       body.innerHTML = "";
-      if (res[1].error || res[2] === null) { body.appendChild(h('<div class="pnl-alert warn">Los exámenes de validación todavía no están activos en la plataforma.</div>')); return; }
-      S.tg = res[0]; S.ex = res[1].data || []; S.exRows = res[2] || [];
-      if (!S.tg.groups.length) { body.appendChild(h('<div class="pnl-alert ok">No tienes grupos activos.</div>')); return; }
+      if (EX_GOTO) {
+        var goto = S.tg.groups.filter(function (g) { return g.id === EX_GOTO; })[0];
+        EX_GOTO = null;
+        if (goto) { exTeacherGroup(main, S, goto); return; }
+      }
       var grid = h('<div class="rs-grid"></div>');
       S.tg.groups.forEach(function (g) {
         var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
         var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
-        var pend = rows.filter(function (r) { return r.state === "pendiente"; }).length;
+        var pend = exPend(rows);
         var grp = rows.filter(function (r) { return !r.individual; })[0];
         var chip = !x ? ["soon", "Su módulo aún no tiene examen"]
           : pend ? ["warn", pend + " por revisar"]
-          : grp ? (grp.closes_on < exToday() ? ["ok", "Cerrado el " + date(grp.closes_on)] : ["done", "Del " + date(grp.opens_on) + " al " + date(grp.closes_on)])
+          : grp ? (grp.closes_on < exToday() ? ["ok", "Cerrado el " + date(grp.closes_on)] : ["info", "Del " + date(grp.opens_on) + " al " + date(grp.closes_on)])
           : ["soon", "Sin programar"];
         grid.appendChild(rcCard({ tone: "lvl", badge: g.modules ? g.modules.level : "", title: exGroupLabel(g), sub: g.modules ? g.modules.title : "", chip: chip,
           onOpen: function () { exTeacherGroup(main, S, g); } }));
       });
+      var past = S.exRows.filter(function (r) { return !r.group_active; });
+      if (past.length) {
+        grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Anteriores", sub: "Resultados de tus grupos de ciclos pasados",
+          chip: ["soon", rcCount(exByCycle(past).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
+      }
+      if (!grid.children.length) { body.appendChild(h('<div class="pnl-alert ok">No tienes grupos activos.</div>')); return; }
       body.appendChild(grid);
-    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert warn">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function exTeacherPast(main, S) {
+    var body = rcPage(main, exTeacherCrumbs(main, S), "Anteriores", "Tus grupos de ciclos que ya terminaron, con sus resultados guardados.");
+    var grid = h('<div class="rs-grid"></div>');
+    exByCycle(S.exRows.filter(function (r) { return !r.group_active; })).forEach(function (cy) {
+      grid.appendChild(rcCard({ tone: "blue", icon: "cal", title: cy.label, sub: rcCount(exByGroup(cy.rows).length, "grupo", "grupos"),
+        onOpen: function () { exTeacherPastCycle(main, S, cy); } }));
+    });
+    body.appendChild(grid);
+  }
+  function exTeacherPastCycle(main, S, cy) {
+    var crumbs = exTeacherCrumbs(main, S).concat([["Anteriores", function () { exTeacherPast(main, S); }]]);
+    var body = rcPage(main, crumbs, cy.label, "Tus grupos de este ciclo.");
+    var grid = h('<div class="rs-grid"></div>');
+    exByGroup(cy.rows).forEach(function (gr) {
+      grid.appendChild(rcCard({ tone: "lvl", badge: gr.rows[0].module_level, title: gr.label, sub: rcCount(gr.rows.length, "estudiante", "estudiantes"),
+        onOpen: function () { exTeacherPastGroup(main, S, cy, gr); } }));
+    });
+    body.appendChild(grid);
+  }
+  function exTeacherPastGroup(main, S, cy, gr) {
+    var crumbs = exTeacherCrumbs(main, S).concat([["Anteriores", function () { exTeacherPast(main, S); }], [cy.label, function () { exTeacherPastCycle(main, S, cy); }]]);
+    var here = crumbs.concat([[gr.label, function () { exTeacherPastGroup(main, S, cy, gr); }]]);
+    var body = rcPage(main, crumbs, gr.label, gr.rows[0].exam_title);
+    var list = h('<div class="rs-files"></div>');
+    body.appendChild(list);
+    gr.rows.slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); }).forEach(function (r) {
+      list.appendChild(exResultRow(r, false, [rcBtn("Ver detalle", "arrow", "btn-dark", function () {
+        exDetail(r, { view: function (rr) { exAnswers(main, here, rr, false); } });
+      })]));
+    });
   }
 
   function exScheduleForm(opens, closes) {
@@ -2421,7 +2681,8 @@
     return h("<div>" +
       '<div class="ex-dates">' + field("Desde", '<input type="date" name="o" min="' + t + '" value="' + esc(opens || t) + '">') +
       field("Hasta", '<input type="date" name="c" min="' + t + '" value="' + esc(closes || exAddDays(t, 3)) + '">') + "</div>" +
-      '<p class="pnl-sub" style="margin:0">Durante estos días el examen le aparece al estudiante en <strong>Clase de hoy</strong>. Lo presenta una sola vez; quien no lo envíe antes de que termine el último día queda como “No presentó”.</p></div>');
+      '<p class="pnl-sub" style="margin:0">El primer día le aparece al estudiante en su calendario y, durante estos días, en <strong>Clase de hoy</strong>. Lo presenta una sola vez; ' +
+      "quien no lo envíe antes de que termine el último día queda como “No presentó”. El último día te sale en tu calendario la revisión pendiente.</p></div>");
   }
   function exReadDates(b) {
     var o = b.querySelector("[name=o]").value, c = b.querySelector("[name=c]").value;
@@ -2431,9 +2692,9 @@
   }
 
   function exApprove(r, done) {
-    modal("Dar OK al resultado",
+    modal("Dar OK y enviar el resultado",
       h('<p class="pnl-sub" style="margin:0">Se publicará el resultado de <strong>' + esc(r.student_name) + "</strong> (" + exNum(r.score) + "/" + exNum(r.max_score) +
-        " puntos) en su Inicio y le llegará un correo avisándole que ya puede verlo.</p>"),
+        " puntos) en su Inicio y le llegará un correo avisándole que ya puede verlo. Después ya no se puede cambiar la calificación.</p>"),
       function () {
         return rpc("teacher_approve_exam", { p_submission: r.submission_id }).then(function () {
           return sb.auth.getSession().then(function (s) {
@@ -2451,22 +2712,26 @@
       }, "Dar OK y enviar");
   }
 
-  function exTeacherGroup(main, S, g) {
-    var body = rcPage(main, exTeacherCrumbs(main, S), exGroupLabel(g), (g.modules ? g.modules.level + " — " + g.modules.title : ""));
-    function reload() {
-      rpc("exam_results", {}).then(function (rows) { S.exRows = rows || []; exTeacherGroup(main, S, g); })
+  function exTeacherGroup(main, S, g, reopen) {
+    var crumbs = exTeacherCrumbs(main, S);
+    var here = crumbs.concat([[exGroupLabel(g), function () { exTeacherGroup(main, S, g); }]]);
+    var body = rcPage(main, crumbs, exGroupLabel(g), (g.modules ? g.modules.level + " — " + g.modules.title : ""));
+    function reload(openSub) {
+      rpc("exam_results", {}).then(function (rows) { S.exRows = rows || []; exTeacherGroup(main, S, g, openSub); })
         .catch(function (e) { toast(friendly(e), "err"); });
     }
+    var ctx = {
+      grade: true,
+      review: function (r) { exAnswers(main, here, r, true, function (subId) { reload(subId); }); },
+      view: function (r) { exAnswers(main, here, r, false); },
+      approve: function (r) { exApprove(r, function () { reload(); }); }
+    };
     var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
     if (!x) { body.appendChild(h('<div class="pnl-alert ok">El módulo ' + esc(g.modules ? g.modules.level : "") + " todavía no tiene examen de validación. LEF lo carga en Recursos compartidos.</div>")); return; }
     var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
     var grp = rows.filter(function (r) { return !r.individual; })[0];
-    var sent = rows.filter(function (r) { return r.submission_id; }).length;
-    var st = exStats(x.content);
-    var card = h('<div class="rs-file ex-exam"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
-      '<span class="rs-file__t">' + esc(x.title) + "<small>" + st.questions + " preguntas · " + exNum(st.points) + " puntos" +
-      (grp ? " · Franja: " + esc(date(grp.opens_on)) + " → " + esc(date(grp.closes_on)) : " · Sin programar") + "</small></span>" +
-      (x.is_test ? '<span class="rs-chip is-warn">Examen de prueba</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+    var sent = rows.filter(function (r) { return r.submission_id && r.state !== "no_presento"; }).length;
+    var card = exExamCard(x, grp ? " · Franja: " + esc(date(grp.opens_on)) + " → " + esc(date(grp.closes_on)) : " · Sin programar");
     var acts = card.querySelector(".rc-ws__acts");
     acts.appendChild(rcBtn(grp ? "Cambiar fechas" : "Programar examen", grp ? "edit" : "plus", grp ? "btn-ghost" : "btn-dark", function () {
       var b = exScheduleForm(grp && grp.opens_on, grp && grp.closes_on);
@@ -2478,7 +2743,7 @@
       }, grp ? "Guardar fechas" : "Programar");
     }));
     if (grp && !sent) acts.appendChild(rcBtn("Quitar", "trash", "btn-ghost", function () {
-      confirmDelete("Quitar programación", "El examen dejará de aparecerles a los estudiantes de este grupo.", function () {
+      confirmDelete("Quitar programación", "El examen dejará de aparecerles a los estudiantes de este grupo (también en su calendario).", function () {
         return rpc("teacher_cancel_exam", { p_assignment: grp.assignment_id }).then(function () { toast("Programación quitada."); reload(); });
       });
     }));
@@ -2488,8 +2753,10 @@
     body.appendChild(list);
     if (!rows.length) { list.appendChild(h('<div class="pnl-alert ok">Cuando programes el examen, aquí verás a cada estudiante con su estado y su resultado.</div>')); return; }
     rows.slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); }).forEach(function (r) {
-      var approve = r.state === "pendiente" ? rcBtn("Dar OK", "plus", "btn-blue", function () { exApprove(r, reload); }) : null;
-      var again = r.state === "no_presento" ? rcBtn("Programar de nuevo", "edit", "btn-ghost", function () {
+      var btns = [rcBtn("Ver detalle", "arrow", "btn-dark", function () { exDetail(r, ctx); })];
+      if (r.state === "pendiente") btns.unshift(rcBtn("Revisar respuestas", "edit", "btn-blue", function () { ctx.review(r); }));
+      if (r.state === "revisado") btns.unshift(rcBtn("Dar OK", "arrow", "btn-blue", function () { ctx.approve(r); }));
+      if (r.state === "no_presento") btns.push(rcBtn("Programar de nuevo", "edit", "btn-ghost", function () {
         var b = exScheduleForm();
         b.insertBefore(h('<p class="pnl-sub" style="margin:0 0 10px">Solo para <strong>' + esc(r.student_name) + "</strong>.</p>"), b.firstChild);
         modal("Programar de nuevo — " + r.student_name, b, function () {
@@ -2498,14 +2765,14 @@
             toast("Examen programado para " + r.student_name + "."); reload();
           });
         }, "Programar");
-      }) : null;
-      list.appendChild(exResultRow(r, false, [
-        rcBtn("Ver detalle", "arrow", "btn-dark", function () {
-          exDetail(r, r.state === "pendiente" ? { label: "Dar OK y enviar", fn: function () { setTimeout(function () { exApprove(r, reload); }, 0); } } : null);
-        }),
-        approve, again
-      ]));
+      }));
+      list.appendChild(exResultRow(r, false, btns));
     });
+    // Al volver de "Confirmar calificación": se abre su recuadro ya actualizado.
+    if (reopen) {
+      var again = rows.filter(function (r) { return r.submission_id === reopen; })[0];
+      if (again) exDetail(again, ctx);
+    }
   }
 
   // Pedido del usuario (27 sep 2026): mismo diseño y carpetas que "Recursos
@@ -2516,7 +2783,8 @@
     head(main, "Recursos de la clase", "Cargando…");
     q("modules").select("*").eq("active", true).order("module_number").then(function (r) {
       if (r.error) throw r.error;
-      rcClaseRoot(main, { mods: r.data || [], ro: true });
+      var S = { mods: r.data || [], ro: true };
+      if (EX_GOTO) exTeacherRoot(main, S); else rcClaseRoot(main, S);
     }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
@@ -2546,7 +2814,8 @@
     }
     var box = h("<div></div>");
     main.appendChild(box);
-    window.LEFCalendar.mount(box, { sb: sb, role: ME.role, teacherId: ME.teacher_id, toast: toast });
+    window.LEFCalendar.mount(box, { sb: sb, role: ME.role, teacherId: ME.teacher_id, toast: toast,
+      onExamReview: function (it) { exOpenGroup(it.group_id); } });
   }
 
   /* ============ PAGOS ============ */

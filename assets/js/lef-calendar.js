@@ -97,7 +97,11 @@
     // La crea el profesor desde su Dashboard ("Clases por reprogramar"), no desde aquí.
     reposicion: { label: "Reposiciones", one: "Reposición", color: "#6b4fa3", icon: "redo" },
     // Festivos de Colombia: los pone el sistema (get_my_calendar), nadie los edita.
-    festivo:    { label: "Festivos", one: "Festivo", color: "#c2410c", icon: "flag" }
+    festivo:    { label: "Festivos", one: "Festivo", color: "#c2410c", icon: "flag" },
+    // Examen de validación: lo programa el profesor (Recursos de la clase); el
+    // estudiante lo ve el día que abre y el profesor, el día que cierra.
+    examen:     { label: "Exámenes", one: "Examen de validación", color: "#0e7490", icon: "check" },
+    revision_examen: { label: "Revisión de exámenes", one: "Revisión de exámenes", color: "#b45309", icon: "check" }
   };
   var CATS_BY_ROLE = {
     teacher: ["actividad", "evaluacion", "aviso", "sin_clase"],
@@ -756,6 +760,8 @@
         (it.link_url && /^https:\/\//.test(it.link_url) ? '<a class="lcal-linkbtn" href="' + esc(it.link_url) + '" target="_blank" rel="noopener">' + ic("link") + "<span>Abrir enlace</span></a>" : "") +
         "</div>");
       var actions = [];
+      if (it.category === "examen" && opts.onExam) actions.push({ label: "Ir a Clase de hoy", icon: "right", cls: "btn-blue", fn: function () { opts.onExam(it); } });
+      if (it.category === "revision_examen" && opts.onExamReview) actions.push({ label: "Ir a revisar", icon: "right", cls: "btn-blue", fn: function () { opts.onExamReview(it); } });
       if (it.item_type === "event" && it.can_edit) {
         actions.push({ label: "Eliminar", icon: "trash", cls: "btn-danger", left: true, fn: function () { return confirmRemove(it); } });
         actions.push({ label: "Editar", icon: "edit", cls: "btn-dark", fn: function () { editEvent(it); } });
