@@ -1239,23 +1239,17 @@
   // mecánica del Planificador del profesor:
   //   Mis recursos → niveles (A1…C1)
   //   Nivel        → "Libros complementarios" (menos A1) + sus módulos
-  //   Módulo       → Libro de estudio · Talleres · Recursos interactivos
+  //   Módulo       → Libro de estudio · Talleres · Ejercicios por habilidad
   // Solo salen los niveles y módulos que el estudiante cursa o ya cursó. Un
   // módulo sin pagar sale con candado y lleva a Facturación (la base de datos
   // tampoco entrega su libro). El libro complementario es de TODO el nivel y se
   // abre con cualquier módulo pagado de ese nivel (get_my_complementary_books;
   // varios libros con título, los carga el admin en Recursos compartidos). El A1
   // NO tiene libro complementario: un estudiante solo de A1 no ve esa carpeta.
-  // Talleres e interactivos todavía no tienen contenido: se muestran vacíos.
+  // Talleres y Ejercicios por habilidad los sube el admin en Recursos compartidos.
   var RS_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
   var RS_BOOK_LEVELS = ["A2", "B1", "B2", "C1"];
   var RS_TALLERES = ["Taller semana 1", "Taller semana 2", "Taller semana 3", "Taller semana 4", "Repaso del módulo"];
-  var RS_INTERACTIVOS = [
-    { label: "Vocabulario", icon: "abc" },
-    { label: "Gramática", icon: "grammar" },
-    { label: "Listening", icon: "headph" },
-    { label: "Reading", icon: "file" }
-  ];
 
   function rsModel(rows, books) {
     var byLevel = {};
@@ -1403,8 +1397,8 @@
       onOpen: function () { rsViewer(rsPage(main, inner, "Libro de estudio", c.module_book_title || ""), c.module_heyzine_url, c.module_book_title || "Libro de estudio — " + c.module_level); } }));
     grid.appendChild(rsCard({ tone: "violet", icon: "pencil", title: "Talleres", sub: "4 semanas + repaso del módulo",
       onOpen: function () { rsTalleres(main, inner, c); } }));
-    grid.appendChild(rsCard({ tone: "green", icon: "spark", title: "Recursos interactivos", sub: "Vocabulario, gramática, listening y reading",
-      onOpen: function () { rsInteractivos(main, inner); } }));
+    grid.appendChild(rsCard({ tone: "green", icon: "spark", title: "Ejercicios por habilidad", sub: "Actividades para practicar lo del módulo",
+      onOpen: function () { rsEjercicios(main, inner, c); } }));
     body.appendChild(grid);
   }
 
@@ -1489,15 +1483,43 @@
   // El motor del taller vive en lef-taller.js (lo usan el portal y el panel).
   function rsTallerRender(main, body, T) { window.LEFTaller.render(body, T); }
 
-  function rsInteractivos(main, crumbs) {
-    var body = rsPage(main, crumbs, "Recursos interactivos", "Actividades para practicar a tu ritmo.");
-    var here = crumbs.concat([["Recursos interactivos", function () { rsInteractivos(main, crumbs); }]]);
+  // Ejercicios por habilidad (antes "Recursos interactivos", 26 sep 2026):
+  // módulo → Vocabulario / Gramática / Listening / Reading (cada carpeta dice
+  // cuántas actividades tiene) → las actividades como tarjetas → el ejercicio.
+  // Las sube el admin en Recursos compartidos (tabla skill_activities; el
+  // estudiante solo recibe las de módulos pagados).
+  var RS_SKILLS = [
+    { id: "vocabulario", label: "Vocabulario", icon: "abc" },
+    { id: "gramatica", label: "Gramática", icon: "grammar" },
+    { id: "listening", label: "Listening", icon: "headph" },
+    { id: "reading", label: "Reading", icon: "read" }
+  ];
+  function rsEjercicios(main, crumbs, c) {
+    var body = rsPage(main, crumbs, "Ejercicios por habilidad", "Elige la habilidad que quieres practicar.");
+    var here = crumbs.concat([["Ejercicios por habilidad", function () { rsEjercicios(main, crumbs, c); }]]);
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    sb.from("skill_activities").select("id,skill,title,file_path,file_name,file_type,content")
+      .eq("module_level", c.module_level).order("created_at").then(function (r) {
+        body.innerHTML = "";
+        var all = r.error ? [] : (r.data || []);
+        var grid = h('<div class="rs-grid"></div>');
+        RS_SKILLS.forEach(function (sk) {
+          var list = all.filter(function (w) { return w.skill === sk.id; });
+          grid.appendChild(rsCard({ tone: "green", icon: sk.icon, title: sk.label + " (" + list.length + ")",
+            sub: list.length ? list.length + (list.length === 1 ? " actividad" : " actividades") : "Próximamente",
+            onOpen: function () { rsEjerciciosSkill(main, here, sk, list); } }));
+        });
+        body.appendChild(grid);
+      });
+  }
+  function rsEjerciciosSkill(main, crumbs, sk, list) {
+    var body = rsPage(main, crumbs, sk.label);
+    if (!list.length) { body.appendChild(rsEmpty("Todavía no hay actividades aquí", "LEF las agregará pronto.")); return; }
+    var here = crumbs.concat([[sk.label, function () { rsEjerciciosSkill(main, crumbs, sk, list); }]]);
     var grid = h('<div class="rs-grid"></div>');
-    RS_INTERACTIVOS.forEach(function (it) {
-      grid.appendChild(rsCard({ tone: "green", icon: it.icon, title: it.label, chip: ["soon", "Próximamente"],
-        onOpen: function () {
-          rsPage(main, here, it.label).appendChild(rsEmpty("Todavía no hay actividades aquí", "LEF las agregará pronto."));
-        } }));
+    list.forEach(function (w) {
+      grid.appendChild(rsCard({ tone: "green", icon: w.content ? "spark" : "file", title: w.title, sub: window.LEFTaller.label(w, "Actividad interactiva"),
+        onOpen: function () { window.LEFTaller.show(rsPage(main, here, w.title), w, sb.storage, "ejercicios"); } }));
     });
     body.appendChild(grid);
   }

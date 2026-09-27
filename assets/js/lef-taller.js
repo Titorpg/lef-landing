@@ -209,20 +209,21 @@
   }
 
   var KIND_LABEL = { html: "HTML", pdf: "PDF", word: "Word", ppt: "PowerPoint", excel: "Excel" };
-  function label(w) { return w.content ? "Taller interactivo" : (KIND_LABEL[w.file_type] || "Archivo"); }
+  function label(w, interactive) { return w.content ? (interactive || "Taller interactivo") : (KIND_LABEL[w.file_type] || "Archivo"); }
 
   // Muestra un taller guardado (fila de la tabla workshops) dentro de "body":
   //   * con content (HTML con la plantilla LEF) → el taller con el diseño de la plataforma;
   //   * otro HTML → tal cual, en un marco aislado (sandbox);
   //   * PDF → el visor del navegador; Word/PowerPoint/Excel → el visor de Office.
-  // storage = cliente de Supabase Storage (sb.storage). El enlace del archivo es
+  // storage = cliente de Supabase Storage (sb.storage); bucket = "talleres" (por
+  // defecto) o "ejercicios" (Ejercicios por habilidad). El enlace del archivo es
   // temporal (1 hora) y solo se entrega a quien tiene permiso (reglas del bucket).
-  function show(body, w, storage) {
+  function show(body, w, storage, bucketName) {
     body.innerHTML = "";
     if (w.content) { render(body, w.content); return Promise.resolve(); }
-    var bucket = storage.from("talleres");
+    var bucket = storage.from(bucketName || "talleres");
     if (w.file_type === "html") {
-      body.innerHTML = '<p class="muted">Cargando el taller…</p>';
+      body.innerHTML = '<p class="muted">Cargando…</p>';
       return bucket.download(w.file_path).then(function (r) {
         if (r.error) throw r.error;
         return r.data.text();
@@ -234,7 +235,7 @@
         fr.setAttribute("title", w.title);
         fr.srcdoc = text;
         body.appendChild(fr);
-      }).catch(function () { body.innerHTML = '<div class="pnl-alert err">No pudimos abrir el taller. Intenta de nuevo en unos minutos.</div>'; });
+      }).catch(function () { body.innerHTML = '<div class="pnl-alert err">No pudimos abrir el archivo. Intenta de nuevo en unos minutos.</div>'; });
     }
     body.innerHTML = '<p class="muted">Cargando el archivo…</p>';
     return bucket.createSignedUrl(w.file_path, 3600).then(function (r) {

@@ -1503,15 +1503,6 @@
       return list;
     }
 
-    function folderRow(title, sub, onOpen) {
-      var row = h('<div class="resource-row" tabindex="0" role="button">' +
-        '<div><div style="font-weight:600">' + esc(title) + "</div>" +
-        (sub ? '<span style="font-size:13px;color:var(--grafito)">' + esc(sub) + "</span>" : "") + "</div>" +
-        '<span class="resource-row__chevron" aria-hidden="true">&rsaquo;</span></div>');
-      row.addEventListener("click", onOpen);
-      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } });
-      return row;
-    }
     // Enlace de Meet de la clase (Google no lo entrega por la API): el
     // estudiante lo ve como "Únete a la reunión" en Clase de hoy, SOLO a la
     // hora de su clase (lo decide la función student-classroom).
@@ -1563,14 +1554,23 @@
       return bar;
     }
 
+    // Carpeta de nivel/módulo con el ícono de nivel (globo con A1, A2…); si el
+    // nombre no trae un nivel reconocible, carpeta normal.
+    function levelCard(code, title, sub, onOpen) {
+      var ok = /^[ABC][12](\.[1-3])?$/.test(code || "");
+      return rcCard(ok ? { tone: "lvl", badge: code, title: title, sub: sub, onOpen: onOpen }
+        : { tone: "blue", icon: "folder", title: title, sub: sub, onOpen: onOpen });
+    }
     function showLevels(nav, tree) {
       nav.innerHTML = "";
       window.scrollTo(0, 0);
+      var grid = h('<div class="rs-grid"></div>');
       tree.forEach(function (lv) {
         var n = lv.moduleList.filter(function (m) { return m.key !== OTHERS; }).length;
-        nav.appendChild(folderRow(lv.label, n + (n === 1 ? " módulo" : " módulos") + " · " + lv.links.map(function (l) { return l.name; }).join(", "),
+        grid.appendChild(levelCard(lv.code, lv.label, n + (n === 1 ? " módulo" : " módulos") + " · " + lv.links.map(function (l) { return l.name; }).join(", "),
           function () { showModules(nav, tree, lv); }));
       });
+      nav.appendChild(grid);
     }
 
     function showModules(nav, tree, lv) {
@@ -1582,10 +1582,13 @@
       }).join(" · ") + "</p>"));
       lv.links.forEach(function (l) { nav.appendChild(meetEditor(l)); });
       if (!lv.moduleList.length) nav.appendChild(h('<div class="pnl-alert ok">Esta clase todavía no tiene materiales.</div>'));
+      var grid = h('<div class="rs-grid" style="margin-top:14px"></div>');
       lv.moduleList.forEach(function (mod) {
         var n = mod.items.length;
-        nav.appendChild(folderRow(modLabel(mod), n + (n === 1 ? " clase" : " clases"), function () { showDays(nav, tree, lv, mod); }));
+        grid.appendChild(levelCard(mod.key, mod.key === OTHERS ? OTHERS : mod.key, (mod.title ? mod.title + " · " : "") + n + (n === 1 ? " clase" : " clases"),
+          function () { showDays(nav, tree, lv, mod); }));
       });
+      nav.appendChild(grid);
     }
 
     // Días como acordeón: el contenido (archivos embebidos) solo se carga al
@@ -1640,7 +1643,11 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
-    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>'
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+    spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    abc: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+    grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
+    headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'
   };
   function rcIc(n) {
     return '<svg class="mc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (RC_ICONS[n] || "") + "</svg>";
@@ -1716,6 +1723,7 @@
     var grid = h('<div class="rs-grid"></div>');
     grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Libros", sub: "Libros principales y complementarios", onOpen: function () { rcLibros(main, S); } }));
     grid.appendChild(rcCard({ tone: "violet", icon: "edit", title: "Talleres", sub: "Semana 1 a 4 y repaso de cada módulo", onOpen: function () { rcTalleres(main, S); } }));
+    grid.appendChild(rcCard({ tone: "green", icon: "spark", title: "Ejercicios por habilidad", sub: "Varias actividades por módulo", onOpen: function () { rcEjercicios(main, S); } }));
     body.appendChild(grid);
   }
 
@@ -1957,16 +1965,18 @@
     return base + (ext ? "." + ext : "");
   }
 
-  // Sube el archivo (y si es HTML con la plantilla LEF, extrae el taller).
-  function rcUploadWorkshop(file, mod, slot) {
+  // Sube el archivo al bucket (talleres: <módulo>/<slot>/…; ejercicios: <módulo>/…)
+  // y si es un HTML hecho con el molde LEF, extrae su contenido.
+  function rcUploadWorkshop(file, mod, slot) { return rcUploadFile("talleres", mod + "/" + slot, file, mod); }
+  function rcUploadFile(bucket, folder, file, mod) {
     var kind = window.LEFTaller.kind(file.name);
     if (!kind) return Promise.reject(new Error("Ese tipo de archivo no se puede subir. Usa HTML, PDF, Word, PowerPoint o Excel."));
     if (file.size > 20 * 1024 * 1024) return Promise.reject(new Error("El archivo pesa más de 20 MB."));
-    var path = mod + "/" + slot + "/" + Date.now() + "-" + rcSafeName(file.name);
+    var path = folder + "/" + Date.now() + "-" + rcSafeName(file.name);
     var contentP = kind === "html" ? file.text().then(function (t) { return window.LEFTaller.extract(t, mod); }) : Promise.resolve(null);
     return contentP.then(function (content) {
       var type = kind === "html" ? "text/html; charset=utf-8" : (file.type || "application/octet-stream");
-      return sb.storage.from("talleres").upload(path, file, { contentType: type, upsert: false }).then(function (r) {
+      return sb.storage.from(bucket).upload(path, file, { contentType: type, upsert: false }).then(function (r) {
         if (r.error) throw r.error;
         return { file_path: path, file_name: file.name, file_type: kind, file_size: file.size, content: content };
       });
@@ -2053,6 +2063,146 @@
     });
   }
 
+  // ---------- Parte 3: Ejercicios por habilidad (26 sep 2026) ----------
+  // (Antes "Recursos interactivos".) Ejercicios por habilidad → nivel (A1…C1) →
+  // módulo → Vocabulario / Gramática / Listening / Reading (cada carpeta dice
+  // cuántas actividades tiene) → "Crear actividad" (título + archivo). Bucket
+  // privado "ejercicios" (<módulo>/<habilidad>/<archivo>), tabla skill_activities.
+  // Mismo molde y visor que los talleres (lef-taller.js).
+  var RC_SKILLS = [
+    { id: "vocabulario", label: "Vocabulario", icon: "abc" },
+    { id: "gramatica", label: "Gramática", icon: "grammar" },
+    { id: "listening", label: "Listening", icon: "headph" },
+    { id: "reading", label: "Reading", icon: "read" }
+  ];
+  function rcCrumbsEj(main, S) {
+    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Ejercicios por habilidad", function () { rcEjercicios(main, S); }]];
+  }
+
+  function rcEjercicios(main, S) {
+    var body = rcPage(main, [["Recursos compartidos", function () { rcRoot(main, S); }]], "Ejercicios por habilidad",
+      "Actividades para practicar cada módulo (varias por módulo). El estudiante las ve en Mis recursos → módulo → Ejercicios por habilidad cuando paga el módulo.");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    q("skill_activities").select("id,module_level,skill").then(function (r) {
+      body.innerHTML = "";
+      if (r.error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Ejercicios por habilidad (20260926070000_recursos_compartidos_ejercicios.sql).</div>')); return; }
+      S.ej = r.data || [];
+      var grid = h('<div class="rs-grid"></div>');
+      RC_WS_LEVELS.forEach(function (lv) {
+        var mods = rcModsOf(S, lv);
+        if (!mods.length) return;
+        var n = S.ej.filter(function (x) { return x.module_level.split(".")[0] === lv; }).length;
+        grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
+          chip: n ? ["ok", rcCount(n, "actividad", "actividades")] : ["soon", "Vacío"],
+          onOpen: function () { rcEjerciciosNivel(main, S, lv); } }));
+      });
+      body.appendChild(grid);
+    });
+  }
+
+  function rcEjerciciosNivel(main, S, lv) {
+    var body = rcPage(main, rcCrumbsEj(main, S), "Ejercicios por habilidad " + lv, "Elige el módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    rcModsOf(S, lv).forEach(function (m) {
+      var n = S.ej.filter(function (x) { return x.module_level === m.code; }).length;
+      grid.appendChild(rcCard({ tone: "lvl", badge: m.code, title: m.code, sub: m.title || "Módulo " + m.code,
+        chip: n ? ["ok", rcCount(n, "actividad", "actividades")] : ["soon", "Vacío"],
+        onOpen: function () { rcEjerciciosModulo(main, S, lv, m); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcEjerciciosModulo(main, S, lv, m) {
+    var crumbs = rcCrumbsEj(main, S).concat([["Ejercicios por habilidad " + lv, function () { rcEjerciciosNivel(main, S, lv); }]]);
+    var body = rcPage(main, crumbs, m.code + (m.title ? " — " + m.title : ""), "Elige la habilidad.");
+    var grid = h('<div class="rs-grid"></div>');
+    RC_SKILLS.forEach(function (sk) {
+      var n = S.ej.filter(function (x) { return x.module_level === m.code && x.skill === sk.id; }).length;
+      grid.appendChild(rcCard({ tone: "green", icon: sk.icon, title: sk.label + " (" + n + ")", sub: n ? rcCount(n, "actividad", "actividades") : "Sin actividades todavía",
+        onOpen: function () { rcEjerciciosSkill(main, S, lv, m, sk); } }));
+    });
+    body.appendChild(grid);
+  }
+
+  function rcEjerciciosSkill(main, S, lv, m, sk) {
+    var crumbs = rcCrumbsEj(main, S).concat([["Ejercicios por habilidad " + lv, function () { rcEjerciciosNivel(main, S, lv); }], [m.code, function () { rcEjerciciosModulo(main, S, lv, m); }]]);
+    var here = crumbs.concat([[sk.label, function () { rcEjerciciosSkill(main, S, lv, m, sk); }]]);
+    var body = rcPage(main, crumbs, sk.label, m.code + (m.title ? " — " + m.title : "") + ". El estudiante ve cada actividad como una carpeta y la abre al tocarla.");
+    function reload() {
+      q("skill_activities").select("id,module_level,skill").then(function (r) { if (!r.error) S.ej = r.data || []; rcEjerciciosSkill(main, S, lv, m, sk); });
+    }
+    function acForm(title, isEdit) {
+      return h("<div>" + field("Título de la actividad", '<input name="t" placeholder="Ej.: Listening: at the airport" value="' + esc(title || "") + '">') +
+        field(isEdit ? "Reemplazar archivo (opcional)" : "Archivo de la actividad", '<input name="f" type="file" accept="' + RC_ACCEPT + '">') +
+        '<p class="pnl-sub" style="margin:-4px 0 8px">HTML, PDF, Word, PowerPoint o Excel (máx. 20 MB). Las actividades interactivas se hacen con el ' +
+        '<strong>molde LEF</strong> (el mismo de los talleres): así se ven con el diseño de la plataforma.</p>' +
+        '<p class="rc-molde"><a href="assets/plantillas/taller-molde-lef.html" download="taller-molde-lef.html">Descargar el molde</a>' +
+        '<a href="assets/plantillas/instrucciones-taller.txt" target="_blank" rel="noopener">Cómo hacer una actividad (instrucciones)</a></p></div>');
+    }
+    var bar = h('<div class="pnl-toolbar" style="margin-bottom:16px"></div>');
+    bar.appendChild(rcBtn("Crear actividad", "plus", "btn-dark", function () {
+      var b = acForm("", false);
+      modal("Crear actividad — " + m.code + " · " + sk.label, b, function () {
+        var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
+        if (!t) throw new Error("Escribe el título de la actividad.");
+        if (!f) throw new Error("Elige el archivo de la actividad.");
+        return rcUploadFile("ejercicios", m.code + "/" + sk.id, f, m.code).then(function (up) {
+          up.module_level = m.code; up.skill = sk.id; up.title = t;
+          return q("skill_activities").insert(up).then(function (r) {
+            if (r.error) { sb.storage.from("ejercicios").remove([up.file_path]); throw r.error; }
+            toast(up.content ? "Actividad creada: se verá con el diseño de la plataforma." : up.file_type === "html" ? "Actividad creada: el HTML no usa el molde LEF, se mostrará tal cual." : "Actividad creada.");
+            reload();
+          });
+        });
+      });
+    }));
+    body.appendChild(bar);
+    var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
+    body.appendChild(list);
+    q("skill_activities").select("*").eq("module_level", m.code).eq("skill", sk.id).order("created_at").then(function (r) {
+      list.innerHTML = "";
+      if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Ejercicios por habilidad.</div>')); bar.remove(); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay actividades de ' + esc(sk.label) + " en " + esc(m.code) + '. Usa “Crear actividad”.</div>')); return; }
+      r.data.forEach(function (w) {
+        var row = h('<div class="rs-file rc-ws is-green"><span class="rs-file__ic">' + rcIc(w.content ? "spark" : "file") + "</span>" +
+          '<span class="rs-file__t">' + esc(w.title) + "<small>" + esc(w.file_name) + "</small></span>" +
+          '<span class="rs-chip ' + (w.content ? "is-ok" : "is-soon") + '">' + esc(window.LEFTaller.label(w, "Actividad interactiva")) + "</span>" +
+          '<span class="rc-ws__acts"></span></div>');
+        var acts = row.querySelector(".rc-ws__acts");
+        acts.appendChild(rcBtn("Ver", "arrow", "btn-dark", function () {
+          window.LEFTaller.show(rcPage(main, here, w.title, window.LEFTaller.label(w, "Actividad interactiva") + " · " + w.file_name), w, sb.storage, "ejercicios");
+        }));
+        acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
+          var b = acForm(w.title, true);
+          modal("Editar actividad", b, function () {
+            var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
+            if (!t) throw new Error("Escribe el título de la actividad.");
+            var upP = f ? rcUploadFile("ejercicios", m.code + "/" + sk.id, f, m.code) : Promise.resolve(null);
+            return upP.then(function (up) {
+              var upd = up || {};
+              upd.title = t; upd.updated_at = new Date().toISOString();
+              return q("skill_activities").update(upd).eq("id", w.id).then(function (u) {
+                if (u.error) { if (up) sb.storage.from("ejercicios").remove([up.file_path]); throw u.error; }
+                if (up) sb.storage.from("ejercicios").remove([w.file_path]);
+                toast("Actividad guardada."); reload();
+              });
+            });
+          });
+        }));
+        acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
+          confirmDelete("Eliminar actividad", "Se eliminará “" + w.title + "” de " + m.code + " · " + sk.label + ", con su archivo. Los estudiantes dejarán de verla.", function () {
+            return q("skill_activities").delete().eq("id", w.id).then(function (u) {
+              if (u.error) throw u.error;
+              sb.storage.from("ejercicios").remove([w.file_path]);
+              toast("Actividad eliminada."); reload();
+            });
+          });
+        }));
+        list.appendChild(row);
+      });
+    });
+  }
+
   function secRecursosClase(main) {
     renderRecursosRoot(main);
   }
@@ -2098,16 +2248,11 @@
             return (m.level + " " + m.title).toLowerCase().indexOf(f) !== -1;
           });
           if (!filtered.length) { listBox.appendChild(h('<p class="muted">Sin resultados.</p>')); return; }
+          var grid = h('<div class="rs-grid"></div>');
           filtered.forEach(function (m) {
-            var row = h(
-              '<div class="resource-row" tabindex="0" role="button">' +
-              '<div><div class="lvl-tag" style="margin-bottom:2px">' + esc(m.level) + "</div>" +
-              '<span style="font-size:13.5px;color:var(--grafito)">' + esc(m.title) + "</span></div>" +
-              '<span class="resource-row__chevron" aria-hidden="true">›</span></div>'
-            );
-            row.addEventListener("click", function () { paintViewer(m); });
-            listBox.appendChild(row);
+            grid.appendChild(rcCard({ tone: "lvl", badge: m.level, title: m.level, sub: m.title, onOpen: function () { paintViewer(m); } }));
           });
+          listBox.appendChild(grid);
         }
 
         function paintViewer(m) {
@@ -2140,7 +2285,7 @@
     main.appendChild(back);
     main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">Materiales</h1>'));
     main.appendChild(h('<p class="pnl-sub">Elige qué quieres ver.</p>'));
-    ["Talleres", "Recursos interactivos", "Material bibliográfico"].forEach(function (label) {
+    ["Talleres", "Ejercicios por habilidad", "Material bibliográfico"].forEach(function (label) {
       var row = h('<div class="resource-row" tabindex="0" role="button"><span>' + esc(label) +
         '</span><span class="resource-row__chevron" aria-hidden="true">›</span></div>');
       row.addEventListener("click", function () { renderMaterialCategory(main, label); });

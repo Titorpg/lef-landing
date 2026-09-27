@@ -1253,3 +1253,4 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .rs-card.is-lvl .rs-card__t{color:#1b2a5e;}
 .rs-card.is-lvl.is-locked .lvl-ic{opacity:.45;filter:grayscale(1);}
 @media(max-width:520px){.rs-card.is-lvl .rs-card__ic{width:50px;height:50px;border-radius:13px;}.rs-card__ic .lvl-ic{width:45px;height:45px;}}
+.rs-file.is-green{--c:#1f7a5a;--cbg:#e3f4ec;}
