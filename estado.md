@@ -64,7 +64,7 @@
   → "Crear actividad" (varias). Tabla `skill_activities` (columna skill), bucket privado
   `ejercicios` (<módulo>/<habilidad>/<archivo>), mismo molde y visor (lef-taller.js).
   Estudiante: módulo → Ejercicios por habilidad → 4 carpetas con cantidad → tarjetas → ejercicio.
-- **SQL `20260926070000_recursos_compartidos_ejercicios.sql`**: pasado al usuario, SIN confirmar.
+- SQL `20260926070000_recursos_compartidos_ejercicios.sql`: APLICADO (26 sep; la tabla responde en producción).
 - Ícono de nivel (globo A1…C1) también en el Planificador (niveles y módulos) y en Recursos de
   la clase → Libro de trabajo (profesor). Sin maqueta: falta que el usuario lo vea con un profesor.
 - Siguientes partes (las contará el usuario): otros recursos.
