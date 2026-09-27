@@ -1,6 +1,35 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (cierre 26 sep 2026, noche — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (cierre 27 sep 2026 — esta lista manda sobre notas viejas de abajo)
+
+### ▶ Lo siguiente (sesión del 27 sep cerrada con todo publicado y el SQL aplicado)
+1. **Probar en vivo el recorrido completo del examen** (con cuentas reales): profesor programa el
+   A1.3 a un grupo A1.3 → estudiante lo ve en su calendario (día que abre) y en Clase de hoy → lo
+   envía → profesor: "Revisar respuestas" → "Confirmar calificación" → "Dar OK y enviar" →
+   estudiante: correo + novedad primera con imagen → "Ver detalle" (ventana flotante) →
+   "Descargar evaluación" (PDF) → admin: resultados por ciclo/grupo → "Borrar respuesta" →
+   profesor "Programar de nuevo". Revisar también el evento "Revisión de exámenes pendiente"
+   del profesor y su novedad en Inicio. Ya hay 1 examen enviado y aprobado de prueba (A1.3).
+2. **Exámenes reales**: el usuario pasa los enlaces del EDITOR de cada Google Form (A1.1, A1.2,
+   A1.3 —confirmar cuál de los dos vale—, A2.1, A2.2; A2.3 aún no tiene). Construir el botón
+   **"Importar desde Google Forms"** en Recursos compartidos → Examen de validación → módulo
+   (la clave está en el DOM del editor: `[aria-label="Respuesta correcta"]`; los puntos solo en
+   la pregunta enfocada). Después, quitar el examen de prueba (ver 🧪 abajo).
+3. **Resto de la cuenta del profesor** con el diseño del portal: ya están Inicio, Mis grupos,
+   Estudiantes y Recursos de la clase; faltan revisar **Planificador**, **Calendario** y **Mi
+   cuenta** (el usuario dijo que "toda la cuenta del profesor" debe verse como la del estudiante).
+
+### ✅ Hecho el 27 sep 2026 (resumen; detalle en git log y en las secciones de abajo)
+- Recursos de la clase del profesor = Recursos compartidos en modo solo ver (+ Exámenes de validación).
+- Exámenes de validación: base + ronda 2 (revisión obligatoria, calendario, novedades temporales,
+  PDF, orden por ciclo). Inicio del profesor con el diseño del estudiante; Mis grupos y Estudiantes
+  en tarjetas.
+- Correcciones del final del día: sin ningún enlace a Classroom en el Planificador ("Ver en
+  Classroom" / "Abrir … en Classroom" fuera); la novedad del resultado siempre con imagen;
+  "Ver detalle" del estudiante en ventana flotante centrada; Inicio del profesor sin el aviso
+  "clases por reprogramar" (ya está el recuadro fijo debajo).
+- SQL: se aplica mejor con un script que el usuario corre en su terminal (`node aplicar-sql-….js`,
+  Management API, se borra después) que pegando en el SQL Editor desde el teléfono.
 
 ### 🧪 EXAMEN DE PRUEBA A1.3 — QUITARLO cuando se carguen los exámenes reales (27 sep 2026)
 - El SQL `20260927020000_examenes_validacion.sql` carga un examen de PRUEBA en A1.3
@@ -61,7 +90,7 @@
   presentó" se guardan de verdad al soltar el grupo (trigger `enrollments_exam_no_show_trg`).
 - Novedades automáticas (resultado del estudiante y las del profesor) NO salen en Novedades del admin.
 
-### Lo siguiente (el usuario lo explica por partes y confirma cada una)
+### Después (el usuario lo explica por partes y confirma cada una)
 - **Recursos compartidos → próxima parte**: "Otros recursos" u otra sección que el usuario
   describa. Mismo patrón que las partes hechas (carpetas nivel → módulo, "Atrás", capturas
   antes/después para aprobar, SQL que pega el usuario).
