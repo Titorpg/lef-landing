@@ -198,3 +198,29 @@ export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime
     `a la reunión se habilitan 10 minutos antes de la hora de la clase: ${portalUrl}#clase-hoy` + LEF_TEXT_FOOTER;
   return { subject, html, text };
 }
+
+// --- Examen de validación (notify-exam-result, 27 sep 2026) ---
+// Cuando el profesor da el OK al examen, se avisa que el resultado ya está en
+// el tablón del portal (Inicio). El correo no trae la nota: la ve en LEF.
+export function examResultEmail(c: { name: string; module: string; examTitle: string; teacher: string }, portalUrl: string) {
+  const subject = `Ya está disponible el resultado de tu examen de validación — ${c.module}`;
+  const heading = "Tu resultado ya está disponible";
+  const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">${c.teacher ? `Tu profesor(a) <strong style="color:${INK};font-weight:600">${escHtml(c.teacher)}</strong>` : "Tu profesor(a)"} ya revisó tu examen de validación del módulo <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong>.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+<td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Dónde verlo</p>
+<p style="margin:0;font-family:${FONT};font-size:16px;font-weight:600;color:${INK}">En tu portal, en Inicio</p>
+<p style="margin:6px 0 0;font-family:${FONT};font-size:14.5px;color:${GRAFITO}">Busca la novedad "Resultado de tu examen de validación". Ahí está tu resultado general y el de cada sección.</p>
+</td></tr></table>
+<p style="margin:0">Recuerda que este examen no afecta tu nota final ni define si pasas de nivel: es una herramienta para que veas tu progreso e identifiques qué puedes mejorar.</p>`;
+  const html = lefEmail({
+    preheader: `Tu profesor(a) revisó tu examen de validación de ${c.module}. Míralo en tu portal.`,
+    eyebrow: "Examen de validación", heading, bodyHtml, cta: { label: "Ver mi resultado", url: portalUrl + "#inicio" },
+  });
+  const text = `${hi}\n\n${c.teacher ? `Tu profesor(a) ${c.teacher}` : "Tu profesor(a)"} ya revisó tu examen de validación del módulo ${c.module}.\n\n` +
+    `Míralo en tu portal, en Inicio: busca la novedad "Resultado de tu examen de validación". ${portalUrl}#inicio\n\n` +
+    `Recuerda que este examen no afecta tu nota final ni define si pasas de nivel.` + LEF_TEXT_FOOTER;
+  return { subject, html, text };
+}

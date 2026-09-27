@@ -36,3 +36,6 @@ verify_jwt = true
 
 [functions.student-taller]
 verify_jwt = true
+
+[functions.notify-exam-result]
+verify_jwt = true

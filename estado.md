@@ -2,6 +2,43 @@
 
 ## 📌 PENDIENTES VIGENTES (cierre 26 sep 2026, noche — esta lista manda sobre notas viejas de abajo)
 
+### 🧪 EXAMEN DE PRUEBA A1.3 — QUITARLO cuando se carguen los exámenes reales (27 sep 2026)
+- El SQL `20260927020000_examenes_validacion.sql` carga un examen de PRUEBA en A1.3
+  (`validation_exams.is_test = true`), copia del Google Form que pasó el usuario
+  (`1RESuE_pW017HpbDuIkGWDskmvOweNLCKrtCmjapSkKQ`). Sale con la etiqueta "Examen de prueba".
+- Lo que NO es real en esa prueba: **Listening (27–30)** no tenía clave en Google → respuestas
+  supuestas por Claude (no pudo escuchar el audio); **puntos** supuestos (3 c/u; 4 la 21,
+  Reading y Listening) para sumar 100. Claves dudosas copiadas tal cual de Google: **P12**
+  ("can / couldn't"), **P14** ("could"; el error real es "to help") y **P19** (2 correctas).
+- Para quitarlo (SQL a mano; borra también lo que hayan enviado con él):
+  `delete from public.validation_exams where is_test;`
+- Exámenes reales: están en Classroom, material "DAY 16" de cada módulo (A1.1, A1.2, A1.3 en
+  Classroom es OTRO form que el de prueba — confirmar cuál vale —, A2.1 como adjunto del DAY 16
+  "Conversation Club", A2.2). A2.3 no tiene form todavía. Falta el botón "Importar desde Google
+  Forms" (la clave se lee del EDITOR del form: `[aria-label="Respuesta correcta"]`).
+
+### Exámenes de validación — base construida el 27 sep 2026 (falta probar en vivo)
+- Admin: Recursos compartidos → **Examen de validación** → nivel → módulo → examen ("Ver
+  examen" con la clave en verde) + resultados de todos los grupos ("Ver detalle", "Borrar
+  respuesta" con motivo → Registro de eventos).
+- Profesor: Recursos de la clase → **Exámenes de validación** → su grupo → "Programar examen"
+  (franja de días, máx. 30) / "Cambiar fechas" / "Quitar" · estudiantes con estado (Por
+  revisar, Resultado enviado, No presentó, Puede presentarlo) · "Dar OK" → novedad personal en
+  el Inicio del estudiante (`announcements.student_id`) + correo (`notify-exam-result`) ·
+  "Programar de nuevo" solo para un estudiante que no lo presentó o al que el admin le borró la
+  respuesta.
+- Estudiante: aviso en **Clase de hoy** mientras la franja está abierta → examen por secciones
+  (lectura, video de YouTube, opciones mezcladas fijas, borrador en el navegador) → "Enviar" →
+  "¡Examen enviado!". La nota la calcula la BD (`submit_my_exam`); la clave nunca llega al portal.
+- Prueba completa pendiente: programar el A1.3 a un grupo A1.3 → presentarlo con un estudiante
+  → Dar OK → revisar novedad + correo → borrarlo como admin → reprogramarlo solo a él.
+- Recursos de la clase del profesor: rediseñado el 27 sep (mismas carpetas que Recursos
+  compartidos, solo ver). SQL `20260927010000_profesor_lee_libros_complementarios.sql`.
+- **SQL aplicado por el usuario el 27 sep** (ambas migraciones, pegadas en 3 bloques: tablas,
+  funciones, examen de prueba). Aprendido: en el SQL Editor elegir **"Run without RLS"** ("Run
+  and enable RLS" mete líneas y rompe el script) y NO pegar líneas larguísimas (el JSON en una
+  sola línea llegó cortado): partir en renglones cortos.
+
 ### Lo siguiente (el usuario lo explica por partes y confirma cada una)
 - **Recursos compartidos → próxima parte**: "Otros recursos" u otra sección que el usuario
   describa. Mismo patrón que las partes hechas (carpetas nivel → módulo, "Atrás", capturas

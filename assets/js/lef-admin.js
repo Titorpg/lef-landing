@@ -264,6 +264,8 @@
       return "No se puede eliminar: tiene " + label + " asociados. Cámbialos, cancélalos o desactívalo primero.";
     }
     if (e && e.code === "23505") return "Ya existe un registro con ese dato (correo duplicado, por ejemplo).";
+    var lef = m.match(/^LEF_[A-Z_]+:\s*([\s\S]+)$/);
+    if (lef) return lef[1];
     return m;
   }
   function btn(label, cls, fn) { var b = h('<button class="btn btn-sm ' + cls + '">' + esc(label) + "</button>"); b.onclick = fn; return b; }
@@ -1619,13 +1621,9 @@
     }
   }
 
-  /* ============ RECURSOS DE LA CLASE (solo profesor) ============ */
-  // Misma mecánica de "carpetas dentro de carpetas" que "Mis recursos" en el
-  // portal del estudiante: lista -> nivel -> contenido, cada uno con su
-  // botón "Volver". Libro de trabajo reusa el mismo visor de Heyzine
-  // (.resource-frame-wrap) que ya ve el estudiante, pero aquí el profesor
-  // elige con cuál módulo entrar mediante una barra de búsqueda.
-  /* ============ RECURSOS COMPARTIDOS DE LAS CLASES (solo admin) ============ */
+  /* ============ RECURSOS COMPARTIDOS DE LAS CLASES (admin; el profesor solo ve) ============ */
+  // El profesor entra por "Recursos de la clase" (secRecursosClase, más abajo)
+  // y recorre estas mismas carpetas con S.ro = true.
   // Pedido del usuario (26 sep 2026): el lugar donde viven los recursos que no
   // cambian según el profesor. Se construye por partes; la primera es Libros:
   //   Libros → Libros principales → nivel → módulo → libro (título + link, Editar)
@@ -1647,6 +1645,7 @@
     spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
     abc: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
     grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
+    exam: '<path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',
     headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'
   };
   function rcIc(n) {
@@ -1717,18 +1716,29 @@
     }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
+  // Ruta hasta "Recursos compartidos": el admin entra directo; el profesor llega
+  // desde "Recursos de la clase" (S.ro = solo ver, sin crear/editar/eliminar).
+  function rcBase(main, S) {
+    return S.ro ? [["Recursos de la clase", function () { rcClaseRoot(main, S); }]] : [];
+  }
+  function rcHome(main, S) {
+    return rcBase(main, S).concat([["Recursos compartidos", function () { rcRoot(main, S); }]]);
+  }
+
   function rcRoot(main, S) {
-    var body = rcPage(main, [], "Recursos compartidos",
-      "Recursos que se usan igual en todas las clases, sin importar el profesor. Los estudiantes los ven en Mis recursos cuando pagan su módulo.");
+    var body = rcPage(main, rcBase(main, S), "Recursos compartidos", S.ro
+      ? "Los recursos que LEF carga para todas las clases. Aquí los puedes ver y abrir; los agrega y edita el administrador."
+      : "Recursos que se usan igual en todas las clases, sin importar el profesor. Los estudiantes los ven en Mis recursos cuando pagan su módulo.");
     var grid = h('<div class="rs-grid"></div>');
     grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Libros", sub: "Libros principales y complementarios", onOpen: function () { rcLibros(main, S); } }));
     grid.appendChild(rcCard({ tone: "violet", icon: "edit", title: "Talleres", sub: "Semana 1 a 4 y repaso de cada módulo", onOpen: function () { rcTalleres(main, S); } }));
     grid.appendChild(rcCard({ tone: "green", icon: "spark", title: "Ejercicios por habilidad", sub: "Varias actividades por módulo", onOpen: function () { rcEjercicios(main, S); } }));
+    if (!S.ro) grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Examen de validación", sub: "Un examen al final de cada módulo y sus resultados", onOpen: function () { rcExamenes(main, S); } }));
     body.appendChild(grid);
   }
 
   function rcLibros(main, S) {
-    var crumbs = [["Recursos compartidos", function () { rcRoot(main, S); }]];
+    var crumbs = rcHome(main, S);
     var body = rcPage(main, crumbs, "Libros");
     var withBook = S.mods.filter(function (m) { return m.heyzine_url; }).length;
     var grid = h('<div class="rs-grid"></div>');
@@ -1740,7 +1750,7 @@
   }
 
   function rcCrumbsLibros(main, S) {
-    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Libros", function () { rcLibros(main, S); }]];
+    return rcHome(main, S).concat([["Libros", function () { rcLibros(main, S); }]]);
   }
 
   function rcPrincipales(main, S) {
@@ -1794,6 +1804,7 @@
       if (!rcValidUrl(u)) throw new Error("Pega el link completo del libro (empieza por https://).");
       return [t, u];
     }
+    if (!m.heyzine_url && S.ro) { body.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene libro cargado.</div>')); return; }
     if (!m.heyzine_url) {
       var card = h('<div class="rc-add"><p class="rc-add__t">Este módulo todavía no tiene libro. Pega el link y se mostrará aquí abajo.</p></div>');
       var f = form(); card.appendChild(f);
@@ -1807,7 +1818,7 @@
       return;
     }
     var title = m.book_title || (m.level + " — " + m.title);
-    body.appendChild(rcBookBlock(title, m.heyzine_url, [
+    body.appendChild(rcBookBlock(title, m.heyzine_url, S.ro ? [] : [
       rcBtn("Editar", "edit", "btn-ghost", function () {
         var b = form(null, m.book_title, m.heyzine_url);
         b.appendChild(h('<p class="pnl-sub" style="margin:0">Para quitar el libro del módulo, borra el link y guarda.</p>'));
@@ -1863,15 +1874,15 @@
         });
       });
     }));
-    body.appendChild(bar);
+    if (!S.ro) body.appendChild(bar);
     var list = h('<div class="rc-books"><p class="muted">Cargando…</p></div>');
     body.appendChild(list);
     q("level_complementary_books").select("*").eq("level", lv).order("created_at").then(function (r) {
       list.innerHTML = "";
-      if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Recursos compartidos.</div>')); bar.remove(); return; }
-      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay libros complementarios para ' + lv + '. Usa "Agregar libro complementario".</div>')); return; }
+      if (r.error) { list.appendChild(h('<div class="pnl-alert warn">' + (S.ro ? "Los libros complementarios todavía no están disponibles para profesores." : "Falta aplicar en Supabase la actualización de Recursos compartidos.") + "</div>")); bar.remove(); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay libros complementarios para ' + lv + (S.ro ? "." : '. Usa "Agregar libro complementario".') + "</div>")); return; }
       r.data.forEach(function (bk) {
-        list.appendChild(rcBookBlock(bk.title, bk.url, [
+        list.appendChild(rcBookBlock(bk.title, bk.url, S.ro ? [] : [
           rcBtn("Editar", "edit", "btn-ghost", function () {
             var b = bookForm(bk.title, bk.url);
             modal("Editar libro complementario", b, function () {
@@ -1911,11 +1922,11 @@
   }
   function rcCount(n, one, many) { return n ? n + " " + (n === 1 ? one : many) : "Vacío"; }
   function rcCrumbsTalleres(main, S) {
-    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Talleres", function () { rcTalleres(main, S); }]];
+    return rcHome(main, S).concat([["Talleres", function () { rcTalleres(main, S); }]]);
   }
 
   function rcTalleres(main, S) {
-    var body = rcPage(main, [["Recursos compartidos", function () { rcRoot(main, S); }]], "Talleres",
+    var body = rcPage(main, rcHome(main, S), "Talleres",
       "Un taller por semana y el repaso de cada módulo. El estudiante los ve en Mis recursos → módulo → Talleres cuando paga el módulo.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
     q("workshops").select("id,module_level,slot").then(function (r) {
@@ -2016,13 +2027,13 @@
         });
       });
     }));
-    body.appendChild(bar);
+    if (!S.ro) body.appendChild(bar);
     var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
     body.appendChild(list);
     q("workshops").select("*").eq("module_level", m.code).eq("slot", slot).order("created_at").then(function (r) {
       list.innerHTML = "";
       if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Talleres.</div>')); bar.remove(); return; }
-      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay taller aquí. Usa “Crear taller”.</div>')); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay taller aquí' + (S.ro ? "." : ". Usa “Crear taller”.") + "</div>")); return; }
       r.data.forEach(function (w) {
         var row = h('<div class="rs-file rc-ws"><span class="rs-file__ic">' + rcIc(w.content ? "edit" : "file") + "</span>" +
           '<span class="rs-file__t">' + esc(w.title) + "<small>" + esc(w.file_name) + "</small></span>" +
@@ -2032,7 +2043,7 @@
         acts.appendChild(rcBtn("Ver", "arrow", "btn-dark", function () {
           window.LEFTaller.show(rcPage(main, here, w.title, window.LEFTaller.label(w) + " · " + w.file_name), w, sb.storage);
         }));
-        acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
+        if (!S.ro) acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
           var b = wsForm(w.title, true);
           modal("Editar taller", b, function () {
             var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
@@ -2049,7 +2060,7 @@
             });
           });
         }));
-        acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
+        if (!S.ro) acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
           confirmDelete("Eliminar taller", "Se eliminará “" + w.title + "” de " + m.code + " · " + name + ", con su archivo. Los estudiantes dejarán de verlo.", function () {
             return q("workshops").delete().eq("id", w.id).then(function (u) {
               if (u.error) throw u.error;
@@ -2076,11 +2087,11 @@
     { id: "reading", label: "Reading", icon: "read" }
   ];
   function rcCrumbsEj(main, S) {
-    return [["Recursos compartidos", function () { rcRoot(main, S); }], ["Ejercicios por habilidad", function () { rcEjercicios(main, S); }]];
+    return rcHome(main, S).concat([["Ejercicios por habilidad", function () { rcEjercicios(main, S); }]]);
   }
 
   function rcEjercicios(main, S) {
-    var body = rcPage(main, [["Recursos compartidos", function () { rcRoot(main, S); }]], "Ejercicios por habilidad",
+    var body = rcPage(main, rcHome(main, S), "Ejercicios por habilidad",
       "Actividades para practicar cada módulo (varias por módulo). El estudiante las ve en Mis recursos → módulo → Ejercicios por habilidad cuando paga el módulo.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
     q("skill_activities").select("id,module_level,skill").then(function (r) {
@@ -2156,13 +2167,13 @@
         });
       });
     }));
-    body.appendChild(bar);
+    if (!S.ro) body.appendChild(bar);
     var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
     body.appendChild(list);
     q("skill_activities").select("*").eq("module_level", m.code).eq("skill", sk.id).order("created_at").then(function (r) {
       list.innerHTML = "";
       if (r.error) { list.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Ejercicios por habilidad.</div>')); bar.remove(); return; }
-      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay actividades de ' + esc(sk.label) + " en " + esc(m.code) + '. Usa “Crear actividad”.</div>')); return; }
+      if (!(r.data || []).length) { list.appendChild(h('<div class="pnl-alert ok">Todavía no hay actividades de ' + esc(sk.label) + " en " + esc(m.code) + (S.ro ? "." : ". Usa “Crear actividad”.") + "</div>")); return; }
       r.data.forEach(function (w) {
         var row = h('<div class="rs-file rc-ws is-green"><span class="rs-file__ic">' + rcIc(w.content ? "spark" : "file") + "</span>" +
           '<span class="rs-file__t">' + esc(w.title) + "<small>" + esc(w.file_name) + "</small></span>" +
@@ -2172,7 +2183,7 @@
         acts.appendChild(rcBtn("Ver", "arrow", "btn-dark", function () {
           window.LEFTaller.show(rcPage(main, here, w.title, window.LEFTaller.label(w, "Actividad interactiva") + " · " + w.file_name), w, sb.storage, "ejercicios");
         }));
-        acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
+        if (!S.ro) acts.appendChild(rcBtn("Editar", "edit", "btn-ghost", function () {
           var b = acForm(w.title, true);
           modal("Editar actividad", b, function () {
             var t = b.querySelector("[name=t]").value.trim(), f = b.querySelector("[name=f]").files[0];
@@ -2189,7 +2200,7 @@
             });
           });
         }));
-        acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
+        if (!S.ro) acts.appendChild(rcBtn("Eliminar", "trash", "btn-ghost", function () {
           confirmDelete("Eliminar actividad", "Se eliminará “" + w.title + "” de " + m.code + " · " + sk.label + ", con su archivo. Los estudiantes dejarán de verla.", function () {
             return q("skill_activities").delete().eq("id", w.id).then(function (u) {
               if (u.error) throw u.error;
@@ -2203,104 +2214,320 @@
     });
   }
 
-  function secRecursosClase(main) {
-    renderRecursosRoot(main);
+  // ---------- Parte 4: Examen de validación (27 sep 2026) ----------
+  // Admin: Examen de validación → nivel → módulo → el examen (Ver examen) y la
+  // lista de resultados de todos los grupos (Ver detalle / Borrar respuesta).
+  // Profesor: Recursos de la clase → Exámenes de validación → su grupo →
+  // Programar (franja de días) · resultados · "Dar OK" (novedad + correo).
+  // Tablas validation_exams / exam_assignments / exam_submissions y funciones
+  // de 20260927020000_examenes_validacion.sql.
+  var EX_STATE = {
+    pendiente: ["warn", "Por revisar"], aprobado: ["ok", "Resultado enviado"],
+    no_presento: ["bad", "No presentó"], abierto: ["done", "Puede presentarlo"], programado: ["soon", "Programado"]
+  };
+  function exChip(state) { var s = EX_STATE[state] || ["soon", state]; return '<span class="rs-chip is-' + s[0] + '">' + esc(s[1]) + "</span>"; }
+  function exNum(n) { return n == null ? "—" : String(Math.round(Number(n) * 100) / 100); }
+  function exToday() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }); }
+  function exAddDays(ymd, n) { var d = new Date(ymd + "T12:00:00"); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); }
+  function exStats(content) {
+    var q = 0, pts = 0, secs = (content && content.sections) || [];
+    secs.forEach(function (s) { (s.items || []).forEach(function (it) { if (it.type === "choice") { q++; pts += Number(it.points || 1); } }); });
+    return { questions: q, points: pts, sections: secs.length };
+  }
+  function exGroupLabel(g) {
+    var sc = g.schedules || {};
+    return (g.modules ? g.modules.level : "") + (sc.days ? " · " + days(sc.days).split(" ").join(" · ") : "") + (sc.start_time ? " · " + time(sc.start_time) : "");
+  }
+  function exCrumbs(main, S) { return rcHome(main, S).concat([["Examen de validación", function () { rcExamenes(main, S); }]]); }
+
+  // Tarjeta de un resultado (admin y profesor). acts: botones extra.
+  function exResultRow(r, showGroup, acts) {
+    var sub = [];
+    if (showGroup && r.group_label) sub.push(r.group_label);
+    if (showGroup && r.teacher_name) sub.push("Prof. " + r.teacher_name);
+    if (r.submitted_at) sub.push("Presentado el " + date(r.submitted_at));
+    else if (r.closes_on) sub.push((r.state === "no_presento" ? "Se cerró el " : "Hasta el ") + date(r.closes_on));
+    var tone = { pendiente: "is-warn", aprobado: "is-ok", no_presento: "is-bad", abierto: "is-info", programado: "is-muted" }[r.state] || "";
+    var row = h('<div class="rs-file ex-row ' + tone + '"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
+      '<span class="rs-file__t">' + esc(r.student_name) + "<small>" + esc(sub.join(" · ")) + "</small></span>" +
+      (r.submission_id ? '<span class="ex-score"><span><strong>' + exNum(r.score) + "</strong>/" + exNum(r.max_score) + "</span><small>" + r.correct_count + " de " + r.total_count + " correctas</small></span>" : "") +
+      exChip(r.state) + '<span class="rc-ws__acts"></span></div>');
+    var box = row.querySelector(".rc-ws__acts");
+    (acts || []).forEach(function (a) { if (a) box.appendChild(a); });
+    return row;
   }
 
-  function renderRecursosRoot(main) {
-    head(main, "Recursos de la clase", "Material de apoyo para tus clases.");
-    [
-      { id: "libro", label: "Libro de trabajo" },
-      { id: "materiales", label: "Materiales" }
-    ].forEach(function (it) {
-      var row = h('<div class="resource-row" tabindex="0" role="button"><span>' + esc(it.label) +
-        '</span><span class="resource-row__chevron" aria-hidden="true">›</span></div>');
-      row.addEventListener("click", function () {
-        if (it.id === "libro") renderLibroTrabajo(main); else renderMateriales(main);
+  // "Ver detalle": todo lo del resultado, para el profesor y para el reporte final.
+  function exDetail(r, extraBtn) {
+    var pct = r.max_score ? Math.round(100 * r.score / r.max_score) : 0;
+    var secs = (r.sections || []).map(function (s) {
+      var p = s.max ? Math.round(100 * s.score / s.max) : 0;
+      return '<div class="ex-sec"><div class="ex-sec__top"><strong>' + esc(s.title) + "</strong><span>" + s.correct + " de " + s.total + " correctas · " +
+        exNum(s.score) + "/" + exNum(s.max) + ' pts</span></div><div class="ex-bar"><i style="width:' + p + '%"></i></div></div>';
+    }).join("");
+    var info = [
+      ["Estudiante", r.student_name], ["Examen", r.exam_title], ["Módulo", r.module_level],
+      ["Grupo", r.group_label || "—"], ["Profesor", r.teacher_name || "—"],
+      ["Presentado", r.submitted_at ? new Date(r.submitted_at).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" }) : "—"],
+      ["Franja", r.opens_on ? date(r.opens_on) + " → " + date(r.closes_on) + (r.individual ? " (solo para este estudiante)" : "") : "—"],
+      ["Estado", (EX_STATE[r.state] || [0, r.state])[1] + (r.approved_at ? " · " + date(r.approved_at) : "")]
+    ];
+    var b = h('<div class="ex-detail">' +
+      (r.submission_id
+        ? '<div class="ex-total"><div class="ex-total__n"><strong>' + exNum(r.score) + "</strong><span>/" + exNum(r.max_score) + " puntos</span></div>" +
+          '<div class="ex-total__m"><span>' + pct + "% · " + r.correct_count + " de " + r.total_count + ' respuestas correctas</span><div class="ex-bar is-big"><i style="width:' + pct + '%"></i></div></div></div>' +
+          '<h4 class="ex-h4">Por sección</h4>' + secs
+        : '<div class="pnl-alert ok">' + (r.state === "no_presento" ? "No presentó el examen en la franja programada." : "Todavía no ha enviado el examen.") + "</div>") +
+      '<dl class="ex-info">' + info.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl></div>");
+    var m = modal("Resultado — " + r.student_name, b, extraBtn ? extraBtn.fn : null, extraBtn ? extraBtn.label : "Cerrar", false, true);
+    if (!extraBtn) {
+      var row = document.querySelector(".pnl-modal-bg:last-child .row");
+      if (row) { row.querySelector("[data-x]").remove(); row.querySelector("[data-s]").onclick = m.close; }
+    }
+    return m;
+  }
+
+  // ---- Admin ----
+  function rcExamenes(main, S) {
+    var body = rcPage(main, rcHome(main, S), "Examen de validación",
+      "Un examen al final de cada módulo. El profesor lo programa para su grupo y el estudiante lo presenta en Clase de hoy; aquí ves el examen y los resultados de todos los grupos.");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([q("validation_exams").select("id,module_level,title,is_test,content"), q("exam_submissions").select("exam_id,status")]).then(function (res) {
+      body.innerHTML = "";
+      if (res[0].error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Exámenes de validación (20260927020000_examenes_validacion.sql).</div>')); return; }
+      S.ex = res[0].data || []; S.exSubs = res[1].data || [];
+      var grid = h('<div class="rs-grid"></div>');
+      RC_WS_LEVELS.forEach(function (lv) {
+        var mods = rcModsOf(S, lv);
+        if (!mods.length) return;
+        var n = S.ex.filter(function (x) { return x.module_level.split(".")[0] === lv; }).length;
+        var pend = S.exSubs.filter(function (s) { var x = S.ex.filter(function (e) { return e.id === s.exam_id; })[0]; return x && x.module_level.split(".")[0] === lv && s.status === "pendiente"; }).length;
+        grid.appendChild(rcCard({ tone: "lvl", badge: lv, title: "Nivel " + lv, sub: mods.map(function (m) { return m.code; }).join(", "),
+          chip: n ? ["ok", n + " de " + mods.length + (n === 1 ? " examen" : " exámenes") + (pend ? " · " + pend + " por revisar" : "")] : ["soon", "Sin exámenes"],
+          onOpen: function () { rcExamenesNivel(main, S, lv); } }));
       });
-      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
-      main.appendChild(row);
+      body.appendChild(grid);
     });
   }
 
-  function renderLibroTrabajo(main) {
-    main.innerHTML = "";
-    var back = h('<button type="button" class="resource-back">&larr; Recursos de la clase</button>');
-    back.addEventListener("click", function () { renderRecursosRoot(main); });
-    main.appendChild(back);
-    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">Libro de trabajo</h1>'));
-    main.appendChild(h('<p class="pnl-sub">Busca el módulo cuyo libro quieres abrir.</p>'));
-
-    var searchBox = h('<input type="search" placeholder="Buscar módulo (ej. A1.1, Hello World)…" style="max-width:360px;margin-bottom:14px;display:block">');
-    var listBox = h("<div></div>");
-    var viewerBox = h("<div></div>");
-    main.appendChild(searchBox); main.appendChild(listBox); main.appendChild(viewerBox);
-
-    q("modules").select("id,level,title,heyzine_url,module_number").eq("active", true).order("module_number")
-      .then(function (r) {
-        if (r.error) throw r.error;
-        var mods = r.data || [];
-
-        function paintList(filter) {
-          listBox.innerHTML = "";
-          var f = (filter || "").trim().toLowerCase();
-          var filtered = !f ? mods : mods.filter(function (m) {
-            return (m.level + " " + m.title).toLowerCase().indexOf(f) !== -1;
-          });
-          if (!filtered.length) { listBox.appendChild(h('<p class="muted">Sin resultados.</p>')); return; }
-          var grid = h('<div class="rs-grid"></div>');
-          filtered.forEach(function (m) {
-            grid.appendChild(rcCard({ tone: "lvl", badge: m.level, title: m.level, sub: m.title, onOpen: function () { paintViewer(m); } }));
-          });
-          listBox.appendChild(grid);
-        }
-
-        function paintViewer(m) {
-          searchBox.style.display = "none";
-          listBox.style.display = "none";
-          viewerBox.innerHTML = "";
-          var backToList = h('<button type="button" class="resource-back">&larr; Elegir otro módulo</button>');
-          backToList.addEventListener("click", function () {
-            viewerBox.innerHTML = "";
-            searchBox.style.display = ""; listBox.style.display = "";
-          });
-          viewerBox.appendChild(backToList);
-          viewerBox.appendChild(h('<h2 style="font-size:16px;margin:0 0 12px">' + esc(m.level) + " — " + esc(m.title) + "</h2>"));
-          if (m.heyzine_url) {
-            viewerBox.appendChild(h('<div class="resource-frame-wrap"><iframe src="' + esc(m.heyzine_url) + '" allowfullscreen loading="lazy"></iframe></div>'));
-          } else {
-            viewerBox.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene un libro cargado.</div>'));
-          }
-        }
-
-        paintList("");
-        searchBox.addEventListener("input", function () { paintList(searchBox.value); });
-      }).catch(function (e) { listBox.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  function rcExamenesNivel(main, S, lv) {
+    var body = rcPage(main, exCrumbs(main, S), "Examen de validación " + lv, "Elige el módulo.");
+    var grid = h('<div class="rs-grid"></div>');
+    rcModsOf(S, lv).forEach(function (m) {
+      var x = S.ex.filter(function (e) { return e.module_level === m.code; })[0];
+      var n = x ? S.exSubs.filter(function (s) { return s.exam_id === x.id; }).length : 0;
+      grid.appendChild(rcCard({ tone: "lvl", badge: m.code, title: m.code, sub: m.title || "Módulo " + m.code,
+        chip: x ? (x.is_test ? ["warn", "Examen de prueba · " + rcCount(n, "resultado", "resultados")] : ["ok", "Con examen · " + rcCount(n, "resultado", "resultados")]) : ["soon", "Sin examen"],
+        onOpen: function () { rcExamenModulo(main, S, lv, m); } }));
+    });
+    body.appendChild(grid);
   }
 
-  function renderMateriales(main) {
-    main.innerHTML = "";
-    var back = h('<button type="button" class="resource-back">&larr; Recursos de la clase</button>');
-    back.addEventListener("click", function () { renderRecursosRoot(main); });
-    main.appendChild(back);
-    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:2px">Materiales</h1>'));
-    main.appendChild(h('<p class="pnl-sub">Elige qué quieres ver.</p>'));
-    ["Talleres", "Ejercicios por habilidad", "Material bibliográfico"].forEach(function (label) {
-      var row = h('<div class="resource-row" tabindex="0" role="button"><span>' + esc(label) +
-        '</span><span class="resource-row__chevron" aria-hidden="true">›</span></div>');
-      row.addEventListener("click", function () { renderMaterialCategory(main, label); });
-      row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); } });
-      main.appendChild(row);
+  function rcExamenModulo(main, S, lv, m) {
+    var crumbs = exCrumbs(main, S).concat([["Examen de validación " + lv, function () { rcExamenesNivel(main, S, lv); }]]);
+    var here = crumbs.concat([[m.code, function () { rcExamenModulo(main, S, lv, m); }]]);
+    var body = rcPage(main, crumbs, "Examen de validación " + m.code, m.title || "");
+    var x = S.ex.filter(function (e) { return e.module_level === m.code; })[0];
+    if (!x) {
+      body.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene examen de validación. Pronto podrás traerlo desde su Google Form con “Importar desde Google Forms”.</div>'));
+      return;
+    }
+    var st = exStats(x.content);
+    var card = h('<div class="rs-file ex-exam"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
+      '<span class="rs-file__t">' + esc(x.title) + "<small>" + st.questions + " preguntas · " + exNum(st.points) + " puntos · " + st.sections + " secciones</small></span>" +
+      (x.is_test ? '<span class="rs-chip is-warn">Examen de prueba</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+    card.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver examen", "arrow", "btn-dark", function () { exPreview(main, here, x); }));
+    body.appendChild(card);
+    body.appendChild(h('<h2 class="ex-h2">Resultados</h2>'));
+    var list = h('<div class="rs-files"><p class="muted">Cargando…</p></div>');
+    body.appendChild(list);
+    rpc("exam_results", { p_exam: x.id }).then(function (rows) {
+      list.innerHTML = "";
+      rows = (rows || []).slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); });
+      if (!rows.length) { list.appendChild(h('<div class="pnl-alert ok">Todavía ningún profesor ha programado este examen.</div>')); return; }
+      rows.forEach(function (r) {
+        list.appendChild(exResultRow(r, true, [
+          rcBtn("Ver detalle", "arrow", "btn-dark", function () { exDetail(r); }),
+          r.submission_id ? rcBtn("Borrar respuesta", "trash", "btn-ghost", function () {
+            promptReason("Borrar respuesta de " + r.student_name,
+              "Se borrará su examen enviado" + (r.state === "aprobado" ? " y la novedad con su resultado" : "") + ". Después su profesor se lo podrá volver a programar.",
+              "Borrar", function (reason) {
+                return rpc("admin_delete_exam_submission", { p_submission: r.submission_id, p_reason: reason }).then(function () {
+                  toast("Respuesta borrada. El profesor ya puede volver a programarle el examen.");
+                  rcExamenModulo(main, S, lv, m);
+                });
+              });
+          }) : null
+        ]));
+      });
+    }).catch(function (e) { list.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  // Vista del examen con la clave (solo admin): así lo verá el estudiante, más
+  // la respuesta correcta en verde y los puntos de cada pregunta.
+  function exPreview(main, crumbs, x) {
+    var body = rcPage(main, crumbs, x.title, "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
+    if (x.intro) body.appendChild(h('<p class="ex-intro">' + esc(x.intro) + "</p>"));
+    (x.content.sections || []).forEach(function (s, si) {
+      var sec = h('<section class="ex-pv"><h2 class="ex-pv__t"><span>Sección ' + (si + 1) + "</span>" + esc(s.title) + "</h2>" +
+        (s.instructions ? '<p class="ex-pv__ins">' + esc(s.instructions) + "</p>" : "") +
+        (s.passage ? '<div class="ex-passage">' + esc(s.passage) + "</div>" : "") +
+        (s.youtube ? '<div class="ex-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.youtube) + '" title="Audio" allowfullscreen loading="lazy"></iframe></div>' : "") + "</section>");
+      (s.items || []).forEach(function (it) {
+        if (it.type === "heading") { sec.appendChild(h('<p class="ex-pv__head">' + esc(it.text) + "</p>")); return; }
+        var ok = it.correct || [];
+        sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" +
+          '<ul class="ex-q__opts">' + (it.options || []).map(function (o, i) {
+            return '<li class="' + (ok.indexOf(i) > -1 ? "is-ok" : "") + '">' + esc(o) + (ok.indexOf(i) > -1 ? " ✓" : "") + "</li>";
+          }).join("") + "</ul></div>"));
+      });
+      body.appendChild(sec);
     });
   }
 
-  function renderMaterialCategory(main, label) {
-    main.innerHTML = "";
-    var back = h('<button type="button" class="resource-back">&larr; Materiales</button>');
-    back.addEventListener("click", function () { renderMateriales(main); });
-    main.appendChild(back);
-    main.appendChild(h('<h1 class="pnl-h" style="margin-bottom:14px">' + esc(label) + "</h1>"));
-    main.appendChild(h('<div class="pnl-alert ok">Todavía no hay contenido cargado aquí — LEF lo agregará pronto.</div>'));
+  // ---- Profesor: Recursos de la clase → Exámenes de validación ----
+  function exTeacherCrumbs(main, S) {
+    return [["Recursos de la clase", function () { rcClaseRoot(main, S); }], ["Exámenes de validación", function () { exTeacherRoot(main, S); }]];
+  }
+  function exTeacherRoot(main, S) {
+    var body = rcPage(main, [["Recursos de la clase", function () { rcClaseRoot(main, S); }]], "Exámenes de validación",
+      "Programa el examen de validación de cada grupo y revisa los resultados. Cuando das el OK, el estudiante recibe su resultado en su Inicio y un correo.");
+    if (!ME.teacher_id) { body.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>')); return; }
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,content"), rpc("exam_results", {}).catch(function () { return null; })]).then(function (res) {
+      body.innerHTML = "";
+      if (res[1].error || res[2] === null) { body.appendChild(h('<div class="pnl-alert warn">Los exámenes de validación todavía no están activos en la plataforma.</div>')); return; }
+      S.tg = res[0]; S.ex = res[1].data || []; S.exRows = res[2] || [];
+      if (!S.tg.groups.length) { body.appendChild(h('<div class="pnl-alert ok">No tienes grupos activos.</div>')); return; }
+      var grid = h('<div class="rs-grid"></div>');
+      S.tg.groups.forEach(function (g) {
+        var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
+        var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
+        var pend = rows.filter(function (r) { return r.state === "pendiente"; }).length;
+        var grp = rows.filter(function (r) { return !r.individual; })[0];
+        var chip = !x ? ["soon", "Su módulo aún no tiene examen"]
+          : pend ? ["warn", pend + " por revisar"]
+          : grp ? (grp.closes_on < exToday() ? ["ok", "Cerrado el " + date(grp.closes_on)] : ["done", "Del " + date(grp.opens_on) + " al " + date(grp.closes_on)])
+          : ["soon", "Sin programar"];
+        grid.appendChild(rcCard({ tone: "lvl", badge: g.modules ? g.modules.level : "", title: exGroupLabel(g), sub: g.modules ? g.modules.title : "", chip: chip,
+          onOpen: function () { exTeacherGroup(main, S, g); } }));
+      });
+      body.appendChild(grid);
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function exScheduleForm(opens, closes) {
+    var t = exToday();
+    return h("<div>" +
+      '<div class="ex-dates">' + field("Desde", '<input type="date" name="o" min="' + t + '" value="' + esc(opens || t) + '">') +
+      field("Hasta", '<input type="date" name="c" min="' + t + '" value="' + esc(closes || exAddDays(t, 3)) + '">') + "</div>" +
+      '<p class="pnl-sub" style="margin:0">Durante estos días el examen le aparece al estudiante en <strong>Clase de hoy</strong>. Lo presenta una sola vez; quien no lo envíe antes de que termine el último día queda como “No presentó”.</p></div>');
+  }
+  function exReadDates(b) {
+    var o = b.querySelector("[name=o]").value, c = b.querySelector("[name=c]").value;
+    if (!o || !c) throw new Error("Elige las dos fechas.");
+    if (c < o) throw new Error("La fecha “Hasta” debe ser igual o posterior a “Desde”.");
+    return [o, c];
+  }
+
+  function exApprove(r, done) {
+    modal("Dar OK al resultado",
+      h('<p class="pnl-sub" style="margin:0">Se publicará el resultado de <strong>' + esc(r.student_name) + "</strong> (" + exNum(r.score) + "/" + exNum(r.max_score) +
+        " puntos) en su Inicio y le llegará un correo avisándole que ya puede verlo.</p>"),
+      function () {
+        return rpc("teacher_approve_exam", { p_submission: r.submission_id }).then(function () {
+          return sb.auth.getSession().then(function (s) {
+            var tok = s.data && s.data.session ? s.data.session.access_token : "";
+            return fetch(window.LEF_SUPABASE.url + "/functions/v1/notify-exam-result", {
+              method: "POST", headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+              body: JSON.stringify({ submission_id: r.submission_id })
+            }).then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return res.ok && j.sent ? "ok" : (j.error || j.skipped || "error"); }); })
+              .catch(function () { return "error"; });
+          }).then(function (mail) {
+            toast(mail === "ok" ? "Resultado enviado: ya está en su Inicio y le llegó el correo." : "Resultado publicado en su Inicio, pero el correo no se pudo enviar.", mail === "ok" ? "ok" : "err");
+            done();
+          });
+        });
+      }, "Dar OK y enviar");
+  }
+
+  function exTeacherGroup(main, S, g) {
+    var body = rcPage(main, exTeacherCrumbs(main, S), exGroupLabel(g), (g.modules ? g.modules.level + " — " + g.modules.title : ""));
+    function reload() {
+      rpc("exam_results", {}).then(function (rows) { S.exRows = rows || []; exTeacherGroup(main, S, g); })
+        .catch(function (e) { toast(friendly(e), "err"); });
+    }
+    var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
+    if (!x) { body.appendChild(h('<div class="pnl-alert ok">El módulo ' + esc(g.modules ? g.modules.level : "") + " todavía no tiene examen de validación. LEF lo carga en Recursos compartidos.</div>")); return; }
+    var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
+    var grp = rows.filter(function (r) { return !r.individual; })[0];
+    var sent = rows.filter(function (r) { return r.submission_id; }).length;
+    var st = exStats(x.content);
+    var card = h('<div class="rs-file ex-exam"><span class="rs-file__ic">' + rcIc("exam") + "</span>" +
+      '<span class="rs-file__t">' + esc(x.title) + "<small>" + st.questions + " preguntas · " + exNum(st.points) + " puntos" +
+      (grp ? " · Franja: " + esc(date(grp.opens_on)) + " → " + esc(date(grp.closes_on)) : " · Sin programar") + "</small></span>" +
+      (x.is_test ? '<span class="rs-chip is-warn">Examen de prueba</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+    var acts = card.querySelector(".rc-ws__acts");
+    acts.appendChild(rcBtn(grp ? "Cambiar fechas" : "Programar examen", grp ? "edit" : "plus", grp ? "btn-ghost" : "btn-dark", function () {
+      var b = exScheduleForm(grp && grp.opens_on, grp && grp.closes_on);
+      modal((grp ? "Cambiar fechas — " : "Programar examen — ") + exGroupLabel(g), b, function () {
+        var d = exReadDates(b);
+        return rpc("teacher_schedule_exam", { p_group: g.id, p_opens: d[0], p_closes: d[1], p_student: null }).then(function () {
+          toast("Examen programado del " + date(d[0]) + " al " + date(d[1]) + "."); reload();
+        });
+      }, grp ? "Guardar fechas" : "Programar");
+    }));
+    if (grp && !sent) acts.appendChild(rcBtn("Quitar", "trash", "btn-ghost", function () {
+      confirmDelete("Quitar programación", "El examen dejará de aparecerles a los estudiantes de este grupo.", function () {
+        return rpc("teacher_cancel_exam", { p_assignment: grp.assignment_id }).then(function () { toast("Programación quitada."); reload(); });
+      });
+    }));
+    body.appendChild(card);
+    body.appendChild(h('<h2 class="ex-h2">Estudiantes</h2>'));
+    var list = h('<div class="rs-files"></div>');
+    body.appendChild(list);
+    if (!rows.length) { list.appendChild(h('<div class="pnl-alert ok">Cuando programes el examen, aquí verás a cada estudiante con su estado y su resultado.</div>')); return; }
+    rows.slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); }).forEach(function (r) {
+      var approve = r.state === "pendiente" ? rcBtn("Dar OK", "plus", "btn-blue", function () { exApprove(r, reload); }) : null;
+      var again = r.state === "no_presento" ? rcBtn("Programar de nuevo", "edit", "btn-ghost", function () {
+        var b = exScheduleForm();
+        b.insertBefore(h('<p class="pnl-sub" style="margin:0 0 10px">Solo para <strong>' + esc(r.student_name) + "</strong>.</p>"), b.firstChild);
+        modal("Programar de nuevo — " + r.student_name, b, function () {
+          var d = exReadDates(b);
+          return rpc("teacher_schedule_exam", { p_group: g.id, p_opens: d[0], p_closes: d[1], p_student: r.student_id }).then(function () {
+            toast("Examen programado para " + r.student_name + "."); reload();
+          });
+        }, "Programar");
+      }) : null;
+      list.appendChild(exResultRow(r, false, [
+        rcBtn("Ver detalle", "arrow", "btn-dark", function () {
+          exDetail(r, r.state === "pendiente" ? { label: "Dar OK y enviar", fn: function () { setTimeout(function () { exApprove(r, reload); }, 0); } } : null);
+        }),
+        approve, again
+      ]));
+    });
+  }
+
+  // Pedido del usuario (27 sep 2026): mismo diseño y carpetas que "Recursos
+  // compartidos" del admin, pero solo para ver (S.ro): el profesor no crea,
+  // no edita ni sube archivos. "Materiales" pasó a llamarse Recursos compartidos
+  // y el Libro de trabajo quedó dentro de Libros → Libros principales.
+  function secRecursosClase(main) {
+    head(main, "Recursos de la clase", "Cargando…");
+    q("modules").select("*").eq("active", true).order("module_number").then(function (r) {
+      if (r.error) throw r.error;
+      rcClaseRoot(main, { mods: r.data || [], ro: true });
+    }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function rcClaseRoot(main, S) {
+    var body = rcPage(main, [], "Recursos de la clase", "Material de apoyo para tus clases.");
+    var grid = h('<div class="rs-grid"></div>');
+    grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Recursos compartidos", sub: "Libros, talleres y ejercicios por habilidad",
+      onOpen: function () { rcRoot(main, S); } }));
+    grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Exámenes de validación", sub: "Programa el examen de tus grupos y revisa sus resultados",
+      onOpen: function () { exTeacherRoot(main, S); } }));
+    body.appendChild(grid);
   }
 
   /* ============ CALENDARIO (admin y profesor) ============ */
@@ -2644,7 +2871,9 @@
       activeModules()
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
-      var rows = res[0].data || [], mods = res[1];
+      // Las novedades personales (resultado del examen de validación de un
+      // estudiante) no se administran aquí: salen del OK del profesor.
+      var rows = (res[0].data || []).filter(function (n) { return !n.student_id; }), mods = res[1];
       bar.querySelector("button").onclick = function () { editNovedad(null, mods); };
       var todayStr = new Date().toISOString().slice(0, 10);
       var t = tableWrap(["Novedad", "Categoría", "Para", "Publicada", "Vence", "Estado", "Acciones"]);
@@ -2882,7 +3111,8 @@
     "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada",
     "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)",
     "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)",
-    "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)"
+    "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)",
+    "exam_submission.delete": "Respuesta de examen de validación borrada"
   };
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
@@ -2997,6 +3227,20 @@
             line("Estado de la inscripción", d.pagado ? "ya estaba pagada: sigue activa en el módulo correcto" : (d.estado === "Active" ? "activa" : "pendiente de pago")),
             line("Mensualidad", moved ? (moved === 1 ? "su mensualidad" : "sus " + moved + " mensualidades") + " (con los pagos que tuviera) pasó al módulo correcto" : "no tenía mensualidad; se creó una sola para el módulo correcto"),
             line("Grupo", grp ? "estaba en el grupo " + grp + " y quedó sin grupo (el grupo era del otro módulo)" : "no tenía grupo asignado")
+          ].join("\n")
+        ];
+      }
+      case "exam_submission.delete": {
+        var exSt = d.status === "aprobado" ? "ya tenía el OK del profesor: también se quitó la novedad con su resultado de su Inicio" : "todavía no tenía el OK del profesor";
+        return [
+          "Se BORRÓ el examen de validación que había enviado " + (d.student_name || who(d)) + ". Su profesor se lo puede volver a programar para que lo presente de nuevo.",
+          "Datos del examen que se borró:\n" + [
+            line("Examen", (d.exam_title || "—") + (d.module_level ? " (" + d.module_level + ")" : "")),
+            line("Resultado", (d.score != null ? d.score + " de " + d.max_score + " puntos" : "—") + (d.correct_count != null ? " · " + d.correct_count + " de " + d.total_count + " correctas" : "")),
+            line("Grupo", d.group_label || "—"),
+            line("Profesor", d.teacher_name || "—"),
+            line("Presentado el", date(d.submitted_at)),
+            line("Estado", exSt)
           ].join("\n")
         ];
       }

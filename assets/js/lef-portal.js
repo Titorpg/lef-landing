@@ -1034,6 +1034,8 @@
       '<span class="today-hero__num">' + new Date().getDate() + "</span></div>" +
       '<div class="today-hero__info"><p class="today-hero__mod">Buscando tu clase de hoy…</p></div></div></div>');
     main.appendChild(box);
+    // Examen de validación abierto (lo programa el profesor): sale arriba, haya o no clase hoy.
+    var examsP = sb.rpc("get_my_pending_exams").then(function (r) { return r.error ? [] : r.data || []; }, function () { return []; });
 
     classFn("today").then(function (d) {
       if (location.hash.slice(1) !== "clase-hoy") return;
@@ -1067,6 +1069,9 @@
           "</div>" : "") +
         (pill ? '<span class="today-pill is-' + state + '"><i></i>' + esc(pill) + "</span>" : "") +
         "</div></div>"));
+      var examSlot = h('<div class="exam-slot"></div>');
+      box.appendChild(examSlot);
+      examsP.then(function (list) { if (location.hash.slice(1) === "clase-hoy") examBanners(examSlot, list, main); });
 
       function empty(icon, title, text, cls) {
         return h('<div class="today-empty' + (cls ? " " + cls : "") + '"><span class="today-empty__ic">' + mcIc(icon) + "</span><h2>" + esc(title) + "</h2><p>" + text + "</p></div>");
@@ -1196,6 +1201,177 @@
   // "Clases anteriores" como una carpeta dentro de Clase de hoy: la lista de
   // agendas ya vistas (la más reciente primero), en acordeón como las ve el
   // profesor en el Planificador, cada una con la fecha de la clase encima.
+  /* ---------- Examen de validación (27 sep 2026) ----------
+     El profesor lo programa para el grupo con una franja de días; mientras está
+     abierta sale en Clase de hoy. Se presenta UNA vez, por secciones (como el
+     Google Form de antes). La nota la calcula la base de datos: aquí nunca llega
+     la clave. Al enviar solo se ve "Enviado"; el resultado llega después al
+     Inicio, cuando el profesor da el OK. Las respuestas a medias se guardan en
+     este navegador por si se cierra la página. */
+  function examErr(e) { var m = (e && e.message) || String(e); var x = m.match(/^LEF_[A-Z_]+:\s*([\s\S]+)$/); return x ? x[1] : m; }
+  function examDraftKey(id) { return "lef-exam-" + id; }
+  function examDraft(id) { try { return JSON.parse(localStorage.getItem(examDraftKey(id)) || "null"); } catch (e) { return null; } }
+  function examSaveDraft(id, d) { try { localStorage.setItem(examDraftKey(id), JSON.stringify(d)); } catch (e) { /* sin almacenamiento */ } }
+  function examDropDraft(id) { try { localStorage.removeItem(examDraftKey(id)); } catch (e) { /* nada */ } }
+
+  function examBanners(slot, list, main) {
+    list.forEach(function (x) {
+      var draft = examDraft(x.assignment_id);
+      var b = h('<section class="exam-banner"><span class="exam-banner__ic">' + mcIc("pencil") + "</span>" +
+        '<div class="exam-banner__txt"><span class="exam-banner__k">Examen de validación · ' + esc(x.module_level) + "</span>" +
+        "<h2>" + esc(x.exam_title) + "</h2>" +
+        "<p>Disponible hasta el <strong>" + esc(longYmd(x.closes_on)) + "</strong>. Tienes un solo intento: cuando lo envíes ya no podrás cambiar tus respuestas.</p></div>" +
+        '<button type="button" class="btn btn-blue">' + (draft ? "Continuar examen" : "Presentar examen") + "</button></section>");
+      b.querySelector("button").addEventListener("click", function () { renderExam(main, x.assignment_id); });
+      slot.appendChild(b);
+    });
+  }
+
+  // Orden de opciones mezclado pero fijo para este estudiante y este examen
+  // (si recarga la página, las opciones no cambian de lugar).
+  function examShuffle(arr, seedTxt) {
+    var s = 0;
+    for (var i = 0; i < seedTxt.length; i++) s = (Math.imul(31, s) + seedTxt.charCodeAt(i)) | 0;
+    function rnd() { s = (s + 0x6D2B79F5) | 0; var t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
+    var a = arr.slice();
+    for (var j = a.length - 1; j > 0; j--) { var k = Math.floor(rnd() * (j + 1)); var tmp = a[j]; a[j] = a[k]; a[k] = tmp; }
+    return a;
+  }
+
+  function renderExam(main, assignmentId) {
+    clearTodayTimers();
+    main.innerHTML = "";
+    window.scrollTo(0, 0);
+    var back = h('<button type="button" class="resource-back">&larr; Clase de hoy</button>');
+    back.addEventListener("click", function () { renderClassToday(main); });
+    main.appendChild(back);
+    var box = h('<div class="exm"><p class="muted">Cargando tu examen…</p></div>');
+    main.appendChild(box);
+
+    sb.rpc("get_my_exam", { p_assignment: assignmentId }).then(function (r) {
+      if (r.error) throw r.error;
+      var x = r.data, secs = (x.sections || []).filter(function (s) { return (s.items || []).some(function (it) { return it.type === "choice"; }); });
+      var draft = examDraft(assignmentId) || {};
+      var answers = draft.answers || {}, cur = Math.min(draft.section || 0, secs.length - 1);
+      var totalQ = 0;
+      secs.forEach(function (s) { s.items.forEach(function (it) { if (it.type === "choice") totalQ++; }); });
+      function save() { examSaveDraft(assignmentId, { answers: answers, section: cur }); }
+      function answered() { return Object.keys(answers).length; }
+
+      box.innerHTML = "";
+      box.appendChild(h('<header class="exm-head"><span class="exm-head__k">Examen de validación · ' + esc(x.module_level) + "</span>" +
+        "<h1>" + esc(x.title) + "</h1>" + (x.intro ? "<p>" + esc(x.intro) + "</p>" : "") +
+        '<div class="exm-chips"><span>' + mcIc("check") + totalQ + " preguntas</span><span>" + mcIc("cal") + "Hasta el " + esc(longYmd(x.closes_on)) + "</span>" +
+        "<span>" + mcIc("lock") + "Un solo intento</span></div></header>"));
+      var prog = h('<div class="exm-prog"><div class="exm-prog__top"><span data-sec></span><span data-cnt></span></div><div class="ex-bar"><i></i></div></div>');
+      box.appendChild(prog);
+      var stage = h("<div></div>");
+      box.appendChild(stage);
+
+      function paintProgress() {
+        prog.querySelector("[data-sec]").textContent = "Sección " + (cur + 1) + " de " + secs.length + " · " + secs[cur].title;
+        prog.querySelector("[data-cnt]").textContent = answered() + " de " + totalQ + " respondidas";
+        prog.querySelector("i").style.width = Math.round(100 * answered() / totalQ) + "%";
+      }
+
+      function paint() {
+        var s = secs[cur];
+        stage.innerHTML = "";
+        var sec = h('<section class="exm-sec"><h2>' + esc(s.title) + "</h2>" +
+          (s.instructions ? '<p class="exm-sec__ins">' + esc(s.instructions) + "</p>" : "") +
+          (s.passage ? '<div class="ex-passage">' + esc(s.passage) + "</div>" : "") +
+          (s.youtube ? '<div class="ex-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.youtube) + '?rel=0" title="Audio del examen" allow="encrypted-media" allowfullscreen></iframe></div>' : "") +
+          "</section>");
+        stage.appendChild(sec);
+        s.items.forEach(function (it) {
+          if (it.type === "heading") { stage.appendChild(h('<p class="exm-note">' + esc(it.text) + "</p>")); return; }
+          if (it.type !== "choice") return;
+          var idx = it.options.map(function (_, i) { return i; });
+          if (it.shuffle) idx = examShuffle(idx, assignmentId + it.id);
+          var q = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend></fieldset>");
+          idx.forEach(function (i) {
+            var opt = h('<label class="exm-opt"><input type="radio" name="' + esc(it.id) + '" value="' + i + '"><span>' + esc(it.options[i]) + "</span></label>");
+            var inp = opt.querySelector("input");
+            if (String(answers[it.id]) === String(i)) { inp.checked = true; opt.classList.add("is-sel"); }
+            inp.addEventListener("change", function () {
+              answers[it.id] = i; save(); paintProgress();
+              q.classList.remove("is-missing");
+              q.querySelectorAll(".exm-opt").forEach(function (o) { o.classList.toggle("is-sel", o.querySelector("input").checked); });
+            });
+            q.appendChild(opt);
+          });
+          stage.appendChild(q);
+        });
+        var nav = h('<div class="exm-nav"><p class="exm-nav__err" aria-live="polite"></p></div>');
+        if (cur > 0) {
+          var prev = h('<button type="button" class="btn btn-ghost">Atrás</button>');
+          prev.addEventListener("click", function () { cur--; save(); paint(); window.scrollTo(0, 0); });
+          nav.appendChild(prev);
+        }
+        var last = cur === secs.length - 1;
+        var next = h('<button type="button" class="btn ' + (last ? "btn-blue" : "btn-dark") + '">' + (last ? "Enviar examen" : "Siguiente") + "</button>");
+        next.addEventListener("click", function () {
+          var missing = [].slice.call(stage.querySelectorAll(".exm-q")).filter(function (f) { return answers[f.getAttribute("data-q")] == null; });
+          missing.forEach(function (f) { f.classList.add("is-missing"); });
+          if (missing.length) {
+            nav.querySelector(".exm-nav__err").textContent = missing.length === 1 ? "Te falta responder 1 pregunta de esta sección." : "Te faltan " + missing.length + " preguntas de esta sección.";
+            missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
+          if (!last) { cur++; save(); paint(); window.scrollTo(0, 0); return; }
+          confirmSend();
+        });
+        nav.appendChild(next);
+        stage.appendChild(nav);
+        paintProgress();
+      }
+
+      function confirmSend() {
+        var bg = h('<div class="pnl-modal-bg"></div>');
+        var m = h('<div class="pnl-modal"><h3>¿Enviar tu examen?</h3>' +
+          '<p class="pnl-sub">Respondiste las ' + totalQ + " preguntas. Solo puedes enviarlo <strong>una vez</strong>: después no podrás cambiar tus respuestas.</p>" +
+          '<p class="exm-nav__err" data-err></p>' +
+          '<div class="row"><button type="button" class="btn btn-ghost" data-x>Revisar</button><button type="button" class="btn btn-blue" data-s>Enviar</button></div></div>');
+        bg.appendChild(m);
+        document.body.appendChild(bg);
+        function close() { bg.remove(); }
+        bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+        m.querySelector("[data-x]").addEventListener("click", close);
+        var send = m.querySelector("[data-s]");
+        send.addEventListener("click", function () {
+          send.disabled = true; send.textContent = "Enviando…";
+          sb.rpc("submit_my_exam", { p_assignment: assignmentId, p_answers: answers }).then(function (res) {
+            if (res.error) throw res.error;
+            examDropDraft(assignmentId);
+            close();
+            done();
+          }).catch(function (e) {
+            send.disabled = false; send.textContent = "Enviar";
+            m.querySelector("[data-err]").textContent = examErr(e);
+          });
+        });
+      }
+
+      function done() {
+        box.innerHTML = "";
+        window.scrollTo(0, 0);
+        var d = h('<div class="today-empty exm-done"><span class="today-empty__ic">' + mcIc("check") + "</span>" +
+          "<h2>¡Examen enviado!</h2>" +
+          "<p>Tu profesor lo va a revisar. Cuando esté listo te llegará un correo y verás tu resultado en tu <strong>Inicio</strong>.</p></div>");
+        var b = h('<button type="button" class="btn btn-dark">Volver a Clase de hoy</button>');
+        b.addEventListener("click", function () { renderClassToday(main); });
+        d.appendChild(b);
+        box.appendChild(d);
+      }
+
+      paint();
+    }).catch(function (e) {
+      box.innerHTML = "";
+      var d = h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>No pudimos abrir el examen</h2><p>" + esc(examErr(e)) + "</p></div>");
+      box.appendChild(d);
+    });
+  }
+
   function renderPastClasses(main, previous) {
     clearTodayTimers();
     main.innerHTML = "";
