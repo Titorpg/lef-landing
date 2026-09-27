@@ -1431,3 +1431,12 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .tst-notes textarea{width:100%;margin-top:8px;resize:vertical;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--niebla);border-radius:10px;}
 .tst-notes__row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;}
 .exr ~ .ex-note,.ex-note{max-width:820px;}
+/* Evaluación corregida del estudiante en ventana flotante centrada (27 sep 2026). */
+.exr-modal-bg{align-items:center;justify-content:center;padding:24px 16px;}
+.exr-modal{position:relative;width:min(880px,100%);max-height:calc(100vh - 48px);overflow-y:auto;overscroll-behavior:contain;
+  background:var(--papel);border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.28);padding:22px 22px 4px;}
+.exr-modal .pay-modal__close{position:sticky;top:0;float:right;z-index:6;margin:-6px -6px 0 0;}
+.exr-modal .exm,.exr-modal .exr,.exr-modal .exr-sum{max-width:none;}
+.exr-modal .exm-head{box-shadow:none;}
+body.is-modal-open{overflow:hidden;}
+@media(max-width:520px){.exr-modal{padding:14px 12px 2px;border-radius:16px;max-height:calc(100vh - 24px);}.exr-modal-bg{padding:12px 8px;}}

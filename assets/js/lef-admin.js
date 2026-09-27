@@ -1514,7 +1514,8 @@
       var embedsHtml = attachments.map(attachmentEmbed).join("");
       return '<div class="cls-post">' +
         (m.description ? '<p class="pnl-sub" style="white-space:pre-line;margin-bottom:10px">' + esc(m.description) + "</p>" : "") +
-        (embedsHtml || '<a href="' + esc(m.alternateLink) + '" target="_blank" rel="noopener" class="cls-fallback">Ver en Classroom ↗</a>') +
+        // Nunca se manda a Classroom desde la plataforma (decisión del usuario).
+        (embedsHtml || '<p class="muted" style="font-size:13px">Esta agenda no tiene archivos adjuntos.</p>') +
         "</div>";
     }
 
@@ -1659,9 +1660,6 @@
       nav.innerHTML = "";
       nav.appendChild(foldBar([["Planificador", function () { showLevels(nav, tree); }]], lv.label));
       nav.appendChild(h('<h2 class="pnl-h" style="font-size:18px;margin-bottom:2px">' + esc(lv.label) + "</h2>"));
-      nav.appendChild(h('<p style="margin-bottom:14px">' + lv.links.map(function (l) {
-        return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--azul);text-decoration:none">Abrir “' + esc(l.name) + "” en Classroom ↗</a>";
-      }).join(" · ") + "</p>"));
       lv.links.forEach(function (l) { nav.appendChild(meetEditor(l)); });
       if (!lv.moduleList.length) nav.appendChild(h('<div class="pnl-alert ok">Esta clase todavía no tiene materiales.</div>'));
       var grid = h('<div class="rs-grid" style="margin-top:14px"></div>');

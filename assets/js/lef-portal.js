@@ -321,7 +321,7 @@
         var weekAgo = Date.now() - 7 * 86400000;
         news.forEach(function (n) {
           var cat = NEWS_CAT[n.category] || NEWS_CAT.novedad;
-          var img = safeUrl(n.image_url);
+          var img = newsImg(n);
           var isNew = new Date(n.publish_at).getTime() > weekAgo;
           var excerpt = (n.body || "").length > 160 ? n.body.slice(0, 157).trim() + "…" : (n.body || "");
           var card = h(
@@ -358,10 +358,13 @@
     });
   }
 
+  // Imagen de la novedad; la del resultado del examen siempre lleva la de examen.
+  function newsImg(n) { return safeUrl(n.image_url) || (n.kind === "exam_result" ? "assets/inicio/noticia-examen-resultado.jpg" : ""); }
+
   // Novedad completa en un recuadro (el tablón solo muestra el resumen).
   function openNews(n) {
     var cat = NEWS_CAT[n.category] || NEWS_CAT.novedad;
-    var img = safeUrl(n.image_url), link = safeLink(n.link_url);
+    var img = newsImg(n), link = safeLink(n.link_url);
     var bg = h('<div class="pnl-modal-bg"></div>');
     var box = h(
       '<div class="pnl-modal news-modal">' +
@@ -382,7 +385,7 @@
     bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
     box.querySelector("[data-close]").addEventListener("click", close);
     var det = box.querySelector("[data-exam-detail]");
-    if (det) det.addEventListener("click", function () { close(); renderExamResult(document.querySelector(".pnl-main"), n.ref_id); });
+    if (det) det.addEventListener("click", function () { close(); openExamResult(n.ref_id); });
   }
 
   /* ---------- Facturación ---------- */
@@ -1391,24 +1394,30 @@
     });
   }
 
-  // Examen corregido (desde la novedad del resultado → "Ver detalle"): sus
-  // respuestas, la correcta cuando se equivocó, y "Descargar evaluación" en PDF
-  // para que no se pierda cuando la novedad se quite al empezar otro módulo.
-  function renderExamResult(main, submissionId) {
-    clearTodayTimers();
-    main.innerHTML = "";
-    window.scrollTo(0, 0);
-    var back = h('<button type="button" class="resource-back">&larr; Inicio</button>');
-    back.addEventListener("click", function () { if (location.hash === "#inicio") renderHome(main); else go("inicio"); });
-    main.appendChild(back);
-    var box = h('<div class="exm"><p class="muted">Cargando tu evaluación…</p></div>');
-    main.appendChild(box);
+  // Examen corregido (desde la novedad del resultado → "Ver detalle"), en una
+  // ventana flotante centrada sobre el Inicio (pedido del usuario: no una página
+  // aparte). Sus respuestas, la correcta cuando se equivocó y, al final,
+  // "Descargar evaluación" en PDF para que no se pierda cuando la novedad se quite.
+  function openExamResult(submissionId) {
+    var bg = h('<div class="pnl-modal-bg exr-modal-bg"></div>');
+    var box = h('<div class="exr-modal" role="dialog" aria-modal="true" aria-label="Tu evaluación">' +
+      '<button type="button" class="pay-modal__close" data-close aria-label="Cerrar">×</button>' +
+      '<div class="exm"><p class="muted">Cargando tu evaluación…</p></div></div>');
+    bg.appendChild(box);
+    document.body.appendChild(bg);
+    document.body.classList.add("is-modal-open");
+    function close() { bg.remove(); document.body.classList.remove("is-modal-open"); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    document.addEventListener("keydown", onKey);
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    box.querySelector("[data-close]").addEventListener("click", close);
+    var wrap = box.querySelector(".exm");
     sb.rpc("get_my_exam_result", { p_submission: submissionId }).then(function (r) {
       if (r.error) throw r.error;
       var d = r.data, num = window.LEFExam.num;
       var pct = d.max_score ? Math.round(100 * d.score / d.max_score) : 0;
-      box.innerHTML = "";
-      box.appendChild(h('<header class="exm-head"><span class="exm-head__k">Tu evaluación · ' + esc(d.module_level) + "</span>" +
+      wrap.innerHTML = "";
+      wrap.appendChild(h('<header class="exm-head"><span class="exm-head__k">Tu evaluación · ' + esc(d.module_level) + "</span>" +
         "<h1>" + esc(d.title) + "</h1>" +
         '<div class="exm-chips">' + (d.teacher_name ? "<span>" + mcIc("user") + "Revisó: " + esc(d.teacher_name) + "</span>" : "") +
         "<span>" + mcIc("cal") + "Presentado el " + esc(date(d.submitted_at)) + "</span></div>" +
@@ -1420,7 +1429,7 @@
             num(s.score) + "/" + num(s.max) + ' pts</span></div><div class="ex-bar"><i style="width:' + p + '%"></i></div></div>';
         }).join("") +
         '<p class="exm-sec__ins" style="margin-top:10px">En verde, la respuesta correcta; en rojo, la que marcaste cuando te equivocaste.</p></header>'));
-      box.appendChild(window.LEFExam.render(d.content, d.answers || {}, d.manual || {}, { who: "Tu respuesta" }));
+      wrap.appendChild(window.LEFExam.render(d.content, d.answers || {}, d.manual || {}, { who: "Tu respuesta" }));
       var foot = h('<div class="exm-nav"><p class="exm-nav__err" aria-live="polite"></p></div>');
       var dl = h('<button type="button" class="btn btn-blue">' + mcIc("file") + "<span>Descargar evaluación</span></button>");
       dl.addEventListener("click", function () {
@@ -1435,10 +1444,10 @@
           .then(function () { dl.disabled = false; });
       });
       foot.appendChild(dl);
-      box.appendChild(foot);
+      wrap.appendChild(foot);
     }).catch(function (e) {
-      box.innerHTML = "";
-      box.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>No pudimos abrir tu evaluación</h2><p>" + esc(examErr(e)) + "</p></div>"));
+      wrap.innerHTML = "";
+      wrap.appendChild(h('<div class="today-empty"><span class="today-empty__ic">' + mcIc("alert") + "</span><h2>No pudimos abrir tu evaluación</h2><p>" + esc(examErr(e)) + "</p></div>"));
     });
   }
 
