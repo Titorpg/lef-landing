@@ -2656,6 +2656,21 @@
     function askDelete(title, msg, fn) {
       modal(title, h('<p class="pnl-sub" style="margin-bottom:4px">' + esc(msg) + "</p>"), function () { fn(); change(); }, "Quitar", true);
     }
+    // Sube la imagen (achicada) al almacén público de imágenes del admin, en la
+    // carpeta examenes/<módulo>/, y la deja puesta en la pregunta.
+    function exUploadImg(it, file, msg) {
+      if (!/^image\//.test(file.type)) { msg.textContent = "Ese archivo no es una imagen."; return; }
+      msg.textContent = "Subiendo…";
+      shrinkImage(file).then(function (blob) {
+        var ext = blob.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+        var path = "examenes/" + String(x.module_level).replace(/[^A-Za-z0-9]/g, "-") + "/" + it.id + "_" + Date.now() + "." + ext;
+        return sb.storage.from("novedades").upload(path, blob, { contentType: blob.type || file.type, upsert: false }).then(function (up) {
+          if (up.error) throw up.error;
+          it.image = sb.storage.from("novedades").getPublicUrl(path).data.publicUrl;
+          change();
+        });
+      }).catch(function (err) { msg.textContent = "No se pudo subir: " + friendly(err); });
+    }
     function paintTotal() {
       var st = exStats({ sections: D.sections });
       bar.querySelector("[data-total]").textContent = st.questions + " preguntas · " + exNum(st.points) + " puntos en total";
@@ -2685,11 +2700,18 @@
       pin.addEventListener("input", function () { dirty = true; it.points = pin.value === "" ? null : Number(pin.value); paintTotal(); });
       top.appendChild(pts);
       top.appendChild(tools);
-      if (it.image) {
-        var im = h('<div class="ex-ed-img">' + exImg(it) + "</div>");
-        im.appendChild(mini(rcIc("trash") + "<span>Quitar imagen</span>", "Quitar imagen", function () { delete it.image; change(); }, "is-del is-wide"));
-        q.appendChild(im);
-      }
+      // Imagen de la pregunta: subir una nueva (o cambiarla) y quitarla.
+      var im = h('<div class="ex-ed-img">' + exImg(it) + '<span class="ex-ed-imgacts"></span><input type="file" accept="image/*" hidden>' +
+        '<span class="ex-ed-upmsg" aria-live="polite"></span></div>');
+      var fileIn = im.querySelector("input"), upMsg = im.querySelector(".ex-ed-upmsg"), imActs = im.querySelector(".ex-ed-imgacts");
+      imActs.appendChild(mini(rcIc(it.image ? "edit" : "plus") + "<span>" + (it.image ? "Cambiar imagen" : "Agregar imagen") + "</span>",
+        it.image ? "Subir otra imagen en lugar de esta" : "Subir una imagen para esta pregunta", function () { fileIn.click(); }, "is-wide"));
+      if (it.image) imActs.appendChild(mini(rcIc("trash") + "<span>Quitar imagen</span>", "Quitar imagen", function () { delete it.image; change(); }, "is-del is-wide"));
+      fileIn.addEventListener("change", function () {
+        var file = fileIn.files && fileIn.files[0];
+        if (file) exUploadImg(it, file, upMsg);
+      });
+      q.appendChild(im);
       if (it.type === "text") {
         q.appendChild(h('<p class="ex-q__open">Pregunta abierta: el estudiante escribe su respuesta y la califica el profesor.</p>'));
         return q;
@@ -2861,6 +2883,8 @@
         if (n.type === "choice" && oc !== nc) out.push(q + "la respuesta correcta pasó de " + (oc || "—") + " a " + nc + ".");
         if (Number(o.points) !== Number(n.points)) out.push(q + "los puntos pasaron de " + exNum(o.points) + " a " + exNum(n.points) + ".");
         if (o.image && !n.image) out.push(q + "se quitó la imagen.");
+        else if (!o.image && n.image) out.push(q + "se agregó una imagen.");
+        else if (o.image !== n.image) out.push(q + "se cambió la imagen.");
       });
       O.order.forEach(function (id) { if (!N.m[id]) out.push("Se eliminó la pregunta " + cut(O.m[id].text) + "."); });
       var kept = function (a, b) { return a.filter(function (id) { return b.indexOf(id) > -1; }).join(","); };
