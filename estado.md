@@ -9,6 +9,11 @@
    carpeta examenes/). SQL `20260928020000_examenes_editor.sql` APLICADO el 28 sep (el usuario
    lo pegó en 4 bloques en el SQL Editor). Los exámenes reales (SQL 20260928010000) también
    aplicados. Falta: que el usuario pruebe una edición real con cuenta admin.
+1b. **Profesor reorganizado (28 sep, publicado, falta verlo con cuenta de profesor):**
+   programar / revisar / dar OK del examen está ahora en **Mis grupos** (bloque "Examen de
+   validación" en cada tarjeta + "Grupos anteriores" al final); Recursos de la clase →
+   Recursos compartidos → **Examen de validación** → nivel → módulo → Ver examen (todos los
+   exámenes, con la correcta en verde, SIN editar). Avisos de Inicio/calendario → Mis grupos.
 2. **Preguntas dudosas copiadas TAL CUAL de Google (decidir con el usuario / director):**
    - **A2.2 P23** ("How does Camila feel about her trip overall?"): la clave marcada es "She is
      angry … wants a refund"; por la lectura la correcta es "Despite the difficulties, she found
