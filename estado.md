@@ -1,28 +1,43 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (cierre 27 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (28 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-### ▶ Lo siguiente (sesión del 27 sep cerrada con todo publicado y el SQL aplicado)
-1. **Probar en vivo el recorrido completo del examen** (con cuentas reales): profesor programa el
-   A1.3 a un grupo A1.3 → estudiante lo ve en su calendario (día que abre) y en Clase de hoy → lo
-   envía → profesor: "Revisar respuestas" → "Confirmar calificación" → "Dar OK y enviar" →
-   estudiante: correo + novedad primera con imagen → "Ver detalle" (ventana flotante) →
-   "Descargar evaluación" (PDF) → admin: resultados por ciclo/grupo → "Borrar respuesta" →
-   profesor "Programar de nuevo". Revisar también el evento "Revisión de exámenes pendiente"
-   del profesor y su novedad en Inicio. Ya hay 1 examen enviado y aprobado de prueba (A1.3).
-2. **Exámenes reales**: el usuario pasa los enlaces del EDITOR de cada Google Form (A1.1, A1.2,
-   A1.3 —confirmar cuál de los dos vale—, A2.1, A2.2; A2.3 aún no tiene). Construir el botón
-   **"Importar desde Google Forms"** en Recursos compartidos → Examen de validación → módulo
-   (la clave está en el DOM del editor: `[aria-label="Respuesta correcta"]`; los puntos solo en
-   la pregunta enfocada). Después, quitar el examen de prueba (ver 🧪 abajo).
-3. **Resto de la cuenta del profesor** con el diseño del portal: ya están Inicio, Mis grupos,
-   Estudiantes y Recursos de la clase; faltan revisar **Planificador**, **Calendario** y **Mi
-   cuenta** (el usuario dijo que "toda la cuenta del profesor" debe verse como la del estudiante).
+### ▶ Lo siguiente
+1. **APLICAR EL SQL de los exámenes reales** (28 sep): el usuario corre en su terminal, en la
+   carpeta LEF: `node aplicar-sql-examenes.js` (aplica
+   `20260928010000_examenes_validacion_reales.sql` y lista los exámenes). Después borrar
+   `aplicar-sql-examenes.js` (no está en git). Ese SQL **borra el examen de PRUEBA A1.3** (y su
+   envío de prueba) y carga A1.1, A1.2, A1.3, A2.1, A2.2 y A2.3 (100 pts c/u, clave y puntos de
+   Google). Frontend con imágenes en preguntas ya publicado.
+2. **Preguntas dudosas copiadas TAL CUAL de Google (decidir con el usuario / director):**
+   - **A2.2 P23** ("How does Camila feel about her trip overall?"): la clave marcada es "She is
+     angry … wants a refund"; por la lectura la correcta es "Despite the difficulties, she found
+     the trip worthwhile…".
+   - **A2.3 P20** ("working from home…"): en Google tiene las MISMAS opciones de la P19
+     (participios) → la pregunta no tiene opciones válidas. Hay que redactar opciones.
+   - A1.3 P19 y A1.2 P19 tienen 2 correctas (en A1.2 es a propósito: pizza/porción).
+   - A2.3 no está adjunto en Classroom (DAY 16 módulo 6 sin form); se tomó el form
+     "VALIDATION EXAM MODULE 6 LEVEL A2.3" del Drive del director (18johD_h…).
+3. **Cuenta del profesor con el diseño del portal — revisado 28 sep (por código):** Inicio, Mis
+   grupos, Estudiantes, Recursos de la clase ✅ (27 sep); Calendario ✅ = el mismo componente del
+   estudiante (`LEFCalendar.mount`, diseño v2 del 24 sep); Planificador ✅ carpetas con icono de
+   nivel + botón Atrás (26 sep); Mi cuenta = mismas tarjetas que Mi cuenta del estudiante. Falta
+   solo que el usuario lo confirme a la vista.
 4. **Probar el pago con Wompi en pestaña nueva** (28 sep): el widget incrustado dejaba al
    estudiante atrapado en la pantalla final de Wompi. Ahora "Pague aquí" abre el Web Checkout
    (`checkout.wompi.co/p/`) en otra pestaña con `redirect-url` = /portal; Wompi vuelve con
    `?id=&env=` → Facturación con aviso del resultado. Si el navegador bloquea la pestaña, se
    paga en la misma y vuelve igual. Falta confirmarlo con un pago real (celular y computador).
+
+### ✅ Hecho el 28 sep 2026
+- El usuario probó el recorrido completo del examen con cuentas reales: funcionó perfecto.
+- Pago con Wompi en pestaña nueva (Web Checkout) que vuelve a Facturación.
+- Exámenes reales extraídos de los Google Forms (cuenta director, /u/3) con el navegador:
+  preguntas, clave (`[aria-label="Respuesta correcta"]` del editor), puntos (inputs
+  "La puntuación de esta pregunta es N puntos" de la vista de respuestas), lecturas y videos.
+  A2.2 traía la lectura como imagen → transcrita. A1.2 P11–20 dependen de imagen →
+  `assets/examenes/a1-2-qNN.jpg` y soporte `image` en las preguntas (portal, vista corregida,
+  admin y PDF).
 
 ### ✅ Hecho el 27 sep 2026 (resumen; detalle en git log y en las secciones de abajo)
 - Recursos de la clase del profesor = Recursos compartidos en modo solo ver (+ Exámenes de validación).
