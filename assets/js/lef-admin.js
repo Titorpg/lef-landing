@@ -1042,8 +1042,8 @@
     var teacherCtx = null;
     var myGroupIdsPromise = (isAdminView || !ME.teacher_id)
       ? Promise.resolve(null)
-      : Promise.all([loadMyGroups(), loadGroupHistory()]).then(function (r) {
-          teacherCtx = { groups: r[0].groups, hist: r[1] };
+      : Promise.all([loadMyGroups(), loadGroupHistory(), rpc("exam_results", {}).catch(function () { return []; })]).then(function (r) {
+          teacherCtx = { groups: r[0].groups, hist: r[1], exRows: r[2] || [] };
           return r[0].groups.map(function (g) { return g.id; });
         });
 
@@ -1187,15 +1187,43 @@
     var any = false;
     var byName = function (a, b) { return String(a.name || "").localeCompare(String(b.name || ""), "es"); };
     function ini(n) { return String(n || "?").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase(); }
-    function section(title, sub, chips, list, lineFor, done) {
+    // Resultado del examen de validación de ese estudiante en ESE grupo (28 sep
+    // 2026): "Ver resultado del examen" abre el mismo detalle de Mis grupos; si
+    // todavía falta revisarlo o darle el OK, "Revisar examen" lleva a su grupo.
+    var pageMain = document.querySelector(".pnl-main");
+    function examRow(studentId, ex) {
+      return (ctx.exRows || []).filter(function (r) {
+        if (r.student_id !== studentId || !r.submission_id || r.state === "no_presento") return false;
+        return ex.groupId ? r.group_id === ex.groupId : r.module_level === ex.level && !r.group_active;
+      })[0];
+    }
+    function examBox(r, ex) {
+      var box = h('<div class="tst-exam"><span class="tst-exam__t"><strong>Examen ' + esc(r.module_level) + "</strong>" +
+        (r.state === "aprobado" || r.state === "revisado" ? exNum(r.score) + "/" + exNum(r.max_score) + " puntos" : "Por revisar") + "</span></div>");
+      if (ex.current && (r.state === "pendiente" || r.state === "revisado")) {
+        box.appendChild(rcBtn("Revisar examen", "edit", "btn-blue", function () { exOpenGroup(r.group_id); }));
+      } else {
+        box.appendChild(rcBtn("Ver resultado del examen", "exam", "btn-dark", function () {
+          exDetail(r, { view: function (rr) { exAnswers(pageMain, [["Estudiantes", function () { route(); }]], rr, false); } });
+        }));
+      }
+      return box;
+    }
+    function section(title, sub, chips, list, lineFor, done, ex) {
       var sec = h('<section class="tst-group' + (done ? " is-done" : "") + '"><div class="tst-group__head"><div class="tst-group__t"><strong>' + esc(title) + "</strong>" +
         (sub ? "<span>" + esc(sub) + "</span>" : "") + '</div><div class="tst-group__chips">' + chips + "</div></div></section>");
       var grid = h('<div class="tst-grid"></div>');
       list.slice().sort(byName).forEach(function (x) {
         var line = lineFor ? lineFor(x) : null;
-        if (makeCard[x.id]) { grid.appendChild(makeCard[x.id](line)); return; }
-        grid.appendChild(h('<article class="tst-card"><div class="tst-card__top"><span class="tst-av">' + esc(ini(x.name)) + "</span>" +
-          '<div class="tst-card__who"><strong>' + esc(x.name || "—") + "</strong><span>" + esc(line || "") + "</span></div></div></article>"));
+        var card = makeCard[x.id] ? makeCard[x.id](line)
+          : h('<article class="tst-card"><div class="tst-card__top"><span class="tst-av">' + esc(ini(x.name)) + "</span>" +
+            '<div class="tst-card__who"><strong>' + esc(x.name || "—") + "</strong><span>" + esc(line || "") + "</span></div></div></article>");
+        var r = ex ? examRow(x.id, ex) : null;
+        if (r) {
+          var notes = card.querySelector(".tst-notes");
+          if (notes) card.insertBefore(examBox(r, ex), notes); else card.appendChild(examBox(r, ex));
+        }
+        grid.appendChild(card);
       });
       if (!list.length) grid.appendChild(h('<p class="muted">Sin estudiantes en este grupo.</p>'));
       sec.appendChild(grid);
@@ -1212,7 +1240,8 @@
       section(g.modules ? g.modules.level + " — " + g.modules.title : "Grupo",
         (sc.days ? days(sc.days).split(" ").join(" · ") + " · " + time(sc.start_time) + " – " + time(sc.end_time) : ""),
         '<span class="rs-chip is-info">' + esc(rcCount(list.length, "estudiante", "estudiantes")) + "</span>" +
-        (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : ""), list, null, false);
+        (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : ""), list, null, false,
+        { groupId: g.id, current: true });
     });
     // Grupos anteriores: una carpeta por ciclo (opción B); al abrirla, sus grupos
     // con sus estudiantes, y "Atrás" vuelve a la lista.
@@ -1222,7 +1251,8 @@
       section(lvl + (hg.module_title ? " — " + hg.module_title : ""),
         (hg.days && hg.days.length ? days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) + " – " + time(hg.end_time) : ""),
         '<span class="rs-chip is-ok">Completado</span>' + (hg.cycle_start ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(hg.cycle_start, hg.cycle_end)) + "</span>" : ""),
-        list, function (x) { return x.result === "cancelado" ? "No completó " + lvl + " (no pagó el módulo)" : "Completó " + lvl + " contigo"; }, true);
+        list, function (x) { return x.result === "cancelado" ? "No completó " + lvl + " (no pagó el módulo)" : "Completó " + lvl + " contigo"; }, true,
+        { groupId: hg.group_id || null, level: lvl, current: false });
     }
     function openCycle(cy) {
       main.innerHTML = "";
