@@ -17,7 +17,14 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
      wants a refund"; por la lectura la correcta es "Despite the difficulties, she found the trip
      worthwhile…".
    - **A2.3 P20** ("working from home…"): tiene las MISMAS opciones de la P19 (participios).
+   - **A1.1 P17** ("She never laughs and always looks calm and formal"): clave marcada "funny";
+     la correcta sería "serious".
    - A1.3 P19 y A1.2 P19 tienen 2 correctas (en A1.2 es a propósito: pizza/porción).
+   - **A1.1 corregido el 28 sep (tarde):** se había copiado el form de 20 preguntas ("VALIDATION
+     EXAM LEVEL A1.1 - LUIS CABALLERO", adjunto en LEVEL A1 GR 1); el bueno es "VALIDATION EXAM
+     MODULE 1 LEVEL A1.1" (1_RYgnrz…, 30 preguntas, 100 pts; puntos leídos seleccionando cada
+     pregunta en el editor porque el form no tenía respuestas). SQL `20260928050000` pasado al
+     usuario para el SQL Editor.
    - **A2.3** no está adjunto en Classroom (DAY 16 del módulo 6 sin form): se tomó el form
      "VALIDATION EXAM MODULE 6 LEVEL A2.3" del Drive del director (18johD_h…); confirmar con el
      profesor que es la versión definitiva.
