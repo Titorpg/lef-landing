@@ -9,8 +9,8 @@
    carpeta examenes/). SQL `20260928020000_examenes_editor.sql` APLICADO el 28 sep (el usuario
    lo pegó en 4 bloques en el SQL Editor). Los exámenes reales (SQL 20260928010000) también
    aplicados. Falta: que el usuario pruebe una edición real con cuenta admin.
-1a. **Historial de grupos (28 sep, publicado; FALTA el SQL `20260928030000_historial_grupos.sql`,
-   3 bloques en el SQL Editor):** al cerrar un ciclo, `lef_finish_cycle` guarda la foto de cada
+1a. **Historial de grupos (28 sep, publicado; SQL `20260928030000_historial_grupos.sql` APLICADO,
+   3 bloques en el SQL Editor, 28 sep):** al cerrar un ciclo, `lef_finish_cycle` guarda la foto de cada
    grupo en `group_history` antes de borrarlo. Mis grupos → "Grupos anteriores" (Completado, con
    estudiantes y resultados del examen); Estudiantes del profesor agrupados por grupo (actuales +
    anteriores). También: Recursos de la clase abre directo en las tarjetas; sin botón "Ver
