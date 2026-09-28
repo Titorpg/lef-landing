@@ -1,9 +1,11 @@
 ﻿/* LEF — Portal del estudiante. Pestañas: Inicio (tablón), Facturación, Mi curso,
    Mis recursos, Mi cuenta. El logo lleva a Inicio.
-   El cobro en línea usa el Widget oficial de Wompi (checkout.wompi.co/widget.js);
-   la firma de integridad se calcula en el Edge Function wompi-checkout (nunca en el
-   navegador) y el pago se confirma por el webhook wompi-webhook, no por el resultado
-   del widget. Guardar tarjeta / cobro automático: pendiente de confirmar, sin nada visible en el portal. */
+   El cobro en línea usa el Web Checkout de Wompi (checkout.wompi.co/p/) en una
+   PESTAÑA NUEVA —el widget incrustado dejaba al estudiante atrapado en la pantalla
+   final de Wompi, sin forma de volver—; al terminar, Wompi devuelve esa pestaña al
+   portal (Facturación). La firma de integridad se calcula en el Edge Function
+   wompi-checkout (nunca en el navegador) y el pago se confirma por el webhook
+   wompi-webhook, no por lo que diga el navegador. Guardar tarjeta / cobro automático: pendiente de confirmar, sin nada visible en el portal. */
 (function () {
   "use strict";
 
@@ -11,6 +13,25 @@
   var app = document.getElementById("app");
   var ME = null; // { user_id, full_name, avatar_url, ... }
   var TOKEN = null;
+
+  // Regreso de Wompi: la pestaña del pago vuelve a /portal?id=<transacción>&env=<prod|test>.
+  // Se lee aquí y se limpia la dirección (queda en Facturación) para que al recargar
+  // no se repita el aviso del resultado.
+  var WOMPI_RETURN = (function () {
+    var q = new URLSearchParams(location.search);
+    var id = q.get("id"), env = q.get("env");
+    if (!id || !env) return null;
+    history.replaceState(null, "", location.pathname + "#facturacion");
+    return { id: id, env: env === "test" ? "test" : "prod", status: null, refreshed: false };
+  })();
+  // Pago lanzado desde esta pestaña: al volver a ella se cierra el recuadro de pago
+  // y se refresca Facturación (el webhook ya pudo haber registrado el pago).
+  var PAY_OPEN = null;
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !PAY_OPEN) return;
+    PAY_OPEN.close();
+    if (location.hash.slice(1) === "facturacion") renderBilling(PAY_OPEN.main);
+  });
 
   function callFn(name, body) {
     return fetch(window.LEF_SUPABASE.url + "/functions/v1/" + name, {
@@ -397,6 +418,7 @@
       var pays = d.payments || [];
       main.innerHTML = '<h1 class="pnl-h">Facturación</h1>' +
         '<p class="pnl-sub">Aquí gestionas el pago de tu mensualidad.</p>';
+      if (WOMPI_RETURN) wompiReturnBanner(main);
 
       if (!subs.length) {
         main.appendChild(h('<div class="pnl-alert ok">Aún no tienes una mensualidad asignada. LEF la configurará al confirmar tu inscripción.</div>'));
@@ -592,43 +614,81 @@
   }
 
   function openWompiCheckout(subscriptionId, msgEl, main, setLoading, closeModal) {
-    if (!window.WidgetCheckout) {
-      msgEl.textContent = "La pasarela de pagos no cargó. Recarga la página e intenta de nuevo.";
-      return;
+    // La pestaña se abre YA, dentro del clic, para que el navegador no la bloquee
+    // como ventana emergente; la dirección de Wompi se le pone cuando llega la firma.
+    var tab = window.open("", "_blank");
+    if (tab) {
+      try {
+        tab.opener = null;
+        tab.document.title = "Conectando con Wompi…";
+        tab.document.body.innerHTML = '<p style="font-family:sans-serif;padding:24px;color:#444">Conectando con Wompi…</p>';
+      } catch (e) { /* sin acceso a la pestaña: igual se le asigna la dirección abajo */ }
     }
     setLoading(true);
     msgEl.textContent = "";
 
     callFn("wompi-checkout", { subscription_id: subscriptionId }).then(function (d) {
       if (!d || !d.signature) throw new Error("respuesta_invalida");
-
-      var checkout = new window.WidgetCheckout({
-        currency: d.currency,
-        amountInCents: d.amountInCents,
-        reference: d.reference,
-        publicKey: d.publicKey,
-        signature: { integrity: d.signature }
-      });
+      var url = "https://checkout.wompi.co/p/" +
+        "?public-key=" + encodeURIComponent(d.publicKey) +
+        "&currency=" + encodeURIComponent(d.currency) +
+        "&amount-in-cents=" + encodeURIComponent(d.amountInCents) +
+        "&reference=" + encodeURIComponent(d.reference) +
+        "&signature:integrity=" + encodeURIComponent(d.signature) +
+        "&redirect-url=" + encodeURIComponent(location.origin + location.pathname);
       setLoading(false);
-      checkout.open(function (result) {
-        var tx = result && result.transaction;
-        if (tx && (tx.status === "APPROVED" || tx.status === "PENDING")) {
-          msgEl.textContent = tx.status === "APPROVED"
-            ? "¡Pago recibido! Actualizando tu historial…"
-            : "Tu pago está pendiente de confirmación. Actualizaremos tu historial apenas se confirme.";
-          setTimeout(closeModal, 1500);
-        } else {
-          msgEl.textContent = "El pago no se completó. Puedes intentarlo de nuevo.";
-        }
-        // El pago real lo confirma el webhook (no este resultado); refrescamos para
-        // mostrarlo si ya llegó, y una vez más un poco después por si tarda unos segundos.
-        setTimeout(function () { renderBilling(main); }, 1800);
-        setTimeout(function () { renderBilling(main); }, 5000);
-      });
+      if (!tab || tab.closed) {
+        // El navegador no dejó abrir otra pestaña: se paga en esta misma y Wompi
+        // la devuelve a Facturación al terminar.
+        location.href = url;
+        return;
+      }
+      tab.location.href = url;
+      PAY_OPEN = { main: main, close: closeModal };
+      msgEl.innerHTML = "Wompi se abrió en una <strong>pestaña nueva</strong>. Cuando termines el pago, " +
+        "vuelve a esta pestaña (o sigue en la otra): tu historial se actualiza solo.";
     }).catch(function (e) {
       setLoading(false);
+      if (tab && !tab.closed) tab.close();
       msgEl.textContent = "No pudimos iniciar el pago: " + ((e && e.message) || e);
     });
+  }
+
+  // Aviso arriba de Facturación en la pestaña que Wompi devolvió al portal: consulta
+  // el estado de la transacción en la API pública de Wompi (solo informativo; el pago
+  // lo registra el webhook) y refresca una vez por si el webhook tarda unos segundos.
+  var WOMPI_MSG = {
+    APPROVED: ["ok", "¡Pago aprobado! Ya quedó registrado en tu historial (si aún no aparece, se verá en unos segundos)."],
+    PENDING: ["warn", "Tu pago está pendiente de confirmación. Lo verás en tu historial apenas Wompi lo confirme."],
+    DECLINED: ["err", "El pago fue rechazado. Puedes intentarlo de nuevo con \"Pagar ahora\"."],
+    VOIDED: ["err", "El pago fue anulado. Puedes intentarlo de nuevo con \"Pagar ahora\"."],
+    ERROR: ["err", "Hubo un error con el pago. Puedes intentarlo de nuevo con \"Pagar ahora\"."]
+  };
+  function wompiReturnBanner(main) {
+    var r = WOMPI_RETURN;
+    var box = h('<div class="pnl-alert ok"></div>');
+    main.appendChild(box);
+    function paint() {
+      var m = WOMPI_MSG[r.status] || ["ok", "Estamos confirmando tu pago con Wompi…"];
+      box.className = "pnl-alert " + m[0];
+      box.innerHTML = esc(m[1]) + (r.status
+        ? '<br><span style="font-size:12.5px">Si tenías el portal abierto en otra pestaña, ya puedes cerrar esta.</span>'
+        : "");
+    }
+    paint();
+    if (r.status) return;
+    var api = r.env === "test" ? "https://sandbox.wompi.co" : "https://production.wompi.co";
+    fetch(api + "/v1/transactions/" + encodeURIComponent(r.id))
+      .then(function (x) { return x.json(); })
+      .then(function (j) { r.status = (j && j.data && j.data.status) || "PENDING"; })
+      .catch(function () { r.status = "PENDING"; })
+      .then(function () {
+        paint();
+        if (!r.refreshed) {
+          r.refreshed = true;
+          setTimeout(function () { if (location.hash.slice(1) === "facturacion") renderBilling(main); }, 4000);
+        }
+      });
   }
 
   /* ---------- Mi curso ---------- */
