@@ -4,10 +4,11 @@
 
 ### ▶ Lo siguiente
 1. **Editor de exámenes (28 sep, publicado)**: Recursos compartidos → Examen de validación →
-   módulo → Ver examen → "Editar examen" (solo admin; se edita sobre la misma vista). Falta:
-   el usuario corre `node aplicar-sql-editor.js` (SQL `20260928020000_examenes_editor.sql`:
-   copia del examen en cada envío + `admin_update_exam`), borrar el script, y probarlo.
-   Los exámenes reales (SQL 20260928010000) YA se aplicaron el 28 sep (lo corrió el usuario).
+   módulo → Ver examen → "Editar examen" (solo las cuentas admin; se edita sobre la misma
+   vista; también agregar/cambiar/quitar imagen de una pregunta → bucket público "novedades",
+   carpeta examenes/). SQL `20260928020000_examenes_editor.sql` APLICADO el 28 sep (el usuario
+   lo pegó en 4 bloques en el SQL Editor). Los exámenes reales (SQL 20260928010000) también
+   aplicados. Falta: que el usuario pruebe una edición real con cuenta admin.
 2. **Preguntas dudosas copiadas TAL CUAL de Google (decidir con el usuario / director):**
    - **A2.2 P23** ("How does Camila feel about her trip overall?"): la clave marcada es "She is
      angry … wants a refund"; por la lectura la correcta es "Despite the difficulties, she found
@@ -47,7 +48,7 @@
   Classroom" / "Abrir … en Classroom" fuera); la novedad del resultado siempre con imagen;
   "Ver detalle" del estudiante en ventana flotante centrada; Inicio del profesor sin el aviso
   "clases por reprogramar" (ya está el recuadro fijo debajo).
-- SQL: se aplica mejor con un script que el usuario corre en su terminal (`node aplicar-sql-….js`,
+- SQL: si el usuario NO está en el computador, pasarle bloques para el SQL Editor (lo más común); si está, script `node aplicar-sql-….js`
   Management API, se borra después) que pegando en el SQL Editor desde el teléfono.
 
 ### 🧪 EXAMEN DE PRUEBA A1.3 — QUITARLO cuando se carguen los exámenes reales (27 sep 2026)
