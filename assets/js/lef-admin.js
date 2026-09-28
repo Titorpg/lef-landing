@@ -812,44 +812,95 @@
   // "Mis grupos" (solo profesor): cada grupo que el admin le configuró como
   // tarjeta flotante (27 sep 2026: mismo lenguaje visual del portal), con su
   // horario, el cupo y la lista de estudiantes a un clic.
+  // Mis grupos (profesor). Desde el 28 sep 2026 cada grupo trae también su
+  // examen de validación: programarlo, revisar las respuestas y dar el OK
+  // (antes estaba en Recursos de la clase). Al final, "Grupos anteriores" con los
+  // resultados de ciclos pasados. Los avisos de Inicio y del calendario llegan aquí.
   function secMisGrupos(main) {
     head(main, "Mis grupos", "Los grupos que el admin te asignó.");
     if (!ME.teacher_id) {
       main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
       return;
     }
-    loadMyGroups().then(function (d) {
-      var groups = d.groups;
-      if (!groups.length) {
-        main.appendChild(h('<div class="home-empty">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
-        return;
+    main.appendChild(h('<p class="muted">Cargando…</p>'));
+    var S = { ro: true };
+    Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,intro,content"),
+      rpc("exam_results", {}).catch(function () { return null; })]).then(function (res) {
+      S.tg = res[0];
+      S.exOn = !res[1].error && res[2] !== null;
+      S.ex = S.exOn ? res[1].data || [] : [];
+      S.exRows = res[2] || [];
+      if (EX_GOTO) {
+        var goto = S.tg.groups.filter(function (g) { return g.id === EX_GOTO; })[0];
+        EX_GOTO = null;
+        if (goto && S.exOn) { exTeacherGroup(main, S, goto); return; }
       }
-      var namesByGroup = {};
-      d.enrollments.forEach(function (e) {
-        (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
-      });
-      var grid = h('<div class="tg-grid"></div>');
-      groups.forEach(function (g) {
-        var sc = g.schedules, names = (namesByGroup[g.id] || []).slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
-        var n = names.length, pct = Math.min(100, Math.round(100 * n / (g.capacity || 1)));
-        var card = h('<article class="tg-card">' +
-          '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(g.modules ? g.modules.level : "") + "</span>" +
-          '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
-          "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
-          (sc ? '<div class="tg-chips"><span>' + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span></div>" : "") +
-          '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
-          '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
-          '<button type="button" class="btn btn-sm btn-ghost tg-toggle">Ver estudiantes</button>' +
-          '<ul class="tg-names" hidden>' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul></article>");
-        var btnT = card.querySelector(".tg-toggle"), list = card.querySelector(".tg-names");
-        btnT.addEventListener("click", function () {
-          list.hidden = !list.hidden;
-          btnT.textContent = list.hidden ? "Ver estudiantes" : "Ocultar estudiantes";
-        });
-        grid.appendChild(card);
-      });
-      main.appendChild(grid);
+      misGruposList(main, S);
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  // Estado del examen de un grupo para su tarjeta: [tono, texto].
+  function exGroupState(S, g) {
+    var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
+    if (!x) return null;
+    var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
+    var pend = exPend(rows), grp = rows.filter(function (r) { return !r.individual; })[0];
+    if (pend) return { tone: "warn", text: rcCount(pend, "examen por revisar", "exámenes por revisar"), btn: "Revisar examen", cls: "btn-blue" };
+    if (!grp) return { tone: "soon", text: "Sin programar", btn: "Programar examen", cls: "btn-dark" };
+    if (grp.closes_on < exToday()) return { tone: "ok", text: "Cerrado el " + date(grp.closes_on), btn: "Ver resultados", cls: "btn-dark" };
+    return { tone: "info", text: "Del " + date(grp.opens_on) + " al " + date(grp.closes_on), btn: "Ver examen del grupo", cls: "btn-dark" };
+  }
+
+  function misGruposList(main, S) {
+    head(main, "Mis grupos", "Los grupos que el admin te asignó, con su examen de validación.");
+    var d = S.tg, groups = d.groups;
+    if (!groups.length) {
+      main.appendChild(h('<div class="home-empty">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
+      exPastCard(main, S);
+      return;
+    }
+    var namesByGroup = {};
+    d.enrollments.forEach(function (e) {
+      (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
+    });
+    var grid = h('<div class="tg-grid"></div>');
+    groups.forEach(function (g) {
+      var sc = g.schedules, names = (namesByGroup[g.id] || []).slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
+      var n = names.length, pct = Math.min(100, Math.round(100 * n / (g.capacity || 1)));
+      var st = S.exOn ? exGroupState(S, g) : null;
+      var card = h('<article class="tg-card">' +
+        '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(g.modules ? g.modules.level : "") + "</span>" +
+        '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
+        "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
+        (sc ? '<div class="tg-chips"><span>' + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span></div>" : "") +
+        '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
+        '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
+        (S.exOn ? '<div class="tg-exam"><span class="tg-exam__ic">' + rcIc("exam") + '</span><div class="tg-exam__t"><strong>Examen de validación</strong>' +
+          (st ? '<span class="rs-chip is-' + st.tone + '">' + esc(st.text) + "</span>" : '<span class="tg-exam__none">Su módulo todavía no tiene examen.</span>') +
+          '</div><span class="tg-exam__go"></span></div>' : "") +
+        '<button type="button" class="btn btn-sm btn-ghost tg-toggle">Ver estudiantes</button>' +
+        '<ul class="tg-names" hidden>' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul></article>");
+      if (st) card.querySelector(".tg-exam__go").appendChild(rcBtn(st.btn, "arrow", st.cls, function () { exTeacherGroup(main, S, g); }));
+      var btnT = card.querySelector(".tg-toggle"), list = card.querySelector(".tg-names");
+      btnT.addEventListener("click", function () {
+        list.hidden = !list.hidden;
+        btnT.textContent = list.hidden ? "Ver estudiantes" : "Ocultar estudiantes";
+      });
+      grid.appendChild(card);
+    });
+    main.appendChild(grid);
+    exPastCard(main, S);
+  }
+
+  // Resultados de exámenes de grupos de ciclos que ya terminaron.
+  function exPastCard(main, S) {
+    var past = (S.exRows || []).filter(function (r) { return !r.group_active; });
+    if (!past.length) return;
+    main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
+    var grid = h('<div class="rs-grid"></div>');
+    grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Resultados de exámenes anteriores", sub: "Tus grupos de ciclos que ya terminaron",
+      chip: ["soon", rcCount(exByCycle(past).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
+    main.appendChild(grid);
   }
 
   /* ============ ESTUDIANTES ============ */
@@ -1812,7 +1863,8 @@
     grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Libros", sub: "Libros principales y complementarios", onOpen: function () { rcLibros(main, S); } }));
     grid.appendChild(rcCard({ tone: "violet", icon: "edit", title: "Talleres", sub: "Semana 1 a 4 y repaso de cada módulo", onOpen: function () { rcTalleres(main, S); } }));
     grid.appendChild(rcCard({ tone: "green", icon: "spark", title: "Ejercicios por habilidad", sub: "Varias actividades por módulo", onOpen: function () { rcEjercicios(main, S); } }));
-    if (!S.ro) grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Examen de validación", sub: "Un examen al final de cada módulo y sus resultados", onOpen: function () { rcExamenes(main, S); } }));
+    grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Examen de validación",
+      sub: S.ro ? "Todos los exámenes, por nivel y módulo" : "Un examen al final de cada módulo y sus resultados", onOpen: function () { rcExamenes(main, S); } }));
     body.appendChild(grid);
   }
 
@@ -2296,7 +2348,7 @@
   // ---------- Parte 4: Examen de validación (27 sep 2026; ronda 2 el mismo día) ----------
   // Admin: Examen de validación → nivel → módulo → "Ver examen" (con la clave) y
   // Resultados → ciclo → grupo (de todos los profesores) → estudiantes.
-  // Profesor: Recursos de la clase → Exámenes de validación → SOLO sus grupos
+  // Profesor: Mis grupos → examen de cada grupo → SOLO sus grupos
   // (actuales, y "Anteriores" por ciclo). Flujo: programar → el estudiante lo
   // envía → "Revisar respuestas" (califica las abiertas y confirma) → "Dar OK y
   // enviar" (novedad + correo). "Ver respuestas" sirve siempre para explicarle al
@@ -2458,10 +2510,12 @@
 
   // ---- Admin ----
   function rcExamenes(main, S) {
-    var body = rcPage(main, rcHome(main, S), "Examen de validación",
-      "Un examen al final de cada módulo. El profesor lo programa para su grupo y el estudiante lo presenta en Clase de hoy; aquí ves el examen y los resultados de todos los grupos, por ciclo.");
+    var body = rcPage(main, rcHome(main, S), "Examen de validación", S.ro
+      ? "Un examen al final de cada módulo. Aquí puedes ver todos los exámenes; para programarlo a tus grupos y revisar sus resultados, entra a Mis grupos."
+      : "Un examen al final de cada módulo. El profesor lo programa para su grupo y el estudiante lo presenta en Clase de hoy; aquí ves el examen y los resultados de todos los grupos, por ciclo.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
-    Promise.all([q("validation_exams").select("id,module_level,title,is_test,intro,content"), q("exam_submissions").select("exam_id,status")]).then(function (res) {
+    Promise.all([q("validation_exams").select("id,module_level,title,is_test,intro,content"),
+      S.ro ? Promise.resolve({ data: [] }) : q("exam_submissions").select("exam_id,status")]).then(function (res) {
       body.innerHTML = "";
       if (res[0].error) { body.appendChild(h('<div class="pnl-alert warn">Falta aplicar en Supabase la actualización de Exámenes de validación.</div>')); return; }
       S.ex = res[0].data || []; S.exSubs = res[1].data || [];
@@ -2485,7 +2539,8 @@
       var x = S.ex.filter(function (e) { return e.module_level === m.code; })[0];
       var n = x ? S.exSubs.filter(function (s) { return s.exam_id === x.id && s.status !== "no_presento"; }).length : 0;
       grid.appendChild(rcCard({ tone: "lvl", badge: m.code, title: m.code, sub: m.title || "Módulo " + m.code,
-        chip: x ? [x.is_test ? "warn" : "ok", (x.is_test ? "Examen de prueba · " : "Con examen · ") + rcCount(n, "resultado", "resultados")] : ["soon", "Sin examen"],
+        chip: !x ? ["soon", "Sin examen"] : S.ro ? ["ok", "Con examen"]
+          : [x.is_test ? "warn" : "ok", (x.is_test ? "Examen de prueba · " : "Con examen · ") + rcCount(n, "resultado", "resultados")],
         onOpen: function () { rcExamenModulo(main, S, lv, m); } }));
     });
     body.appendChild(grid);
@@ -2506,12 +2561,13 @@
     var body = rcPage(main, crumbs, "Examen de validación " + m.code, m.title || "");
     var x = S.ex.filter(function (e) { return e.module_level === m.code; })[0];
     if (!x) {
-      body.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene examen de validación. Pronto podrás traerlo desde su Google Form con “Importar desde Google Forms”.</div>'));
+      body.appendChild(h('<div class="pnl-alert ok">Este módulo todavía no tiene examen de validación.</div>'));
       return;
     }
     var card = exExamCard(x);
-    card.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver examen", "arrow", "btn-dark", function () { exPreview(main, here, x); }));
+    card.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver examen", "arrow", "btn-dark", function () { exPreview(main, here, x, S.ro); }));
     body.appendChild(card);
+    if (S.ro) return; // el profesor solo ve el examen; sus resultados están en Mis grupos
     body.appendChild(h('<h2 class="ex-h2">Resultados por ciclo</h2>'));
     var box = h('<div><p class="muted">Cargando…</p></div>');
     body.appendChild(box);
@@ -2574,11 +2630,16 @@
   }
   // Vista del examen con la clave (solo admin). "Editar examen" vuelve editable
   // esta misma vista (exEditor).
-  function exPreview(main, crumbs, x) {
-    var body = rcPage(main, crumbs, x.title, "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
-    var bar = h('<div class="ex-ed-top"><span>¿Hay que corregir algo? Edita el examen aquí mismo.</span></div>');
-    bar.appendChild(rcBtn("Editar examen", "edit", "btn-blue", function () { exEditor(main, crumbs, x); }));
-    body.appendChild(bar);
+  // ro = profesor: solo ve (con la respuesta correcta en verde), sin editar.
+  function exPreview(main, crumbs, x, ro) {
+    var body = rcPage(main, crumbs, x.title, ro
+      ? "La respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas."
+      : "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
+    if (!ro && ME.role === "admin") {
+      var bar = h('<div class="ex-ed-top"><span>¿Hay que corregir algo? Edita el examen aquí mismo.</span></div>');
+      bar.appendChild(rcBtn("Editar examen", "edit", "btn-blue", function () { exEditor(main, crumbs, x); }));
+      body.appendChild(bar);
+    }
     if (x.intro) body.appendChild(h('<p class="ex-intro">' + esc(x.intro) + "</p>"));
     (x.content.sections || []).forEach(function (s, si) {
       var sec = h('<section class="ex-pv"><h2 class="ex-pv__t"><span>Sección ' + (si + 1) + "</span>" + esc(s.title) + "</h2>" +
@@ -2926,55 +2987,14 @@
     paint();
   }
 
-  // ---- Profesor: Recursos de la clase → Exámenes de validación ----
+  // ---- Profesor: Mis grupos → Examen de validación de cada grupo ----
   // Llega desde el calendario o una novedad: abre ese grupo.
   function exOpenGroup(groupId) {
     EX_GOTO = groupId || "__root__";
-    if (location.hash === "#recursos_clase") route(); else location.hash = "recursos_clase";
+    if (location.hash === "#misgrupos") route(); else location.hash = "misgrupos";
   }
   function exTeacherCrumbs(main, S) {
-    return [["Recursos de la clase", function () { rcClaseRoot(main, S); }], ["Exámenes de validación", function () { exTeacherRoot(main, S); }]];
-  }
-  function exLoadTeacher(S) {
-    return Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,content"), rpc("exam_results", {}).catch(function () { return null; })])
-      .then(function (res) {
-        if (res[1].error || res[2] === null) throw new Error("Los exámenes de validación todavía no están activos en la plataforma.");
-        S.tg = res[0]; S.ex = res[1].data || []; S.exRows = res[2] || [];
-      });
-  }
-  function exTeacherRoot(main, S) {
-    var body = rcPage(main, [["Recursos de la clase", function () { rcClaseRoot(main, S); }]], "Exámenes de validación",
-      "Programa el examen de validación de cada grupo y revisa los resultados. Cuando confirmas la calificación y das el OK, el estudiante recibe su resultado en su Inicio y un correo.");
-    if (!ME.teacher_id) { body.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>')); return; }
-    body.innerHTML = '<p class="muted">Cargando…</p>';
-    exLoadTeacher(S).then(function () {
-      body.innerHTML = "";
-      if (EX_GOTO) {
-        var goto = S.tg.groups.filter(function (g) { return g.id === EX_GOTO; })[0];
-        EX_GOTO = null;
-        if (goto) { exTeacherGroup(main, S, goto); return; }
-      }
-      var grid = h('<div class="rs-grid"></div>');
-      S.tg.groups.forEach(function (g) {
-        var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
-        var rows = S.exRows.filter(function (r) { return r.group_id === g.id; });
-        var pend = exPend(rows);
-        var grp = rows.filter(function (r) { return !r.individual; })[0];
-        var chip = !x ? ["soon", "Su módulo aún no tiene examen"]
-          : pend ? ["warn", pend + " por revisar"]
-          : grp ? (grp.closes_on < exToday() ? ["ok", "Cerrado el " + date(grp.closes_on)] : ["info", "Del " + date(grp.opens_on) + " al " + date(grp.closes_on)])
-          : ["soon", "Sin programar"];
-        grid.appendChild(rcCard({ tone: "lvl", badge: g.modules ? g.modules.level : "", title: exGroupLabel(g), sub: g.modules ? g.modules.title : "", chip: chip,
-          onOpen: function () { exTeacherGroup(main, S, g); } }));
-      });
-      var past = S.exRows.filter(function (r) { return !r.group_active; });
-      if (past.length) {
-        grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Anteriores", sub: "Resultados de tus grupos de ciclos pasados",
-          chip: ["soon", rcCount(exByCycle(past).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
-      }
-      if (!grid.children.length) { body.appendChild(h('<div class="pnl-alert ok">No tienes grupos activos.</div>')); return; }
-      body.appendChild(grid);
-    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert warn">' + esc(friendly(e)) + "</div>"; });
+    return [["Mis grupos", function () { misGruposList(main, S); }]];
   }
 
   function exTeacherPast(main, S) {
@@ -3066,6 +3086,7 @@
     var sent = rows.filter(function (r) { return r.submission_id && r.state !== "no_presento"; }).length;
     var card = exExamCard(x, grp ? " · Franja: " + esc(date(grp.opens_on)) + " → " + esc(date(grp.closes_on)) : " · Sin programar");
     var acts = card.querySelector(".rc-ws__acts");
+    acts.appendChild(rcBtn("Ver examen", "read", "btn-ghost", function () { exPreview(main, here, x, true); }));
     acts.appendChild(rcBtn(grp ? "Cambiar fechas" : "Programar examen", grp ? "edit" : "plus", grp ? "btn-ghost" : "btn-dark", function () {
       var b = exScheduleForm(grp && grp.opens_on, grp && grp.closes_on);
       modal((grp ? "Cambiar fechas — " : "Programar examen — ") + exGroupLabel(g), b, function () {
@@ -3117,17 +3138,17 @@
     q("modules").select("*").eq("active", true).order("module_number").then(function (r) {
       if (r.error) throw r.error;
       var S = { mods: r.data || [], ro: true };
-      if (EX_GOTO) exTeacherRoot(main, S); else rcClaseRoot(main, S);
+      rcClaseRoot(main, S);
     }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
+  // Programar, revisar y dar OK a los exámenes pasó a Mis grupos (28 sep 2026);
+  // aquí solo quedan los recursos para ver.
   function rcClaseRoot(main, S) {
     var body = rcPage(main, [], "Recursos de la clase", "Material de apoyo para tus clases.");
     var grid = h('<div class="rs-grid"></div>');
-    grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Recursos compartidos", sub: "Libros, talleres y ejercicios por habilidad",
+    grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Recursos compartidos", sub: "Libros, talleres, ejercicios por habilidad y exámenes de validación",
       onOpen: function () { rcRoot(main, S); } }));
-    grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Exámenes de validación", sub: "Programa el examen de tus grupos y revisa sus resultados",
-      onOpen: function () { exTeacherRoot(main, S); } }));
     body.appendChild(grid);
   }
 

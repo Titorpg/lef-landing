@@ -98,7 +98,7 @@
     reposicion: { label: "Reposiciones", one: "Reposición", color: "#6b4fa3", icon: "redo" },
     // Festivos de Colombia: los pone el sistema (get_my_calendar), nadie los edita.
     festivo:    { label: "Festivos", one: "Festivo", color: "#c2410c", icon: "flag" },
-    // Examen de validación: lo programa el profesor (Recursos de la clase); el
+    // Examen de validación: lo programa el profesor (Mis grupos); el
     // estudiante lo ve el día que abre y el profesor, el día que cierra.
     examen:     { label: "Exámenes", one: "Examen de validación", color: "#0e7490", icon: "check" },
     revision_examen: { label: "Revisión de exámenes", one: "Revisión de exámenes", color: "#b45309", icon: "check" }
