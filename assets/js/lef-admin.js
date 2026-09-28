@@ -848,6 +848,31 @@
     return q("group_history").select("*").eq("teacher_id", ME.teacher_id).order("cycle_start", { ascending: false })
       .then(function (r) { return r.error ? [] : r.data || []; }, function () { return []; });
   }
+  // Grupos anteriores agrupados por ciclo (el más reciente primero): cada ciclo
+  // es una carpeta en Mis grupos y en Estudiantes (opción B, 28 sep 2026).
+  function histByCycle(hist) {
+    var map = {}, out = [];
+    (hist || []).forEach(function (hg) {
+      var k = (hg.cycle_start || "") + "|" + (hg.cycle_end || "") + "|" + (hg.cycle_name || "");
+      if (!map[k]) {
+        var d = hg.cycle_start ? new Date(hg.cycle_start + "T12:00:00") : null;
+        var mes = d ? d.toLocaleDateString("es-CO", { month: "long", year: "numeric" }).replace(" de ", " ") : "";
+        map[k] = { key: k, start: hg.cycle_start || "", end: hg.cycle_end || "", label: d ? "Ciclo " + mes : (hg.cycle_name || "Ciclo sin fecha"), groups: [] };
+        out.push(map[k]);
+      }
+      map[k].groups.push(hg);
+    });
+    return out.sort(function (a, b) { return a.start < b.start ? 1 : a.start > b.start ? -1 : 0; });
+  }
+  function histStudents(hg) {
+    return (Array.isArray(hg.students) ? hg.students : []).filter(function (s) { return s.result !== "cancelado"; }).length;
+  }
+  function cycleFolderCard(cy, onOpen) {
+    var n = cy.groups.reduce(function (a, hg) { return a + histStudents(hg); }, 0);
+    return rcCard({ tone: "green", icon: "cal", title: cy.label,
+      sub: (cy.start ? fmtCycle(cy.start, cy.end) + " · " : "") + rcCount(cy.groups.length, "grupo", "grupos") + " · " + rcCount(n, "estudiante", "estudiantes"),
+      chip: ["ok", "Completado"], onOpen: onOpen });
+  }
   function fmtCycle(start, end) {
     if (!start) return "";
     var f = function (d) { return new Date(d + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", ""); };
@@ -902,9 +927,10 @@
     misGruposPast(main, S);
   }
 
-  // Grupos anteriores: tarjeta "Completado" por grupo, con sus estudiantes y los
-  // resultados de su examen. Los resultados de grupos que se cerraron antes de
-  // existir el historial salen aparte ("Otros resultados anteriores").
+  // Grupos anteriores: una carpeta por ciclo terminado (opción B); al abrirla,
+  // una tarjeta "Completado" por grupo con sus estudiantes y los resultados de su
+  // examen. Los resultados de grupos que se cerraron antes de existir el
+  // historial salen aparte ("Otros resultados anteriores").
   function misGruposPast(main, S) {
     var hist = S.hist || [];
     var pastRows = (S.exRows || []).filter(function (r) { return !r.group_active; });
@@ -912,9 +938,22 @@
     var loose = pastRows.filter(function (r) { return histIds.indexOf(r.group_id) === -1; });
     if (!hist.length && !loose.length) return;
     main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
-    main.appendChild(h('<p class="pnl-sub" style="margin-top:-6px">Grupos de ciclos que ya terminaron. Quedan aquí con sus estudiantes y los resultados del examen.</p>'));
+    main.appendChild(h('<p class="pnl-sub" style="margin-top:-6px">Cada ciclo que termina queda como una carpeta, con sus grupos, estudiantes y resultados del examen.</p>'));
+    var grid = h('<div class="rs-grid"></div>');
+    histByCycle(hist).forEach(function (cy) { grid.appendChild(cycleFolderCard(cy, function () { misGruposCycle(main, S, cy); })); });
+    if (loose.length) {
+      grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Otros resultados anteriores", sub: "Exámenes de grupos que se cerraron antes del historial",
+        chip: ["soon", rcCount(exByCycle(loose).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
+    }
+    main.appendChild(grid);
+  }
+
+  function misGruposCycle(main, S, cy) {
+    var crumbs = exTeacherCrumbs(main, S);
+    var body = rcPage(main, crumbs, cy.label, (cy.start ? fmtCycle(cy.start, cy.end) + " · " : "") + "tus grupos de ese ciclo.");
+    var pastRows = (S.exRows || []).filter(function (r) { return !r.group_active; });
     var grid = h('<div class="tg-grid"></div>');
-    hist.forEach(function (hg) {
+    cy.groups.forEach(function (hg) {
       var studs = Array.isArray(hg.students) ? hg.students : [];
       var rows = hg.group_id ? pastRows.filter(function (r) { return r.group_id === hg.group_id; }) : [];
       var card = h('<article class="tg-card is-done">' +
@@ -931,23 +970,17 @@
         (rows.length ? '<div class="tg-exam"><span class="tg-exam__ic">' + rcIc("exam") + '</span><div class="tg-exam__t"><strong>Examen de validación</strong>' +
           '<span class="rs-chip is-ok">' + esc(rcCount(rows.filter(function (r) { return r.state === "aprobado"; }).length, "resultado enviado", "resultados enviados")) + "</span>" +
           '</div><span class="tg-exam__go"></span></div>' : "") + "</article>");
-      if (rows.length) card.querySelector(".tg-exam__go").appendChild(rcBtn("Ver resultados", "arrow", "btn-dark", function () { exTeacherHistResults(main, S, hg, rows); }));
+      if (rows.length) card.querySelector(".tg-exam__go").appendChild(rcBtn("Ver resultados", "arrow", "btn-dark", function () { exTeacherHistResults(main, S, hg, rows, cy); }));
       grid.appendChild(card);
     });
-    main.appendChild(grid);
-    if (loose.length) {
-      var g2 = h('<div class="rs-grid" style="margin-top:14px"></div>');
-      g2.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Otros resultados anteriores", sub: "Exámenes de grupos que se cerraron antes del historial",
-        chip: ["soon", rcCount(exByCycle(loose).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
-      main.appendChild(g2);
-    }
+    body.appendChild(grid);
   }
 
   // Resultados del examen de un grupo anterior (solo ver).
-  function exTeacherHistResults(main, S, hg, rows) {
+  function exTeacherHistResults(main, S, hg, rows, cy) {
     var label = (hg.module_level || "") + (hg.days && hg.days.length ? " · " + days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) : "");
-    var crumbs = exTeacherCrumbs(main, S);
-    var here = crumbs.concat([[label, function () { exTeacherHistResults(main, S, hg, rows); }]]);
+    var crumbs = exTeacherCrumbs(main, S).concat(cy ? [[cy.label, function () { misGruposCycle(main, S, cy); }]] : []);
+    var here = crumbs.concat([[label, function () { exTeacherHistResults(main, S, hg, rows, cy); }]]);
     var body = rcPage(main, crumbs, label, (rows[0] && rows[0].exam_title) || "Examen de validación");
     var list = h('<div class="rs-files"></div>');
     body.appendChild(list);
@@ -1181,16 +1214,36 @@
         '<span class="rs-chip is-info">' + esc(rcCount(list.length, "estudiante", "estudiantes")) + "</span>" +
         (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : ""), list, null, false);
     });
+    // Grupos anteriores: una carpeta por ciclo (opción B); al abrirla, sus grupos
+    // con sus estudiantes, y "Atrás" vuelve a la lista.
+    function pastGroup(hg) {
+      var list = (Array.isArray(hg.students) ? hg.students : []).map(function (x) { return { id: x.student_id, name: x.name, result: x.result }; });
+      var lvl = hg.module_level || "";
+      section(lvl + (hg.module_title ? " — " + hg.module_title : ""),
+        (hg.days && hg.days.length ? days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) + " – " + time(hg.end_time) : ""),
+        '<span class="rs-chip is-ok">Completado</span>' + (hg.cycle_start ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(hg.cycle_start, hg.cycle_end)) + "</span>" : ""),
+        list, function (x) { return x.result === "cancelado" ? "No completó " + lvl + " (no pagó el módulo)" : "Completó " + lvl + " contigo"; }, true);
+    }
+    function openCycle(cy) {
+      main.innerHTML = "";
+      window.scrollTo(0, 0);
+      var bar = h('<div class="fold-bar"><button type="button" class="fold-back">' + rcIc("arrow") + "<span>Atrás</span></button></div>");
+      bar.querySelector(".fold-back").addEventListener("click", function () {
+        main.innerHTML = "";
+        teacherStudentSections(main, ctx, enrs, makeCard, nameById);
+      });
+      main.appendChild(bar);
+      main.appendChild(h('<h2 class="tst-cycle-h">' + esc(cy.label) + "</h2>"));
+      main.appendChild(h('<p class="pnl-sub">' + esc((cy.start ? fmtCycle(cy.start, cy.end) + " · " : "") + "tus grupos de ese ciclo.") + "</p>"));
+      cy.groups.forEach(pastGroup);
+    }
     if (ctx.hist.length) {
       main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
-      ctx.hist.forEach(function (hg) {
-        var list = (Array.isArray(hg.students) ? hg.students : []).map(function (x) { return { id: x.student_id, name: x.name, result: x.result }; });
-        var lvl = hg.module_level || "";
-        section(lvl + (hg.module_title ? " — " + hg.module_title : ""),
-          (hg.days && hg.days.length ? days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) + " – " + time(hg.end_time) : ""),
-          '<span class="rs-chip is-ok">Completado</span>' + (hg.cycle_start ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(hg.cycle_start, hg.cycle_end)) + "</span>" : ""),
-          list, function (x) { return x.result === "cancelado" ? "No completó " + lvl + " (no pagó el módulo)" : "Completó " + lvl + " contigo"; }, true);
-      });
+      main.appendChild(h('<p class="pnl-sub" style="margin-top:-6px">Cada ciclo que termina queda como una carpeta. Se abre al tocarla.</p>'));
+      var folders = h('<div class="rs-grid"></div>');
+      histByCycle(ctx.hist).forEach(function (cy) { folders.appendChild(cycleFolderCard(cy, function () { openCycle(cy); })); });
+      main.appendChild(folders);
+      any = true;
     }
     if (!any) main.appendChild(h('<div class="home-empty">Todavía no tienes estudiantes asignados.</div>'));
   }

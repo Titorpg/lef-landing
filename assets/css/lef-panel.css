@@ -1466,6 +1466,7 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .tst-group__t span{font-size:13px;color:var(--grafito);}
 .tst-group__chips{display:flex;gap:6px;flex-wrap:wrap;}
 .tst-group .tst-card{box-shadow:none;background:#fbfbfa;}
+.tst-cycle-h{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:20px;margin:4px 0 4px;}
 .tg-card,.tst-card{background:#fff;border:1px solid var(--niebla);border-radius:16px;box-shadow:var(--card-shadow);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0;}
 .tg-card{border-top:3px solid #d9a52b;}
 .tg-card__top{display:flex;align-items:center;gap:12px;}
