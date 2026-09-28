@@ -16,6 +16,9 @@
    anteriores). También: Recursos de la clase abre directo en las tarjetas; sin botón "Ver
    estudiantes"; calendario del profesor con tipo "Examen de validación" (programa con
    `teacher_schedule_exam`).
+   **Opción B (elegida por el usuario con maqueta, 28 sep):** "Grupos anteriores" = una carpeta
+   por ciclo ("Ciclo octubre 2026") en Estudiantes y en Mis grupos; al abrirla, sus grupos con
+   estudiantes (y resultados del examen en Mis grupos). Los grupos actuales siguen desplegados.
 1b. **Profesor reorganizado (28 sep, publicado, falta verlo con cuenta de profesor):**
    programar / revisar / dar OK del examen está ahora en **Mis grupos** (bloque "Examen de
    validación" en cada tarjeta + "Grupos anteriores" al final); Recursos de la clase →
