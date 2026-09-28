@@ -1,91 +1,80 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (28 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (cierre 28 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-### ▶ Lo siguiente
-1. **Editor de exámenes (28 sep, publicado)**: Recursos compartidos → Examen de validación →
-   módulo → Ver examen → "Editar examen" (solo las cuentas admin; se edita sobre la misma
-   vista; también agregar/cambiar/quitar imagen de una pregunta → bucket público "novedades",
-   carpeta examenes/). SQL `20260928020000_examenes_editor.sql` APLICADO el 28 sep (el usuario
-   lo pegó en 4 bloques en el SQL Editor). Los exámenes reales (SQL 20260928010000) también
-   aplicados. Falta: que el usuario pruebe una edición real con cuenta admin.
-1a. **Historial de grupos (28 sep, publicado; SQL `20260928030000_historial_grupos.sql` APLICADO,
-   3 bloques en el SQL Editor, 28 sep):** al cerrar un ciclo, `lef_finish_cycle` guarda la foto de cada
-   grupo en `group_history` antes de borrarlo. Mis grupos → "Grupos anteriores" (Completado, con
-   estudiantes y resultados del examen); Estudiantes del profesor agrupados por grupo (actuales +
-   anteriores). También: Recursos de la clase abre directo en las tarjetas; sin botón "Ver
-   estudiantes"; calendario del profesor con tipo "Examen de validación" (programa con
-   `teacher_schedule_exam`).
-   **Opción B (elegida por el usuario con maqueta, 28 sep):** "Grupos anteriores" = una carpeta
-   por ciclo ("Ciclo octubre 2026") en Estudiantes y en Mis grupos; al abrirla, sus grupos con
-   estudiantes (y resultados del examen en Mis grupos). Los grupos actuales siguen desplegados.
-1c. **28 sep, más tarde (todo publicado y SQL aplicado):** tarjeta del estudiante (Estudiantes del
-   profesor) con "Ver resultado del examen" / "Revisar examen"; filas de examen bien acomodadas en
-   celular; SQL `20260928040000_novedad_resultado_huerfana.sql` APLICADO: borró la novedad vacía de
-   Liam (resultado del examen de prueba borrado) y un trigger borra la novedad cuando se borra su
-   envío. Regla vigente: la novedad del resultado se quita cuando el estudiante tiene ACTIVO un
-   módulo posterior. El examen de un grupo solo lo ven los inscritos en ESE grupo (lef_exam_targets).
-1b. **Profesor reorganizado (28 sep, publicado, falta verlo con cuenta de profesor):**
-   programar / revisar / dar OK del examen está ahora en **Mis grupos** (bloque "Examen de
-   validación" en cada tarjeta + "Grupos anteriores" al final); Recursos de la clase →
-   Recursos compartidos → **Examen de validación** → nivel → módulo → Ver examen (todos los
-   exámenes, con la correcta en verde, SIN editar). Avisos de Inicio/calendario → Mis grupos.
-2. **Preguntas dudosas copiadas TAL CUAL de Google (decidir con el usuario / director):**
-   - **A2.2 P23** ("How does Camila feel about her trip overall?"): la clave marcada es "She is
-     angry … wants a refund"; por la lectura la correcta es "Despite the difficulties, she found
-     the trip worthwhile…".
-   - **A2.3 P20** ("working from home…"): en Google tiene las MISMAS opciones de la P19
-     (participios) → la pregunta no tiene opciones válidas. Hay que redactar opciones.
+Sesión del 28 sep cerrada con TODO publicado en Vercel y TODOS los SQL aplicados (el usuario los
+pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpeta.
+
+### ▶ Lo siguiente (depende del usuario)
+1. **Probar un pago real con Wompi** (celular y computador): "Pague aquí" abre el Web Checkout
+   (`checkout.wompi.co/p/`) en una pestaña nueva con `redirect-url` = /portal; Wompi vuelve con
+   `?id=&env=` → Facturación con aviso del resultado (consulta la API pública de Wompi). Si el
+   navegador bloquea la pestaña, se paga en la misma y vuelve igual. Antes el widget incrustado
+   dejaba al estudiante atrapado en la pantalla final de Wompi.
+2. **Preguntas con error que vienen de Google** (el usuario no las corrige: avisa al encargado, que
+   ya puede arreglarlas con el editor de exámenes):
+   - **A2.2 P23** ("How does Camila feel about her trip overall?"): clave marcada "She is angry …
+     wants a refund"; por la lectura la correcta es "Despite the difficulties, she found the trip
+     worthwhile…".
+   - **A2.3 P20** ("working from home…"): tiene las MISMAS opciones de la P19 (participios).
    - A1.3 P19 y A1.2 P19 tienen 2 correctas (en A1.2 es a propósito: pizza/porción).
-   - A2.3 no está adjunto en Classroom (DAY 16 módulo 6 sin form); se tomó el form
-     "VALIDATION EXAM MODULE 6 LEVEL A2.3" del Drive del director (18johD_h…).
-3. **Cuenta del profesor con el diseño del portal — revisado 28 sep (por código):** Inicio, Mis
-   grupos, Estudiantes, Recursos de la clase ✅ (27 sep); Calendario ✅ = el mismo componente del
-   estudiante (`LEFCalendar.mount`, diseño v2 del 24 sep); Planificador ✅ carpetas con icono de
-   nivel + botón Atrás (26 sep); Mi cuenta = mismas tarjetas que Mi cuenta del estudiante. Falta
-   solo que el usuario lo confirme a la vista.
-4. **Probar el pago con Wompi en pestaña nueva** (28 sep): el widget incrustado dejaba al
-   estudiante atrapado en la pantalla final de Wompi. Ahora "Pague aquí" abre el Web Checkout
-   (`checkout.wompi.co/p/`) en otra pestaña con `redirect-url` = /portal; Wompi vuelve con
-   `?id=&env=` → Facturación con aviso del resultado. Si el navegador bloquea la pestaña, se
-   paga en la misma y vuelve igual. Falta confirmarlo con un pago real (celular y computador).
+   - **A2.3** no está adjunto en Classroom (DAY 16 del módulo 6 sin form): se tomó el form
+     "VALIDATION EXAM MODULE 6 LEVEL A2.3" del Drive del director (18johD_h…); confirmar con el
+     profesor que es la versión definitiva.
+3. **Primer examen real**: cuando Liam presente el A1.3 y el profesor le dé el OK → revisar la
+   novedad del resultado, "Ver detalle" y el PDF; y cuando cierre el ciclo del A1.3, confirmar que
+   el grupo pasa a "Grupos anteriores" (carpeta del ciclo) en Mis grupos y en Estudiantes.
+4. **Probar el editor de exámenes** con una edición real (cuenta admin) y ver el evento en
+   Registro de eventos.
+5. Pendientes viejos que siguen abiertos: exámenes de B1 en adelante (aún no existen); botón
+   "Importar desde Google Forms" (ya no urge: los 6 exámenes se cargaron y se editan en la plataforma).
 
-### ✅ Hecho el 28 sep 2026
-- El usuario probó el recorrido completo del examen con cuentas reales: funcionó perfecto.
-- Pago con Wompi en pestaña nueva (Web Checkout) que vuelve a Facturación.
-- Exámenes reales extraídos de los Google Forms (cuenta director, /u/3) con el navegador:
-  preguntas, clave (`[aria-label="Respuesta correcta"]` del editor), puntos (inputs
-  "La puntuación de esta pregunta es N puntos" de la vista de respuestas), lecturas y videos.
-  A2.2 traía la lectura como imagen → transcrita. A1.2 P11–20 dependen de imagen →
-  `assets/examenes/a1-2-qNN.jpg` y soporte `image` en las preguntas (portal, vista corregida,
-  admin y PDF).
+### ✅ Hecho el 28 sep 2026 (detalle en git log)
+- **Wompi en pestaña nueva** (arriba).
+- **Exámenes de validación reales** A1.1, A1.2, A1.3, A2.1, A2.2, A2.3 cargados (100 pts c/u;
+  clave y puntos de Google) y el de PRUEBA A1.3 borrado (SQL `20260928010000`). Se sacaron con el
+  navegador de los Google Forms de la cuenta del director (/u/3): `FB_LOAD_DATA_` del editor
+  (preguntas; imagen de pregunta en item[9]), clave del DOM (`[aria-label="Respuesta correcta"]`),
+  puntos de los inputs "La puntuación de esta pregunta es N puntos". A2.2 traía la lectura como
+  imagen → transcrita a texto. A1.2 P11–20 dependen de imagen → `assets/examenes/a1-2-qNN.jpg`.
+- **Preguntas con imagen** (`image` en la pregunta): se ven en el examen del estudiante, la vista
+  corregida, la vista del admin y el PDF.
+- **Editor de exámenes** (solo cuentas admin): Recursos compartidos → Examen de validación →
+  módulo → Ver examen → "Editar examen". Se edita sobre la misma vista: textos, respuesta correcta
+  (círculo), puntos, YouTube, lecturas; agregar/quitar/mover preguntas, opciones, subtítulos y
+  secciones; agregar/cambiar/quitar imagen (bucket público "novedades", carpeta examenes/).
+  Guardar → `admin_update_exam` (valida + Registro de eventos "exam.update" con la lista de
+  cambios y la versión anterior). Cada envío guarda su copia del examen (`exam_submissions.content`):
+  las correcciones solo aplican a quienes lo presenten después (SQL `20260928020000`).
+- **Profesor**:
+  - Recursos de la clase abre directo en Libros / Talleres / Ejercicios / Examen de validación
+    (todos los exámenes por nivel y módulo, con la correcta en verde, SIN editar).
+  - Programar / revisar / dar OK del examen pasó a **Mis grupos** (recuadro en cada grupo); avisos
+    de Inicio y del calendario llevan ahí. El examen de un grupo solo lo ven los inscritos en ESE
+    grupo (`lef_exam_targets`).
+  - Calendario: tipo "Examen de validación" que programa el examen de un grupo
+    (`teacher_schedule_exam`).
+  - Mis grupos sin el botón "Ver estudiantes"; muestra el ciclo de cada grupo.
+  - **Historial de grupos** (`group_history`, SQL `20260928030000`): al cerrar un ciclo,
+    `lef_finish_cycle` guarda la foto de cada grupo antes de borrarlo. "Grupos anteriores" = una
+    carpeta por ciclo (opción B, elegida con maqueta) en Mis grupos y en Estudiantes.
+  - Estudiantes agrupados por grupo (módulo, horario, ciclo); cada tarjeta con "Ver resultado del
+    examen" o "Revisar examen".
+  - Celular: filas de examen/archivos con el título a lo ancho y los botones debajo.
+- **Novedad del resultado vacía** (la de Liam, del examen de prueba borrado): borrada; un trigger
+  borra la novedad cuando se borra su envío (SQL `20260928040000`). Regla vigente: la novedad se
+  quita cuando el estudiante tiene ACTIVO un módulo posterior.
+- **Cómo pasar el SQL**: si el usuario NO está en el computador (lo normal), bloques cortos para el
+  SQL Editor, validados con libpg-query; si está frente al computador, script
+  `node aplicar-sql-….js` (Management API) que se borra después.
 
 ### ✅ Hecho el 27 sep 2026 (resumen; detalle en git log y en las secciones de abajo)
-- Recursos de la clase del profesor = Recursos compartidos en modo solo ver (+ Exámenes de validación).
 - Exámenes de validación: base + ronda 2 (revisión obligatoria, calendario, novedades temporales,
   PDF, orden por ciclo). Inicio del profesor con el diseño del estudiante; Mis grupos y Estudiantes
   en tarjetas.
-- Correcciones del final del día: sin ningún enlace a Classroom en el Planificador ("Ver en
-  Classroom" / "Abrir … en Classroom" fuera); la novedad del resultado siempre con imagen;
-  "Ver detalle" del estudiante en ventana flotante centrada; Inicio del profesor sin el aviso
-  "clases por reprogramar" (ya está el recuadro fijo debajo).
-- SQL: si el usuario NO está en el computador, pasarle bloques para el SQL Editor (lo más común);
-  si está frente al computador, script `node aplicar-sql-….js` (Management API, se borra después).
+- Sin ningún enlace a Classroom en el Planificador; la novedad del resultado siempre con imagen;
+  "Ver detalle" del estudiante en ventana flotante centrada.
 
-### 🧪 EXAMEN DE PRUEBA A1.3 — QUITARLO cuando se carguen los exámenes reales (27 sep 2026)
-- El SQL `20260927020000_examenes_validacion.sql` carga un examen de PRUEBA en A1.3
-  (`validation_exams.is_test = true`), copia del Google Form que pasó el usuario
-  (`1RESuE_pW017HpbDuIkGWDskmvOweNLCKrtCmjapSkKQ`). Sale con la etiqueta "Examen de prueba".
-- Lo que NO es real en esa prueba: **Listening (27–30)** no tenía clave en Google → respuestas
-  supuestas por Claude (no pudo escuchar el audio); **puntos** supuestos (3 c/u; 4 la 21,
-  Reading y Listening) para sumar 100. Claves dudosas copiadas tal cual de Google: **P12**
-  ("can / couldn't"), **P14** ("could"; el error real es "to help") y **P19** (2 correctas).
-- Para quitarlo (SQL a mano; borra también lo que hayan enviado con él):
-  `delete from public.validation_exams where is_test;`
-- Exámenes reales: están en Classroom, material "DAY 16" de cada módulo (A1.1, A1.2, A1.3 en
-  Classroom es OTRO form que el de prueba — confirmar cuál vale —, A2.1 como adjunto del DAY 16
-  "Conversation Club", A2.2). A2.3 no tiene form todavía. Falta el botón "Importar desde Google
-  Forms" (la clave se lee del EDITOR del form: `[aria-label="Respuesta correcta"]`).
 
 ### Exámenes de validación — base construida el 27 sep 2026 (falta probar en vivo)
 - Admin: Recursos compartidos → **Examen de validación** → nivel → módulo → examen ("Ver
