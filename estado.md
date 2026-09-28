@@ -18,6 +18,11 @@
 3. **Resto de la cuenta del profesor** con el diseño del portal: ya están Inicio, Mis grupos,
    Estudiantes y Recursos de la clase; faltan revisar **Planificador**, **Calendario** y **Mi
    cuenta** (el usuario dijo que "toda la cuenta del profesor" debe verse como la del estudiante).
+4. **Probar el pago con Wompi en pestaña nueva** (28 sep): el widget incrustado dejaba al
+   estudiante atrapado en la pantalla final de Wompi. Ahora "Pague aquí" abre el Web Checkout
+   (`checkout.wompi.co/p/`) en otra pestaña con `redirect-url` = /portal; Wompi vuelve con
+   `?id=&env=` → Facturación con aviso del resultado. Si el navegador bloquea la pestaña, se
+   paga en la misma y vuelve igual. Falta confirmarlo con un pago real (celular y computador).
 
 ### ✅ Hecho el 27 sep 2026 (resumen; detalle en git log y en las secciones de abajo)
 - Recursos de la clase del profesor = Recursos compartidos en modo solo ver (+ Exámenes de validación).
