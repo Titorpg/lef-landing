@@ -48,8 +48,8 @@
   Classroom" / "Abrir … en Classroom" fuera); la novedad del resultado siempre con imagen;
   "Ver detalle" del estudiante en ventana flotante centrada; Inicio del profesor sin el aviso
   "clases por reprogramar" (ya está el recuadro fijo debajo).
-- SQL: si el usuario NO está en el computador, pasarle bloques para el SQL Editor (lo más común); si está, script `node aplicar-sql-….js`
-  Management API, se borra después) que pegando en el SQL Editor desde el teléfono.
+- SQL: si el usuario NO está en el computador, pasarle bloques para el SQL Editor (lo más común);
+  si está frente al computador, script `node aplicar-sql-….js` (Management API, se borra después).
 
 ### 🧪 EXAMEN DE PRUEBA A1.3 — QUITARLO cuando se carguen los exámenes reales (27 sep 2026)
 - El SQL `20260927020000_examenes_validacion.sql` carga un examen de PRUEBA en A1.3
