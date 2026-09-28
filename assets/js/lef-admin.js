@@ -2416,13 +2416,16 @@
     var body = rcPage(main, crumbs, "Respuestas de " + r.student_name, r.exam_title + " · " + r.module_level + " · " + (EX_STATE[r.state] || [0, r.state])[1]);
     body.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
-      q("exam_submissions").select("answers,manual,status").eq("id", r.submission_id),
+      // "*": trae también la copia del examen que presentó (content), para que una
+      // edición posterior del examen no cambie lo que ya respondió.
+      q("exam_submissions").select("*").eq("id", r.submission_id),
       q("validation_exams").select("content").eq("id", r.exam_id)
     ]).then(function (res) {
       if (res[0].error) throw res[0].error;
       if (res[1].error) throw res[1].error;
       var sub = (res[0].data || [])[0], x = (res[1].data || [])[0];
       if (!sub || !x) throw new Error("No se encontró el examen.");
+      if (sub.content) x = { content: sub.content };
       body.innerHTML = "";
       var sum = h('<div class="exr-sum"><div class="exr-sum__n"><strong data-s>—</strong><span data-m></span></div>' +
         '<div class="exr-sum__t"><span data-c></span><span class="exr-sum__open" data-o></span></div><span class="exr-sum__acts"></span></div>');
@@ -2569,9 +2572,13 @@
     var u = it && it.image;
     return /^(assets\/[\w\/.-]+|https:\/\/)/.test(u || "") ? '<img class="ex-q-img" src="' + esc(u) + '" alt="" loading="lazy">' : "";
   }
-  // Vista del examen con la clave (solo admin).
+  // Vista del examen con la clave (solo admin). "Editar examen" vuelve editable
+  // esta misma vista (exEditor).
   function exPreview(main, crumbs, x) {
     var body = rcPage(main, crumbs, x.title, "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
+    var bar = h('<div class="ex-ed-top"><span>¿Hay que corregir algo? Edita el examen aquí mismo.</span></div>');
+    bar.appendChild(rcBtn("Editar examen", "edit", "btn-blue", function () { exEditor(main, crumbs, x); }));
+    body.appendChild(bar);
     if (x.intro) body.appendChild(h('<p class="ex-intro">' + esc(x.intro) + "</p>"));
     (x.content.sections || []).forEach(function (s, si) {
       var sec = h('<section class="ex-pv"><h2 class="ex-pv__t"><span>Sección ' + (si + 1) + "</span>" + esc(s.title) + "</h2>" +
@@ -2593,6 +2600,306 @@
       });
       body.appendChild(sec);
     });
+  }
+
+  // ---- Editor del examen (solo admin, 28 sep 2026) ----
+  // Se edita sobre la misma vista: los textos se escriben encima, el círculo de
+  // cada opción marca la correcta (puede haber más de una) y hay botones para
+  // agregar, quitar y mover preguntas, opciones y secciones. Guardar →
+  // admin_update_exam (valida y lo anota en el Registro de eventos con la lista
+  // de cambios). Solo afecta a quienes lo presenten de ahí en adelante: cada envío
+  // guarda su propia copia del examen (20260928020000_examenes_editor.sql).
+  function exYtId(v) {
+    v = String(v || "").trim();
+    if (!v) return "";
+    if (/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    var m = v.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null; // null = no es un enlace de YouTube
+  }
+  function exEditor(main, crumbs, x) {
+    var D = JSON.parse(JSON.stringify({ title: x.title, intro: x.intro || "", sections: (x.content && x.content.sections) || [] }));
+    var dirty = false;
+    var body = rcPage(main, crumbs, "Editar examen " + x.module_level, "Toca cualquier texto para cambiarlo. El círculo de cada opción marca la respuesta correcta.");
+    body.appendChild(h('<div class="pnl-alert warn ex-ed-warn">Los cambios aplican a quienes presenten el examen <strong>de ahora en adelante</strong>. ' +
+      "Los exámenes ya presentados conservan la versión con la que se hicieron.</div>"));
+    var wrap = h('<div class="ex-ed-wrap"></div>');
+    body.appendChild(wrap);
+    var probsBox = h('<div class="pnl-alert err ex-ed-probs" hidden></div>');
+    body.appendChild(probsBox);
+    var bar = h('<div class="ex-ed-bar"><span class="ex-ed-bar__t" data-total></span><span class="ex-ed-bar__acts"></span></div>');
+    body.appendChild(bar);
+
+    function change() { dirty = true; paint(); }
+    function mv(arr, i, d) { var t = arr[i]; arr[i] = arr[i + d]; arr[i + d] = t; }
+    function newId() {
+      var n = 0;
+      D.sections.forEach(function (s) { s.items.forEach(function (it) { var m = /^q(\d+)$/.exec(it.id || ""); if (m) n = Math.max(n, Number(m[1])); }); });
+      return "q" + (n + 1);
+    }
+    // Texto editable en el sitio (sin formato: se guarda como texto plano).
+    function ed(tag, cls, val, ph, onVal, multi) {
+      var el = document.createElement(tag);
+      el.className = "ex-ed " + (cls || "") + (multi ? " is-multi" : "");
+      el.setAttribute("contenteditable", "plaintext-only");
+      if (el.contentEditable !== "plaintext-only") el.setAttribute("contenteditable", "true");
+      el.setAttribute("data-ph", ph || "");
+      el.textContent = val || "";
+      el.addEventListener("input", function () { dirty = true; onVal(el.innerText.replace(/ /g, " ")); });
+      if (!multi) el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
+      return el;
+    }
+    function mini(label, title, fn, cls) {
+      var b = h('<button type="button" class="ex-ed-mini ' + (cls || "") + '" title="' + esc(title) + '" aria-label="' + esc(title) + '">' + label + "</button>");
+      b.onclick = fn;
+      return b;
+    }
+    function askDelete(title, msg, fn) {
+      modal(title, h('<p class="pnl-sub" style="margin-bottom:4px">' + esc(msg) + "</p>"), function () { fn(); change(); }, "Quitar", true);
+    }
+    function paintTotal() {
+      var st = exStats({ sections: D.sections });
+      bar.querySelector("[data-total]").textContent = st.questions + " preguntas · " + exNum(st.points) + " puntos en total";
+    }
+
+    function paintItem(s, it, ii) {
+      var isQ = it.type !== "heading";
+      var tools = h('<span class="ex-ed-tools"></span>');
+      if (ii > 0) tools.appendChild(mini("↑", "Subir", function () { mv(s.items, ii, -1); change(); }));
+      if (ii < s.items.length - 1) tools.appendChild(mini("↓", "Bajar", function () { mv(s.items, ii, 1); change(); }));
+      tools.appendChild(mini(rcIc("trash"), isQ ? "Eliminar pregunta" : "Quitar subtítulo", function () {
+        if (!isQ || !String(it.text || "").trim()) { s.items.splice(ii, 1); change(); return; }
+        askDelete("Eliminar pregunta", "Se quitará la pregunta “" + String(it.text).slice(0, 80) + "” (el cambio se aplica al guardar).", function () { s.items.splice(ii, 1); });
+      }, "is-del"));
+      if (!isQ) {
+        var hd = h('<div class="ex-ed-headrow"></div>');
+        hd.appendChild(ed("p", "ex-pv__head", it.text, "Subtítulo", function (v) { it.text = v; }));
+        hd.appendChild(tools);
+        return hd;
+      }
+      var q = h('<div class="ex-q is-edit"><div class="ex-q__t"></div></div>');
+      var top = q.querySelector(".ex-q__t");
+      top.appendChild(ed("div", "ex-ed-qtext", it.text, "Escribe la pregunta", function (v) { it.text = v; }, true));
+      var pts = h('<label class="ex-ed-pts" title="Puntos de esta pregunta"><input type="number" min="0.5" step="0.5" inputmode="decimal"><span>pts</span></label>');
+      var pin = pts.querySelector("input");
+      pin.value = it.points == null ? "" : it.points;
+      pin.addEventListener("input", function () { dirty = true; it.points = pin.value === "" ? null : Number(pin.value); paintTotal(); });
+      top.appendChild(pts);
+      top.appendChild(tools);
+      if (it.image) {
+        var im = h('<div class="ex-ed-img">' + exImg(it) + "</div>");
+        im.appendChild(mini(rcIc("trash") + "<span>Quitar imagen</span>", "Quitar imagen", function () { delete it.image; change(); }, "is-del is-wide"));
+        q.appendChild(im);
+      }
+      if (it.type === "text") {
+        q.appendChild(h('<p class="ex-q__open">Pregunta abierta: el estudiante escribe su respuesta y la califica el profesor.</p>'));
+        return q;
+      }
+      var ul = h('<ul class="ex-ed-opts"></ul>');
+      it.options.forEach(function (o, oi) {
+        var ok = it.correct.indexOf(oi) > -1;
+        var li = h('<li class="' + (ok ? "is-ok" : "") + '"></li>');
+        li.appendChild(mini(ok ? "✓" : "", ok ? "Respuesta correcta (toca para quitarla)" : "Marcar como respuesta correcta", function () {
+          it.correct = ok ? it.correct.filter(function (c) { return c !== oi; }) : it.correct.concat([oi]).sort(function (a, b) { return a - b; });
+          change();
+        }, "ex-ed-mark"));
+        li.appendChild(ed("span", "ex-ed-opt", o, "Opción " + (oi + 1), function (v) { it.options[oi] = v; }));
+        if (it.options.length > 2) li.appendChild(mini("×", "Quitar esta opción", function () {
+          it.options.splice(oi, 1);
+          it.correct = it.correct.filter(function (c) { return c !== oi; }).map(function (c) { return c > oi ? c - 1 : c; });
+          change();
+        }, "is-del"));
+        ul.appendChild(li);
+      });
+      q.appendChild(ul);
+      q.appendChild(h('<div class="ex-ed-qfoot"></div>')).appendChild(rcBtn("Agregar opción", "plus", "btn-ghost", function () { it.options.push(""); change(); }));
+      return q;
+    }
+
+    function paintSection(s, si) {
+      var sec = h('<section class="ex-pv is-edit"><div class="ex-ed-sechead"><span class="ex-ed-k is-blue">Sección ' + (si + 1) + '</span><span class="ex-ed-tools"></span></div></section>');
+      var tools = sec.querySelector(".ex-ed-tools");
+      if (si > 0) tools.appendChild(mini("↑", "Subir sección", function () { mv(D.sections, si, -1); change(); }));
+      if (si < D.sections.length - 1) tools.appendChild(mini("↓", "Bajar sección", function () { mv(D.sections, si, 1); change(); }));
+      tools.appendChild(mini(rcIc("trash"), "Eliminar sección", function () {
+        var n = s.items.filter(function (it) { return it.type !== "heading"; }).length;
+        askDelete("Eliminar sección", "Se quitará la sección “" + (s.title || "sin nombre") + "”" + (n ? " con sus " + n + (n === 1 ? " pregunta" : " preguntas") : "") + " (el cambio se aplica al guardar).",
+          function () { D.sections.splice(si, 1); });
+      }, "is-del"));
+      sec.appendChild(ed("h2", "ex-ed-sectitle", s.title, "Nombre de la sección", function (v) { s.title = v; }));
+      sec.appendChild(h('<span class="ex-ed-k">Instrucciones</span>'));
+      sec.appendChild(ed("p", "ex-pv__ins", s.instructions, "Instrucciones (opcional)", function (v) { s.instructions = v; }, true));
+      sec.appendChild(h('<span class="ex-ed-k">Lectura</span>'));
+      sec.appendChild(ed("div", "ex-passage", s.passage, "Texto de la lectura (opcional)", function (v) { s.passage = v; }, true));
+      var yt = h('<div class="ex-ed-yt"><span class="ex-ed-k">Audio o video de YouTube</span>' +
+        '<input type="url" placeholder="Pega aquí el enlace del video (opcional)"><p class="ex-ed-err" hidden></p><div data-prev></div></div>');
+      var inp = yt.querySelector("input"), err = yt.querySelector(".ex-ed-err"), prev = yt.querySelector("[data-prev]");
+      inp.value = s._ytRaw != null ? s._ytRaw : s.youtube ? "https://www.youtube.com/watch?v=" + s.youtube : "";
+      function ytPaint() {
+        err.hidden = !s._ytBad;
+        err.textContent = s._ytBad ? "Ese enlace no es de un video de YouTube. Cópialo desde el botón Compartir del video." : "";
+        prev.innerHTML = s.youtube && !s._ytBad ? '<div class="ex-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.youtube) +
+          '?rel=0" title="Audio" allowfullscreen loading="lazy"></iframe></div>' : "";
+      }
+      inp.addEventListener("change", function () {
+        var id = exYtId(inp.value);
+        dirty = true;
+        s._ytRaw = inp.value;
+        s._ytBad = id === null;
+        if (!s._ytBad) s.youtube = id || null;
+        ytPaint();
+      });
+      ytPaint();
+      sec.appendChild(yt);
+      var list = h('<div class="ex-ed-items"></div>');
+      s.items.forEach(function (it, ii) { list.appendChild(paintItem(s, it, ii)); });
+      sec.appendChild(list);
+      var adds = h('<div class="ex-ed-adds"><span class="ex-ed-k">Agregar a esta sección</span></div>');
+      adds.appendChild(rcBtn("Pregunta de opción múltiple", "plus", "btn-ghost", function () {
+        s.items.push({ type: "choice", id: newId(), text: "", options: ["", "", ""], correct: [], points: 1, shuffle: true }); change();
+      }));
+      adds.appendChild(rcBtn("Pregunta abierta", "plus", "btn-ghost", function () { s.items.push({ type: "text", id: newId(), text: "", points: 1 }); change(); }));
+      adds.appendChild(rcBtn("Subtítulo", "plus", "btn-ghost", function () { s.items.push({ type: "heading", text: "" }); change(); }));
+      sec.appendChild(adds);
+      return sec;
+    }
+
+    function paint() {
+      var y = window.scrollY;
+      wrap.innerHTML = "";
+      var head = h('<section class="ex-pv is-edit"><span class="ex-ed-k is-blue">Título del examen</span></section>');
+      head.appendChild(ed("h2", "ex-ed-title", D.title, "Título del examen", function (v) { D.title = v; }));
+      head.appendChild(h('<span class="ex-ed-k">Introducción (la ve el estudiante al abrir el examen)</span>'));
+      head.appendChild(ed("p", "ex-intro", D.intro, "Introducción (opcional)", function (v) { D.intro = v; }, true));
+      wrap.appendChild(head);
+      D.sections.forEach(function (s, si) { wrap.appendChild(paintSection(s, si)); });
+      wrap.appendChild(h('<div class="ex-ed-addsec"></div>')).appendChild(rcBtn("Agregar sección", "plus", "btn-ghost", function () {
+        D.sections.push({ title: "", instructions: null, passage: null, youtube: null, items: [] }); change();
+      }));
+      paintTotal();
+      window.scrollTo(0, y);
+    }
+
+    // Examen limpio para guardar (sin los datos de apoyo del editor).
+    function cleaned() {
+      var t = function (v) { return String(v == null ? "" : v).replace(/ /g, " ").replace(/[ \t]+\n/g, "\n").trim(); };
+      return {
+        title: t(D.title), intro: t(D.intro),
+        content: { version: 1, sections: D.sections.map(function (s) {
+          return { title: t(s.title), instructions: t(s.instructions) || null, passage: t(s.passage) || null, youtube: s.youtube || null,
+            items: s.items.map(function (it) {
+              if (it.type === "heading") return { type: "heading", text: t(it.text) };
+              var o = { type: it.type, id: it.id, text: t(it.text), points: Number(it.points) };
+              if (it.type === "choice") {
+                o.options = it.options.map(t);
+                o.correct = it.correct.slice().sort(function (a, b) { return a - b; });
+                o.shuffle = it.shuffle !== false;
+              }
+              if (it.image) o.image = it.image;
+              return o;
+            }) };
+        }) }
+      };
+    }
+    // Lo que falta para poder guardar, en palabras.
+    function problems(c) {
+      var out = [];
+      if (!c.title) out.push("El examen necesita un título.");
+      if (!c.content.sections.length) out.push("El examen necesita al menos una sección.");
+      var nq = 0;
+      c.content.sections.forEach(function (s, si) {
+        var where = "Sección " + (si + 1) + (s.title ? " (" + s.title + ")" : "");
+        if (!s.title) out.push(where + ": falta el nombre de la sección.");
+        if (D.sections[si]._ytBad) out.push(where + ": el enlace de YouTube no es válido.");
+        var k = 0;
+        s.items.forEach(function (it) {
+          if (it.type === "heading") { if (!it.text) out.push(where + ": hay un subtítulo vacío (escríbelo o quítalo)."); return; }
+          k++; nq++;
+          var lbl = where + ", pregunta " + k + (it.text ? " (“" + it.text.slice(0, 40) + (it.text.length > 40 ? "…" : "") + "”)" : "");
+          if (!it.text) out.push(lbl + ": falta el texto de la pregunta.");
+          if (!(it.points > 0)) out.push(lbl + ": los puntos deben ser mayores que 0.");
+          if (it.type !== "choice") return;
+          if (it.options.some(function (o) { return !o; })) out.push(lbl + ": hay una opción vacía (escríbela o quítala).");
+          if (!it.correct.length) out.push(lbl + ": marca cuál es la respuesta correcta.");
+        });
+      });
+      if (!nq) out.push("El examen necesita al menos una pregunta.");
+      return out;
+    }
+    // Lista de cambios en palabras (va al Registro de eventos).
+    function changes(c) {
+      var out = [], oldSecs = (x.content && x.content.sections) || [], newSecs = c.content.sections;
+      var cut = function (s) { s = String(s || ""); return "“" + (s.length > 60 ? s.slice(0, 60) + "…" : s) + "”"; };
+      if (c.title !== x.title) out.push("Título: " + cut(x.title) + " → " + cut(c.title));
+      if ((c.intro || "") !== (x.intro || "")) out.push("Se cambió la introducción del examen.");
+      var oldNames = oldSecs.map(function (s) { return s.title; }), newNames = newSecs.map(function (s) { return s.title; });
+      newSecs.forEach(function (s, i) {
+        var o = oldSecs[i];
+        if (!o) { out.push("Se agregó la sección " + cut(s.title) + "."); return; }
+        if (o.title !== s.title) out.push("Sección " + (i + 1) + ": el nombre pasó de " + cut(o.title) + " a " + cut(s.title) + ".");
+        if ((o.instructions || "") !== (s.instructions || "")) out.push("Sección " + cut(s.title) + ": se cambiaron las instrucciones.");
+        if ((o.passage || "") !== (s.passage || "")) out.push("Sección " + cut(s.title) + ": " + (!o.passage ? "se agregó la lectura." : !s.passage ? "se quitó la lectura." : "se corrigió la lectura."));
+        if ((o.youtube || "") !== (s.youtube || "")) out.push("Sección " + cut(s.title) + ": " + (!o.youtube ? "se agregó el video de YouTube." : !s.youtube ? "se quitó el video de YouTube." : "se cambió el enlace de YouTube (antes " + o.youtube + ", ahora " + s.youtube + ")."));
+        var oh = o.items.filter(function (it) { return it.type === "heading"; }).map(function (it) { return it.text; }).join("|");
+        var nh = s.items.filter(function (it) { return it.type === "heading"; }).map(function (it) { return it.text; }).join("|");
+        if (oh !== nh) out.push("Sección " + cut(s.title) + ": se cambiaron los subtítulos.");
+      });
+      if (oldSecs.length > newSecs.length) out.push("Se eliminaron " + (oldSecs.length - newSecs.length) + " sección(es) (antes: " + oldNames.join(", ") + "; ahora: " + newNames.join(", ") + ").");
+      var byId = function (secs) {
+        var m = {}, order = [];
+        secs.forEach(function (s) { s.items.forEach(function (it) { if (it.type !== "heading") { m[it.id] = it; order.push(it.id); } }); });
+        return { m: m, order: order };
+      };
+      var O = byId(oldSecs), N = byId(newSecs);
+      var opt = function (it, i) { return cut((it.options || [])[i]); };
+      N.order.forEach(function (id) {
+        var n = N.m[id], o = O.m[id];
+        if (!o) { out.push("Se agregó la pregunta " + cut(n.text) + "."); return; }
+        var q = "Pregunta " + cut(n.text) + ": ";
+        if (o.text !== n.text) out.push("Se corrigió el texto de la pregunta " + cut(o.text) + " → " + cut(n.text) + ".");
+        if (JSON.stringify(o.options || []) !== JSON.stringify(n.options || [])) out.push(q + "se cambiaron las opciones.");
+        var oc = (o.correct || []).map(function (i) { return opt(o, i); }).join(" / "), nc = (n.correct || []).map(function (i) { return opt(n, i); }).join(" / ");
+        if (n.type === "choice" && oc !== nc) out.push(q + "la respuesta correcta pasó de " + (oc || "—") + " a " + nc + ".");
+        if (Number(o.points) !== Number(n.points)) out.push(q + "los puntos pasaron de " + exNum(o.points) + " a " + exNum(n.points) + ".");
+        if (o.image && !n.image) out.push(q + "se quitó la imagen.");
+      });
+      O.order.forEach(function (id) { if (!N.m[id]) out.push("Se eliminó la pregunta " + cut(O.m[id].text) + "."); });
+      var kept = function (a, b) { return a.filter(function (id) { return b.indexOf(id) > -1; }).join(","); };
+      if (kept(O.order, N.order) !== kept(N.order, O.order)) out.push("Se cambió el orden de las preguntas.");
+      return out;
+    }
+
+    function save() {
+      var c = cleaned(), probs = problems(c);
+      probsBox.hidden = !probs.length;
+      if (probs.length) {
+        probsBox.innerHTML = "<strong>Antes de guardar, corrige esto:</strong><ul>" + probs.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>";
+        probsBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      var list = changes(c);
+      if (!list.length) { toast("No hay cambios para guardar."); return; }
+      var b = h('<div><p class="pnl-sub" style="margin-bottom:8px">Esto es lo que cambia:</p><ul class="ex-ed-changes">' +
+        list.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>" +
+        '<p class="pnl-sub" style="margin:10px 0">Aplica a quienes presenten el examen de ahora en adelante. Queda anotado en el Registro de eventos.</p>' +
+        field("Nota (opcional)", '<input name="note" maxlength="300" placeholder="Ej.: el profesor corrigió la clave de la pregunta 23">') + "</div>");
+      modal("Guardar cambios del examen", b, function () {
+        return rpc("admin_update_exam", { p_exam: x.id, p_title: c.title, p_intro: c.intro, p_content: c.content,
+          p_changes: list, p_note: b.querySelector("[name=note]").value.trim() || null }).then(function () {
+          x.title = c.title; x.intro = c.intro || null; x.content = c.content; dirty = false;
+          toast("Examen guardado. Quienes lo presenten desde ahora verán esta versión.");
+          exPreview(main, crumbs, x);
+        });
+      }, "Guardar", false, true);
+    }
+
+    var acts = bar.querySelector(".ex-ed-bar__acts");
+    acts.appendChild(rcBtn("Cancelar", "arrow", "btn-ghost", function () {
+      if (!dirty) { exPreview(main, crumbs, x); return; }
+      modal("Descartar cambios", h('<p class="pnl-sub" style="margin-bottom:4px">Tienes cambios sin guardar en este examen. Si sales, se pierden.</p>'),
+        function () { exPreview(main, crumbs, x); }, "Descartar cambios", true);
+    }));
+    acts.appendChild(rcBtn("Guardar cambios", "arrow", "btn-blue", save));
+    paint();
   }
 
   // ---- Profesor: Recursos de la clase → Exámenes de validación ----
@@ -3383,7 +3690,8 @@
     "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)",
     "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)",
     "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)",
-    "exam_submission.delete": "Respuesta de examen de validación borrada"
+    "exam_submission.delete": "Respuesta de examen de validación borrada",
+    "exam.update": "Examen de validación editado"
   };
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
@@ -3513,6 +3821,15 @@
             line("Presentado el", date(d.submitted_at)),
             line("Estado", exSt)
           ].join("\n")
+        ];
+      }
+      case "exam.update": {
+        var chg = Array.isArray(d.changes) ? d.changes : [];
+        return [
+          "Se EDITÓ el examen de validación " + (d.module_level || "") + " — " + (d.title || d.old_title || "") +
+            ". Los cambios aplican a quienes lo presenten desde ese momento; los exámenes ya presentados conservan la versión anterior.",
+          (chg.length ? "Qué cambió:\n" + chg.map(function (c) { return "• " + c; }).join("\n") : "Qué cambió: no quedó el detalle.") +
+            "\n\nLa versión anterior del examen quedó guardada en este registro (en el detalle técnico)."
         ];
       }
     }

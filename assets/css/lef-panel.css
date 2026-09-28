@@ -1299,6 +1299,54 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .ex-q__opts{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px;}
 .ex-q__opts li{padding:5px 12px;border-radius:999px;background:#f3f3f0;font-size:13.5px;}
 .ex-q__opts li.is-ok{background:var(--ok-bg);color:var(--ok);font-weight:600;}
+/* Editor del examen (admin): se edita sobre la misma vista */
+.ex-ed-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--niebla);border-radius:14px;box-shadow:var(--card-shadow);padding:12px 16px;margin:0 0 16px;font-size:13.5px;color:var(--grafito);}
+.ex-ed-warn{max-width:760px;}
+.ex-pv.is-edit{padding-top:16px;}
+.ex-ed{display:block;border-radius:8px;padding:3px 6px;margin-left:-6px;outline:1px dashed transparent;transition:outline-color .15s,background .15s;min-height:1.4em;cursor:text;}
+.ex-ed.is-multi{white-space:pre-wrap;}
+.ex-ed:hover{outline-color:#b9c3dd;background:#fafbfe;}
+.ex-ed:focus{outline:2px solid var(--azul);background:#fff;}
+.ex-ed:empty::before{content:attr(data-ph);color:var(--plata);font-weight:400;font-style:italic;}
+.ex-passage.ex-ed{margin-left:0;padding:16px 18px;}
+.ex-ed-k{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--plata);font-weight:600;margin:12px 0 2px;}
+.ex-ed-k.is-blue{color:var(--azul);margin-top:0;}
+.ex-ed-title{font-size:21px;font-weight:600;margin:2px 0 4px -6px;}
+.ex-ed-sectitle{font-size:19px;font-weight:600;margin:2px 0 0 -6px;}
+.ex-ed-sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ex-ed-tools{display:inline-flex;align-items:center;gap:4px;flex:none;}
+.ex-ed-mini{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:28px;height:28px;padding:0 7px;border:1px solid var(--niebla);border-radius:8px;background:#fff;color:var(--grafito);font:inherit;font-size:14px;line-height:1;cursor:pointer;}
+.ex-ed-mini:hover{border-color:var(--ink);color:var(--ink);}
+.ex-ed-mini .mc-ic{width:15px;height:15px;}
+.ex-ed-mini.is-del:hover{border-color:var(--bad);color:var(--bad);background:var(--bad-bg);}
+.ex-ed-mini.is-wide{font-size:12.5px;padding:0 10px;}
+.ex-ed-yt input{width:100%;max-width:560px;padding:9px 12px;border:1px solid var(--niebla);border-radius:10px;font:inherit;font-size:14px;}
+.ex-ed-yt input:focus{outline:2px solid var(--azul);border-color:transparent;}
+.ex-ed-err{color:var(--bad);font-size:13px;margin:6px 0 0;}
+.ex-ed-items{margin-top:14px;}
+.ex-q.is-edit .ex-q__t{align-items:flex-start;white-space:normal;}
+.ex-ed-qtext{flex:1;font-weight:500;}
+.ex-ed-pts{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:12px;color:var(--plata);}
+.ex-ed-pts input{width:62px;padding:5px 7px;border:1px solid var(--niebla);border-radius:8px;font:inherit;font-size:13.5px;text-align:center;}
+.ex-ed-img{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:6px;}
+.ex-ed-opts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.ex-ed-opts li{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 6px;border-radius:12px;background:#f3f3f0;font-size:14px;}
+.ex-ed-opts li.is-ok{background:var(--ok-bg);color:var(--ok);font-weight:600;}
+.ex-ed-opts .ex-ed-opt{flex:1;margin-left:0;}
+.ex-ed-mark{border-radius:50%;width:26px;min-width:26px;height:26px;padding:0;font-weight:700;}
+.ex-ed-opts li.is-ok .ex-ed-mark{background:var(--ok);border-color:var(--ok);color:#fff;}
+.ex-ed-qfoot{margin-top:8px;}
+.ex-ed-headrow{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--niebla);padding-top:8px;}
+.ex-ed-headrow .ex-pv__head{flex:1;margin:4px 0 4px -6px;}
+.ex-ed-adds{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px dashed var(--niebla);margin-top:12px;padding-top:12px;}
+.ex-ed-adds .ex-ed-k{width:100%;margin:0;}
+.ex-ed-addsec{margin:0 0 18px;}
+.ex-ed-probs ul{margin:6px 0 0 18px;padding:0;}
+.ex-ed-bar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--niebla);border-radius:14px;box-shadow:0 10px 30px rgba(16,24,40,.16);padding:10px 14px;margin-top:8px;}
+.ex-ed-bar__t{font-size:13.5px;color:var(--grafito);}
+.ex-ed-bar__acts{display:flex;gap:8px;}
+.ex-ed-changes{margin:0 0 0 18px;padding:0;font-size:13.5px;color:var(--carbon);max-height:260px;overflow:auto;}
+.ex-ed-changes li{margin:3px 0;}
 /* Estudiante */
 .exam-banner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;border:1px solid var(--niebla);border-left:5px solid var(--azul);
   border-radius:16px;box-shadow:var(--card-shadow);padding:18px 20px;margin:16px 0 0;}
