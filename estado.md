@@ -3,12 +3,11 @@
 ## 📌 PENDIENTES VIGENTES (28 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
 ### ▶ Lo siguiente
-1. **APLICAR EL SQL de los exámenes reales** (28 sep): el usuario corre en su terminal, en la
-   carpeta LEF: `node aplicar-sql-examenes.js` (aplica
-   `20260928010000_examenes_validacion_reales.sql` y lista los exámenes). Después borrar
-   `aplicar-sql-examenes.js` (no está en git). Ese SQL **borra el examen de PRUEBA A1.3** (y su
-   envío de prueba) y carga A1.1, A1.2, A1.3, A2.1, A2.2 y A2.3 (100 pts c/u, clave y puntos de
-   Google). Frontend con imágenes en preguntas ya publicado.
+1. **Editor de exámenes (28 sep, publicado)**: Recursos compartidos → Examen de validación →
+   módulo → Ver examen → "Editar examen" (solo admin; se edita sobre la misma vista). Falta:
+   el usuario corre `node aplicar-sql-editor.js` (SQL `20260928020000_examenes_editor.sql`:
+   copia del examen en cada envío + `admin_update_exam`), borrar el script, y probarlo.
+   Los exámenes reales (SQL 20260928010000) YA se aplicaron el 28 sep (lo corrió el usuario).
 2. **Preguntas dudosas copiadas TAL CUAL de Google (decidir con el usuario / director):**
    - **A2.2 P23** ("How does Camila feel about her trip overall?"): la clave marcada es "She is
      angry … wants a refund"; por la lectura la correcta es "Despite the difficulties, she found
