@@ -23,8 +23,8 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
    - **A1.1 corregido el 28 sep (tarde):** se había copiado el form de 20 preguntas ("VALIDATION
      EXAM LEVEL A1.1 - LUIS CABALLERO", adjunto en LEVEL A1 GR 1); el bueno es "VALIDATION EXAM
      MODULE 1 LEVEL A1.1" (1_RYgnrz…, 30 preguntas, 100 pts; puntos leídos seleccionando cada
-     pregunta en el editor porque el form no tenía respuestas). SQL `20260928050000` pasado al
-     usuario para el SQL Editor.
+     pregunta en el editor porque el form no tenía respuestas). SQL `20260928050000` APLICADO por el
+     usuario (SQL Editor, 28 sep).
    - **A2.3** no está adjunto en Classroom (DAY 16 del módulo 6 sin form): se tomó el form
      "VALIDATION EXAM MODULE 6 LEVEL A2.3" del Drive del director (18johD_h…); confirmar con el
      profesor que es la versión definitiva.
