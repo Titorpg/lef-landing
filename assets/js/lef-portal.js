@@ -211,6 +211,8 @@
 
   function go(tab) { location.hash = tab; }
   function firstName(n) { return String(n || "").trim().split(/\s+/)[0] || ""; }
+  // Imagen de una pregunta del examen (p. ej. "What activity is it?" del A1.2).
+  function examImg(it) { var u = safeUrl(it.image); return u ? '<img class="ex-q-img" src="' + esc(u) + '" alt="" loading="lazy">' : ""; }
   function safeUrl(u) { return /^(https:\/\/|assets\/)/.test(u || "") ? u : ""; }
   function safeLink(u) { return /^https?:\/\//.test(u || "") ? u : ""; }
 
@@ -1355,7 +1357,7 @@
           if (it.type === "heading") { stage.appendChild(h('<p class="exm-note">' + esc(it.text) + "</p>")); return; }
           if (it.type === "text") {
             // Pregunta abierta: la escribe el estudiante y la califica el profesor.
-            var tq = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend>" +
+            var tq = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend>" + examImg(it) +
               '<textarea class="exm-text" rows="4" maxlength="4000" placeholder="Escribe tu respuesta aquí"></textarea>' +
               '<p class="exm-text__note">Esta respuesta la califica tu profesor.</p></fieldset>');
             var ta = tq.querySelector("textarea");
@@ -1370,7 +1372,7 @@
           if (it.type !== "choice") return;
           var idx = it.options.map(function (_, i) { return i; });
           if (it.shuffle) idx = examShuffle(idx, assignmentId + it.id);
-          var q = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend></fieldset>");
+          var q = h('<fieldset class="exm-q" data-q="' + esc(it.id) + '"><legend>' + esc(it.text) + "</legend>" + examImg(it) + "</fieldset>");
           idx.forEach(function (i) {
             var opt = h('<label class="exm-opt"><input type="radio" name="' + esc(it.id) + '" value="' + i + '"><span>' + esc(it.options[i]) + "</span></label>");
             var inp = opt.querySelector("input");

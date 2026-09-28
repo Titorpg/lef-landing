@@ -2565,6 +2565,10 @@
     });
   }
 
+  function exImg(it) {
+    var u = it && it.image;
+    return /^(assets\/[\w\/.-]+|https:\/\/)/.test(u || "") ? '<img class="ex-q-img" src="' + esc(u) + '" alt="" loading="lazy">' : "";
+  }
   // Vista del examen con la clave (solo admin).
   function exPreview(main, crumbs, x) {
     var body = rcPage(main, crumbs, x.title, "Vista del admin: la respuesta correcta sale en verde. El estudiante ve lo mismo sin las respuestas.");
@@ -2577,12 +2581,12 @@
       (s.items || []).forEach(function (it) {
         if (it.type === "heading") { sec.appendChild(h('<p class="ex-pv__head">' + esc(it.text) + "</p>")); return; }
         if (it.type === "text") {
-          sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" +
+          sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" + exImg(it) +
             '<p class="ex-q__open">Pregunta abierta: la califica el profesor.</p></div>'));
           return;
         }
         var ok = it.correct || [];
-        sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" +
+        sec.appendChild(h('<div class="ex-q"><div class="ex-q__t">' + esc(it.text) + '<span class="ex-q__pts">' + exNum(it.points) + " pts</span></div>" + exImg(it) +
           '<ul class="ex-q__opts">' + (it.options || []).map(function (o, i) {
             return '<li class="' + (ok.indexOf(i) > -1 ? "is-ok" : "") + '">' + esc(o) + (ok.indexOf(i) > -1 ? " ✓" : "") + "</li>";
           }).join("") + "</ul></div>"));

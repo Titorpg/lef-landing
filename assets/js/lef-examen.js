@@ -19,6 +19,9 @@
   }
   function num(n) { return String(Math.round(Number(n || 0) * 100) / 100); }
   function isQ(it) { return it.type === "choice" || it.type === "text"; }
+  // Imagen de la pregunta: solo archivos de la plataforma (assets/…) o https.
+  function imgSrc(it) { var u = it && it.image; return /^(assets\/[\w\/.-]+|https:\/\/)/.test(u || "") ? u : ""; }
+  function imgHtml(it) { var u = imgSrc(it); return u ? '<img class="ex-q-img" src="' + esc(u) + '" alt="" loading="lazy">' : ""; }
   function manualOf(manual, id) {
     var v = manual ? manual[id] : null;
     return v === "" || v == null || isNaN(Number(v)) ? null : Number(v);
@@ -77,7 +80,7 @@
         if (it.type === "choice") {
           var mine = a == null ? -1 : Number(a), ok = (it.correct || []).indexOf(mine) > -1;
           var q = h('<div class="exr-q ' + (ok ? "is-ok" : "is-bad") + '"><div class="exr-q__top"><p class="exr-q__t">' + esc(it.text) + "</p>" +
-            '<span class="exr-badge">' + (ok ? "✓ Correcta" : "✗ Incorrecta") + " · " + (ok ? num(pts) : "0") + "/" + num(pts) + " pts</span></div>" +
+            '<span class="exr-badge">' + (ok ? "✓ Correcta" : "✗ Incorrecta") + " · " + (ok ? num(pts) : "0") + "/" + num(pts) + " pts</span></div>" + imgHtml(it) +
             '<ul class="exr-opts">' + (it.options || []).map(function (o, i) {
               var isC = (it.correct || []).indexOf(i) > -1, isM = i === mine;
               return '<li class="' + (isC ? "is-correct" : "") + (isM && !isC ? " is-wrong" : "") + '">' +
@@ -89,7 +92,7 @@
         } else {
           var m = manualOf(manual, it.id);
           var q2 = h('<div class="exr-q is-open"><div class="exr-q__top"><p class="exr-q__t">' + esc(it.text) + "</p>" +
-            '<span class="exr-badge">' + (m == null ? "Por calificar" : num(m) + "/" + num(pts) + " pts") + "</span></div>" +
+            '<span class="exr-badge">' + (m == null ? "Por calificar" : num(m) + "/" + num(pts) + " pts") + "</span></div>" + imgHtml(it) +
             '<div class="exr-open"><span class="exr-open__k">' + esc(who) + "</span><p>" + esc(a || "(sin respuesta)") + "</p></div></div>");
           if (opts.editable) {
             var f = h('<label class="exr-grade"><span>Puntos para esta respuesta (0 a ' + num(pts) + ')</span>' +
@@ -134,9 +137,36 @@
       .replace(/→/g, "->").replace(/…/g, "...").replace(/[^\x00-\xFF]/g, "");
   }
 
+  // Imágenes de las preguntas para el PDF: { idPregunta: { data, w, h } } (si una
+  // no carga, esa pregunta sale sin imagen).
+  function itemImages(content) {
+    var jobs = [];
+    ((content && content.sections) || []).forEach(function (s) {
+      (s.items || []).forEach(function (it) {
+        var u = imgSrc(it);
+        if (!u) return;
+        jobs.push(fetch(u).then(function (r) { return r.blob(); }).then(function (b) {
+          return new Promise(function (ok) { var fr = new FileReader(); fr.onload = function () { ok(fr.result); }; fr.readAsDataURL(b); });
+        }).then(function (data) {
+          return new Promise(function (ok) {
+            var im = new Image();
+            im.onload = function () { ok([it.id, { data: data, w: im.naturalWidth, h: im.naturalHeight }]); };
+            im.onerror = function () { ok(null); };
+            im.src = data;
+          });
+        }).catch(function () { return null; }));
+      });
+    });
+    return Promise.all(jobs).then(function (list) {
+      var out = {};
+      list.forEach(function (x) { if (x) out[x[0]] = x[1]; });
+      return out;
+    });
+  }
+
   function pdf(d) {
-    return Promise.all([loadJsPdf(), logoData()]).then(function (res) {
-      var JsPDF = res[0], logo = res[1];
+    return Promise.all([loadJsPdf(), logoData(), itemImages(d.content)]).then(function (res) {
+      var JsPDF = res[0], logo = res[1], imgs = res[2];
       var doc = new JsPDF({ unit: "pt", format: "a4" });
       var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48, y = M;
       function need(hh) { if (y + hh > H - M) { doc.addPage(); y = M; } }
@@ -176,14 +206,24 @@
           n++;
           var pts = Number(it.points || 1), a = d.answers ? d.answers[it.id] : null;
           y += 6;
+          function drawImg() {
+            var im = imgs[it.id];
+            if (!im) return;
+            var hh = Math.min(110, im.h), ww = im.w * hh / im.h;
+            if (ww > W - 2 * M - 12) { ww = W - 2 * M - 12; hh = im.h * ww / im.w; }
+            need(hh + 8);
+            try { doc.addImage(im.data, /png/i.test(im.data.slice(0, 30)) ? "PNG" : "JPEG", M + 12, y + 2, ww, hh); y += hh + 8; } catch (e) { /* sin imagen */ }
+          }
           if (it.type === "choice") {
             var mine = a == null ? -1 : Number(a), ok = (it.correct || []).indexOf(mine) > -1;
             text(it.text + "   [" + (ok ? "Correcta" : "Incorrecta") + " · " + (ok ? num(pts) : "0") + "/" + num(pts) + " pts]", 10.5, "bold", ok ? [31, 122, 68] : [138, 43, 43]);
+            drawImg();
             text("Tu respuesta: " + (mine > -1 ? it.options[mine] : "(sin respuesta)"), 10, "normal", [16, 16, 16], 12);
             if (!ok) text("Respuesta correcta: " + (it.correct || []).map(function (i) { return it.options[i]; }).join(" / "), 10, "normal", [31, 122, 68], 12);
           } else {
             var m = manualOf(d.manual, it.id);
             text(it.text + "   [" + (m == null ? "Sin calificar" : num(m) + "/" + num(pts) + " pts") + "]", 10.5, "bold");
+            drawImg();
             text("Tu respuesta: " + (a || "(sin respuesta)"), 10, "normal", [16, 16, 16], 12);
           }
         });
