@@ -19,6 +19,12 @@
    **Opción B (elegida por el usuario con maqueta, 28 sep):** "Grupos anteriores" = una carpeta
    por ciclo ("Ciclo octubre 2026") en Estudiantes y en Mis grupos; al abrirla, sus grupos con
    estudiantes (y resultados del examen en Mis grupos). Los grupos actuales siguen desplegados.
+1c. **28 sep, más tarde (todo publicado y SQL aplicado):** tarjeta del estudiante (Estudiantes del
+   profesor) con "Ver resultado del examen" / "Revisar examen"; filas de examen bien acomodadas en
+   celular; SQL `20260928040000_novedad_resultado_huerfana.sql` APLICADO: borró la novedad vacía de
+   Liam (resultado del examen de prueba borrado) y un trigger borra la novedad cuando se borra su
+   envío. Regla vigente: la novedad del resultado se quita cuando el estudiante tiene ACTIVO un
+   módulo posterior. El examen de un grupo solo lo ven los inscritos en ESE grupo (lef_exam_targets).
 1b. **Profesor reorganizado (28 sep, publicado, falta verlo con cuenta de profesor):**
    programar / revisar / dar OK del examen está ahora en **Mis grupos** (bloque "Examen de
    validación" en cada tarjeta + "Grupos anteriores" al final); Recursos de la clase →
