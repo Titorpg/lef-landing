@@ -103,13 +103,17 @@
     examen:     { label: "Exámenes", one: "Examen de validación", color: "#0e7490", icon: "check" },
     revision_examen: { label: "Revisión de exámenes", one: "Revisión de exámenes", color: "#b45309", icon: "check" }
   };
+  // "examen" (solo al crear, profesor): no es un evento del calendario, programa
+  // el examen de validación de uno de sus grupos (teacher_schedule_exam), igual
+  // que desde Mis grupos; el calendario lo muestra solo desde la programación.
   var CATS_BY_ROLE = {
-    teacher: ["actividad", "evaluacion", "aviso", "sin_clase"],
+    teacher: ["actividad", "evaluacion", "examen", "aviso", "sin_clase"],
     admin:   ["evento", "aviso", "actividad", "evaluacion", "sin_clase"]
   };
   var CAT_HINT = {
     actividad: "Tareas, lecturas, entregas.",
-    evaluacion: "Quiz, examen, presentación.",
+    evaluacion: "Quiz, presentación u otra evaluación de tu clase.",
+    examen: "El examen de validación del módulo: el estudiante lo presenta una sola vez en Clase de hoy, entre las fechas que elijas.",
     evento: "Talleres, actividades de LEF.",
     aviso: "Un recordatorio o novedad.",
     sin_clase: "Tacha las clases de esos días. Los estudiantes reciben un correo y la clase queda pendiente por reprogramar en el Dashboard del profesor."
@@ -810,7 +814,7 @@
 
     function editEvent(ev, dayKey, atTime) {
       loadGroups().catch(function () { return []; }).then(function (groups) {
-        var cats = CATS_BY_ROLE[role];
+        var cats = CATS_BY_ROLE[role].filter(function (c) { return !ev || c !== "examen"; });
         if (ev && cats.indexOf(ev.category) === -1) cats = [ev.category];
         var e = ev || {
           category: cats[0], starts_on: dayKey, ends_on: dayKey,
@@ -837,6 +841,13 @@
             return '<label class="lcal-cat" style="--c:' + CATS[c].color + '"><input type="radio" name="category" value="' + c + '"' + (e.category === c ? " checked" : "") + ">" +
               "<span>" + ic(CATS[c].icon) + esc(CATS[c].one) + "</span></label>";
           }).join("") + '</div><p class="lcal-f__hint" data-cat-hint></p></div>' +
+          (cats.indexOf("examen") > -1 ? '<div class="lcal-f" data-exam-box style="display:none"><span class="lcal-f__l">Grupo y examen</span>' +
+            '<label class="lcal-in lcal-groupsel">' + ic("users") + '<select name="exam_group"><option value="">Cargando exámenes…</option></select></label>' +
+            '<span class="lcal-f__l" style="margin-top:12px">Fechas para presentarlo</span>' +
+            '<div class="lcal-when"><span class="lcal-when__sep">Desde</span><label class="lcal-in">' + ic("cal") + '<input type="date" name="exam_opens" aria-label="Desde"></label>' +
+            '<span class="lcal-when__sep">Hasta</span><label class="lcal-in">' + ic("cal") + '<input type="date" name="exam_closes" aria-label="Hasta"></label></div>' +
+            '<p class="lcal-f__hint">El primer día le aparece al estudiante en su calendario y, durante esos días, en Clase de hoy. Quien no lo envíe antes de que termine el último día queda como “No presentó”. ' +
+            "Si el grupo ya lo tenía programado, se cambian las fechas. Los resultados los revisas en Mis grupos.</p></div>" : "") +
           '<div class="lcal-f"><span class="lcal-f__l">Cuándo</span>' +
           '<div class="lcal-when"><label class="lcal-in">' + ic("cal") + '<input type="date" name="starts_on" value="' + esc(e.starts_on || "") + '" aria-label="Fecha"></label>' +
           '<label class="lcal-switch"><input type="checkbox" name="allday"' + (allDay ? " checked" : "") + '><i></i><span>Todo el día</span></label></div>' +
@@ -865,8 +876,34 @@
         allBox.onchange = function () { times.style.display = allBox.checked ? "none" : ""; until.style.display = allBox.checked ? "" : "none"; };
         var catHint = f.querySelector("[data-cat-hint]");
         function curCat() { var x = f.querySelector("[name=category]:checked"); return x ? x.value : cats[0]; }
-        function syncCat() { catHint.textContent = CAT_HINT[curCat()] || ""; }
+        var examBox = f.querySelector("[data-exam-box]");
+        // Con "Examen de validación" se ocultan los campos de un evento normal.
+        var stdBlocks = [].slice.call(f.children).filter(function (el) { return el !== examBox && !el.querySelector("[name=category]"); });
+        function syncCat() {
+          catHint.textContent = CAT_HINT[curCat()] || "";
+          var isExam = curCat() === "examen";
+          if (examBox) examBox.style.display = isExam ? "" : "none";
+          stdBlocks.forEach(function (el) { el.style.display = isExam ? "none" : ""; });
+        }
         f.querySelectorAll("[name=category]").forEach(function (r) { r.onchange = syncCat; }); syncCat();
+        if (examBox) {
+          var today = keyOf(new Date()), op = dayKey && dayKey > today ? dayKey : today;
+          examBox.querySelector("[name=exam_opens]").value = op;
+          examBox.querySelector("[name=exam_opens]").min = today;
+          examBox.querySelector("[name=exam_closes]").value = keyOf(addDays(parseKey(op), 3));
+          examBox.querySelector("[name=exam_closes]").min = today;
+          sb.from("validation_exams").select("module_level,title").then(function (r) {
+            var byLevel = {};
+            (r.data || []).forEach(function (x) { byLevel[x.module_level] = x.title; });
+            var sel = examBox.querySelector("[name=exam_group]");
+            var withExam = groups.filter(function (g) { return byLevel[(g.modules || {}).level]; });
+            sel.innerHTML = (groups.length ? (withExam.length ? "" : '<option value="">Ninguno de tus grupos tiene examen todavía</option>') + groups.map(function (g) {
+              var lv = (g.modules || {}).level || "", t = byLevel[lv];
+              return '<option value="' + g.id + '"' + (t ? "" : " disabled") + ">" + esc(lv + " · " + groupDays(g) + " — " + (t || "su módulo aún no tiene examen")) + "</option>";
+            }).join("") : '<option value="">No tienes grupos asignados</option>');
+            if (withExam.length) sel.value = withExam[0].id;
+          });
+        }
         var gp = f.querySelector("[data-group-pick]");
         function curAud() { var x = f.querySelector("[name=aud]:checked"); return x ? x.value : ""; }
         function syncAud() { if (gp) gp.style.display = curAud() === "group" ? "" : "none"; }
@@ -874,6 +911,19 @@
 
         function save() {
           var val = function (n) { var x = f.querySelector("[name=" + n + "]"); return x ? String(x.value || "").trim() : ""; };
+          if (curCat() === "examen") {
+            var gid = val("exam_group"), o = val("exam_opens"), c = val("exam_closes");
+            if (!gid) throw new Error("Elige el grupo.");
+            if (!o || !c) throw new Error("Elige las dos fechas.");
+            if (c < o) throw new Error("La fecha “Hasta” debe ser igual o posterior a “Desde”.");
+            return sb.rpc("teacher_schedule_exam", { p_group: gid, p_opens: o, p_closes: c, p_student: null }).then(function (r) {
+              if (r.error) throw new Error(String(r.error.message || "").replace(/^LEF_[A-Z_]+:\s*/, ""));
+              toast("Examen programado del " + longDay(parseKey(o)) + " al " + longDay(parseKey(c)) + ".");
+              cursor = parseKey(o);
+              miniMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+              refresh();
+            });
+          }
           var title = val("title");
           if (title.length < 2) throw new Error("Escribe un título.");
           var starts = val("starts_on");

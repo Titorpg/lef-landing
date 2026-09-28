@@ -1453,6 +1453,19 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
   url("../inicio/hero-profesor.jpg") center 12%/cover no-repeat;}
 /* Mis grupos y Estudiantes del profesor (27 sep 2026): tarjetas flotantes como el portal. */
 .tg-grid,.tst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:14px;}
+/* Grupos anteriores (Completado) y estudiantes agrupados por grupo */
+.tg-card.is-done{border-top-color:var(--ok);background:#fcfdfc;}
+.tg-card.is-done .tg-card__top{align-items:flex-start;}
+.tg-done{margin-left:auto;flex:none;}
+.tg-names li.is-off{background:#f1f1ef;color:var(--plata);text-decoration:line-through;}
+.tst-group{background:#fff;border:1px solid var(--niebla);border-radius:18px;box-shadow:var(--card-shadow);padding:16px;margin-bottom:18px;border-top:3px solid #d9a52b;}
+.tst-group.is-done{border-top-color:var(--ok);}
+.tst-group__head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.tst-group__t{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.tst-group__t strong{font-size:16px;color:#1b2a5e;}
+.tst-group__t span{font-size:13px;color:var(--grafito);}
+.tst-group__chips{display:flex;gap:6px;flex-wrap:wrap;}
+.tst-group .tst-card{box-shadow:none;background:#fbfbfa;}
 .tg-card,.tst-card{background:#fff;border:1px solid var(--niebla);border-radius:16px;box-shadow:var(--card-shadow);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0;}
 .tg-card{border-top:3px solid #d9a52b;}
 .tg-card__top{display:flex;align-items:center;gap:12px;}

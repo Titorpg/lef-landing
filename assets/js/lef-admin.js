@@ -681,7 +681,7 @@
   // Grupos activos del profesor + sus inscripciones (Active/PendingPayment).
   // Usado por el Dashboard (resumen) y por "Mis grupos" (detalle).
   function loadMyGroups() {
-    return q("groups").select("id,capacity,active,modules(id,level,title,module_number),schedules(days,start_time,end_time)")
+    return q("groups").select("id,capacity,active,modules(id,level,title,module_number),schedules(days,start_time,end_time,cycles(name,start_date,end_date))")
       .eq("teacher_id", ME.teacher_id).eq("active", true)
       .then(function (gr) {
         if (gr.error) throw gr.error;
@@ -814,8 +814,10 @@
   // horario, el cupo y la lista de estudiantes a un clic.
   // Mis grupos (profesor). Desde el 28 sep 2026 cada grupo trae también su
   // examen de validación: programarlo, revisar las respuestas y dar el OK
-  // (antes estaba en Recursos de la clase). Al final, "Grupos anteriores" con los
-  // resultados de ciclos pasados. Los avisos de Inicio y del calendario llegan aquí.
+  // (antes estaba en Recursos de la clase). Los grupos de ciclos que ya
+  // terminaron no desaparecen: pasan a "Grupos anteriores" como Completado, con
+  // sus estudiantes y los resultados del examen (tabla group_history, que llena
+  // el cierre del ciclo). Los avisos de Inicio y del calendario llegan aquí.
   function secMisGrupos(main) {
     head(main, "Mis grupos", "Los grupos que el admin te asignó.");
     if (!ME.teacher_id) {
@@ -825,11 +827,12 @@
     main.appendChild(h('<p class="muted">Cargando…</p>'));
     var S = { ro: true };
     Promise.all([loadMyGroups(), q("validation_exams").select("id,module_level,title,is_test,intro,content"),
-      rpc("exam_results", {}).catch(function () { return null; })]).then(function (res) {
+      rpc("exam_results", {}).catch(function () { return null; }), loadGroupHistory()]).then(function (res) {
       S.tg = res[0];
       S.exOn = !res[1].error && res[2] !== null;
       S.ex = S.exOn ? res[1].data || [] : [];
       S.exRows = res[2] || [];
+      S.hist = res[3];
       if (EX_GOTO) {
         var goto = S.tg.groups.filter(function (g) { return g.id === EX_GOTO; })[0];
         EX_GOTO = null;
@@ -839,7 +842,19 @@
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
   }
 
-  // Estado del examen de un grupo para su tarjeta: [tono, texto].
+  // Grupos anteriores del profesor (vacío si la tabla todavía no existe).
+  function loadGroupHistory() {
+    if (!ME.teacher_id) return Promise.resolve([]);
+    return q("group_history").select("*").eq("teacher_id", ME.teacher_id).order("cycle_start", { ascending: false })
+      .then(function (r) { return r.error ? [] : r.data || []; }, function () { return []; });
+  }
+  function fmtCycle(start, end) {
+    if (!start) return "";
+    var f = function (d) { return new Date(d + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", ""); };
+    return f(start) + " – " + f(end) + " " + String(end || start).slice(0, 4);
+  }
+
+  // Estado del examen de un grupo para su tarjeta.
   function exGroupState(S, g) {
     var x = S.ex.filter(function (e) { return g.modules && e.module_level === g.modules.level; })[0];
     if (!x) return null;
@@ -855,53 +870,94 @@
     head(main, "Mis grupos", "Los grupos que el admin te asignó, con su examen de validación.");
     var d = S.tg, groups = d.groups;
     if (!groups.length) {
-      main.appendChild(h('<div class="home-empty">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
-      exPastCard(main, S);
-      return;
-    }
-    var namesByGroup = {};
-    d.enrollments.forEach(function (e) {
-      (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
-    });
-    var grid = h('<div class="tg-grid"></div>');
-    groups.forEach(function (g) {
-      var sc = g.schedules, names = (namesByGroup[g.id] || []).slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
-      var n = names.length, pct = Math.min(100, Math.round(100 * n / (g.capacity || 1)));
-      var st = S.exOn ? exGroupState(S, g) : null;
-      var card = h('<article class="tg-card">' +
-        '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(g.modules ? g.modules.level : "") + "</span>" +
-        '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
-        "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
-        (sc ? '<div class="tg-chips"><span>' + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span></div>" : "") +
-        '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
-        '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
-        (S.exOn ? '<div class="tg-exam"><span class="tg-exam__ic">' + rcIc("exam") + '</span><div class="tg-exam__t"><strong>Examen de validación</strong>' +
-          (st ? '<span class="rs-chip is-' + st.tone + '">' + esc(st.text) + "</span>" : '<span class="tg-exam__none">Su módulo todavía no tiene examen.</span>') +
-          '</div><span class="tg-exam__go"></span></div>' : "") +
-        '<button type="button" class="btn btn-sm btn-ghost tg-toggle">Ver estudiantes</button>' +
-        '<ul class="tg-names" hidden>' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul></article>");
-      if (st) card.querySelector(".tg-exam__go").appendChild(rcBtn(st.btn, "arrow", st.cls, function () { exTeacherGroup(main, S, g); }));
-      var btnT = card.querySelector(".tg-toggle"), list = card.querySelector(".tg-names");
-      btnT.addEventListener("click", function () {
-        list.hidden = !list.hidden;
-        btnT.textContent = list.hidden ? "Ver estudiantes" : "Ocultar estudiantes";
+      main.appendChild(h('<div class="home-empty">No tienes grupos activos en este momento — el admin te asigna desde Académico → Grupos.</div>'));
+    } else {
+      var namesByGroup = {};
+      d.enrollments.forEach(function (e) {
+        (namesByGroup[e.group_id] = namesByGroup[e.group_id] || []).push(e.students ? e.students.full_name : "—");
       });
+      var grid = h('<div class="tg-grid"></div>');
+      groups.forEach(function (g) {
+        var sc = g.schedules, cy = sc && sc.cycles;
+        var names = (namesByGroup[g.id] || []).slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
+        var n = names.length, pct = Math.min(100, Math.round(100 * n / (g.capacity || 1)));
+        var st = S.exOn ? exGroupState(S, g) : null;
+        var card = h('<article class="tg-card">' +
+          '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(g.modules ? g.modules.level : "") + "</span>" +
+          '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
+          "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
+          '<div class="tg-chips">' + (sc ? "<span>" + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span>" : "") +
+          (cy ? "<span>Ciclo " + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : "") + "</div>" +
+          '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
+          '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
+          '<ul class="tg-names">' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul>" +
+          (S.exOn ? '<div class="tg-exam"><span class="tg-exam__ic">' + rcIc("exam") + '</span><div class="tg-exam__t"><strong>Examen de validación</strong>' +
+            (st ? '<span class="rs-chip is-' + st.tone + '">' + esc(st.text) + "</span>" : '<span class="tg-exam__none">Su módulo todavía no tiene examen.</span>') +
+            '</div><span class="tg-exam__go"></span></div>' : "") + "</article>");
+        if (st) card.querySelector(".tg-exam__go").appendChild(rcBtn(st.btn, "arrow", st.cls, function () { exTeacherGroup(main, S, g); }));
+        grid.appendChild(card);
+      });
+      main.appendChild(grid);
+    }
+    misGruposPast(main, S);
+  }
+
+  // Grupos anteriores: tarjeta "Completado" por grupo, con sus estudiantes y los
+  // resultados de su examen. Los resultados de grupos que se cerraron antes de
+  // existir el historial salen aparte ("Otros resultados anteriores").
+  function misGruposPast(main, S) {
+    var hist = S.hist || [];
+    var pastRows = (S.exRows || []).filter(function (r) { return !r.group_active; });
+    var histIds = hist.map(function (hg) { return hg.group_id; }).filter(Boolean);
+    var loose = pastRows.filter(function (r) { return histIds.indexOf(r.group_id) === -1; });
+    if (!hist.length && !loose.length) return;
+    main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
+    main.appendChild(h('<p class="pnl-sub" style="margin-top:-6px">Grupos de ciclos que ya terminaron. Quedan aquí con sus estudiantes y los resultados del examen.</p>'));
+    var grid = h('<div class="tg-grid"></div>');
+    hist.forEach(function (hg) {
+      var studs = Array.isArray(hg.students) ? hg.students : [];
+      var rows = hg.group_id ? pastRows.filter(function (r) { return r.group_id === hg.group_id; }) : [];
+      var card = h('<article class="tg-card is-done">' +
+        '<div class="tg-card__top"><span class="rs-card__ic">' + lvlIc(hg.module_level || "") + "</span>" +
+        '<div class="tg-card__t"><strong>' + esc((hg.module_level || "") + (hg.module_title ? " — " + hg.module_title : "")) + "</strong>" +
+        "<span>" + esc(hg.days && hg.days.length ? days(hg.days).split(" ").join(" · ") : "") + "</span></div>" +
+        '<span class="rs-chip is-ok tg-done">Completado</span></div>' +
+        '<div class="tg-chips">' + (hg.start_time ? "<span>" + esc(time(hg.start_time) + " – " + time(hg.end_time)) + "</span>" : "") +
+        (hg.cycle_start ? "<span>Ciclo " + esc(fmtCycle(hg.cycle_start, hg.cycle_end)) + "</span>" : "") + "</div>" +
+        '<div class="tg-cap__top"><span>Estudiantes</span><strong>' + studs.filter(function (s) { return s.result !== "cancelado"; }).length + "</strong></div>" +
+        '<ul class="tg-names">' + (studs.length ? studs.map(function (s) {
+          return '<li class="' + (s.result === "cancelado" ? "is-off" : "") + '"' + (s.result === "cancelado" ? ' title="No pagó el módulo"' : "") + ">" + esc(s.name) + "</li>";
+        }).join("") : '<li class="muted">Sin estudiantes.</li>') + "</ul>" +
+        (rows.length ? '<div class="tg-exam"><span class="tg-exam__ic">' + rcIc("exam") + '</span><div class="tg-exam__t"><strong>Examen de validación</strong>' +
+          '<span class="rs-chip is-ok">' + esc(rcCount(rows.filter(function (r) { return r.state === "aprobado"; }).length, "resultado enviado", "resultados enviados")) + "</span>" +
+          '</div><span class="tg-exam__go"></span></div>' : "") + "</article>");
+      if (rows.length) card.querySelector(".tg-exam__go").appendChild(rcBtn("Ver resultados", "arrow", "btn-dark", function () { exTeacherHistResults(main, S, hg, rows); }));
       grid.appendChild(card);
     });
     main.appendChild(grid);
-    exPastCard(main, S);
+    if (loose.length) {
+      var g2 = h('<div class="rs-grid" style="margin-top:14px"></div>');
+      g2.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Otros resultados anteriores", sub: "Exámenes de grupos que se cerraron antes del historial",
+        chip: ["soon", rcCount(exByCycle(loose).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
+      main.appendChild(g2);
+    }
   }
 
-  // Resultados de exámenes de grupos de ciclos que ya terminaron.
-  function exPastCard(main, S) {
-    var past = (S.exRows || []).filter(function (r) { return !r.group_active; });
-    if (!past.length) return;
-    main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
-    var grid = h('<div class="rs-grid"></div>');
-    grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Resultados de exámenes anteriores", sub: "Tus grupos de ciclos que ya terminaron",
-      chip: ["soon", rcCount(exByCycle(past).length, "ciclo", "ciclos")], onOpen: function () { exTeacherPast(main, S); } }));
-    main.appendChild(grid);
+  // Resultados del examen de un grupo anterior (solo ver).
+  function exTeacherHistResults(main, S, hg, rows) {
+    var label = (hg.module_level || "") + (hg.days && hg.days.length ? " · " + days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) : "");
+    var crumbs = exTeacherCrumbs(main, S);
+    var here = crumbs.concat([[label, function () { exTeacherHistResults(main, S, hg, rows); }]]);
+    var body = rcPage(main, crumbs, label, (rows[0] && rows[0].exam_title) || "Examen de validación");
+    var list = h('<div class="rs-files"></div>');
+    body.appendChild(list);
+    rows.slice().sort(function (a, b) { return a.student_name.localeCompare(b.student_name, "es"); }).forEach(function (r) {
+      list.appendChild(exResultRow(r, false, [rcBtn("Ver detalle", "arrow", "btn-dark", function () {
+        exDetail(r, { view: function (rr) { exAnswers(main, here, rr, false); } });
+      })]));
+    });
   }
+
 
   /* ============ ESTUDIANTES ============ */
   function secEstudiantes(main) {
@@ -947,12 +1003,15 @@
     var isAdminView = ME.role === "admin";
 
     // El profesor solo ve a los estudiantes de SUS grupos (los que el admin
-    // le asignó en Académico → Grupos) — no a todo el colegio.
+    // le asignó en Académico → Grupos) — no a todo el colegio. Desde el 28 sep
+    // 2026 los ve agrupados por grupo: primero los actuales y luego los de sus
+    // grupos anteriores (group_history), para distinguir módulo, horario y ciclo.
+    var teacherCtx = null;
     var myGroupIdsPromise = (isAdminView || !ME.teacher_id)
       ? Promise.resolve(null)
-      : q("groups").select("id").eq("teacher_id", ME.teacher_id).then(function (r) {
-          if (r.error) throw r.error;
-          return (r.data || []).map(function (g) { return g.id; });
+      : Promise.all([loadMyGroups(), loadGroupHistory()]).then(function (r) {
+          teacherCtx = { groups: r[0].groups, hist: r[1] };
+          return r[0].groups.map(function (g) { return g.id; });
         });
 
     myGroupIdsPromise.then(function (myGroupIds) {
@@ -960,7 +1019,7 @@
         main.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>'));
         return;
       }
-      if (!isAdminView && !myGroupIds.length) {
+      if (!isAdminView && !myGroupIds.length && !teacherCtx.hist.length) {
         main.appendChild(h('<div class="pnl-alert ok">Todavía no tienes grupos asignados — el admin te asigna desde Académico → Grupos.</div>'));
         return;
       }
@@ -987,7 +1046,11 @@
           (res[2].data || []).forEach(function (e) {
             if (e.status !== "Cancelled" && e.group_id && myGroupIds.indexOf(e.group_id) !== -1) myStudentIds[e.student_id] = true;
           });
+          teacherCtx.hist.forEach(function (hg) {
+            (Array.isArray(hg.students) ? hg.students : []).forEach(function (x) { if (x.student_id) myStudentIds[x.student_id] = true; });
+          });
         }
+        var makeCard = {}; // profesor: student_id → function(línea) que arma su tarjeta
         (res[4].data || []).forEach(function (n) { noteByStudent[n.student_id] = n.note; });
         var mods = res[3];
         if (toolbar) toolbar.querySelector("[data-add]").onclick = function () { editStudent(null, null, mods, {}); };
@@ -1038,6 +1101,7 @@
           // Profesor (27 sep 2026): una tarjeta flotante por estudiante, con el
           // mismo lenguaje visual del portal, en vez de la tabla.
           tr = null;
+          makeCard[s.id] = (function (s, enr, modLabel) { return function (line) {
           var ini = String(s.full_name || "?").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
           var wa = String(s.whatsapp || "").replace(/\D/g, "");
           if (wa.length === 10) wa = "57" + wa;
@@ -1045,7 +1109,7 @@
             '<div class="tst-card__top"><span class="tst-av">' + esc(ini) + '</span><div class="tst-card__who"><strong>' + esc(s.full_name) + "</strong>" +
             "<span>" + esc(((s.doc_type || "") + " " + (s.doc_number || "")).trim() || "Sin documento") + "</span></div>" +
             (enr && enr.modules ? '<span class="tst-mod" style="--c:' + modColor(enr.modules.module_number) + '">' + esc(enr.modules.level) + "</span>" : "") + "</div>" +
-            '<p class="tst-line">' + esc(modLabel) + "</p>" +
+            '<p class="tst-line">' + esc(line || modLabel) + "</p>" +
             '<ul class="tst-contact">' +
             (wa ? '<li><a href="https://wa.me/' + wa + '" target="_blank" rel="noopener">WhatsApp · ' + esc(s.whatsapp) + "</a></li>" : "") +
             (s.email ? '<li><a href="mailto:' + esc(s.email) + '">' + esc(s.email) + "</a></li>" : "") +
@@ -1053,7 +1117,6 @@
             '<details class="tst-notes"' + (noteByStudent[s.id] ? " open" : "") + "><summary>Mis anotaciones</summary>" +
             '<textarea rows="3" placeholder="Cómo va, qué reforzar, acuerdos…">' + esc(noteByStudent[s.id] || "") + "</textarea>" +
             '<div class="tst-notes__row"><button class="btn btn-sm btn-dark" data-save-note>Guardar</button><span class="muted" data-note-msg></span></div></details></article>');
-          tGrid.appendChild(noteBox);
           noteBox.querySelector("[data-save-note]").addEventListener("click", function () {
             var msg = noteBox.querySelector("[data-note-msg]");
             if (!ME.teacher_id) { msg.textContent = "Tu cuenta no está vinculada a un profesor — pide al admin que la revise."; return; }
@@ -1067,17 +1130,69 @@
               setTimeout(function () { msg.textContent = ""; }, 2000);
             }).catch(function (e) { msg.textContent = friendly(e); });
           });
+          return noteBox;
+          }; })(s, enr, modLabel);
         }
         if (tr) t.body.appendChild(tr);
       });
         if (!isAdminView) {
-          main.appendChild(visibleStudents.length ? tGrid : h('<div class="home-empty">Todavía no tienes estudiantes asignados.</div>'));
+          var nameById = {};
+          (res[0].data || []).forEach(function (st) { nameById[st.id] = st.full_name; });
+          teacherStudentSections(main, teacherCtx, res[2].data || [], makeCard, nameById);
           return;
         }
         if (!visibleStudents.length) t.body.appendChild(h('<tr><td colspan="' + cols.length + '" class="muted">Sin estudiantes todavía. Aparecen aquí cuando el admin crea uno (desde “+ Estudiante” o desde una solicitud de la pestaña Pre-inscritos).</td></tr>'));
         main.appendChild(t.wrap);
       });
     }).catch(function (e) { main.appendChild(h('<div class="pnl-alert err">' + esc(friendly(e)) + "</div>")); });
+  }
+
+  // Estudiantes del profesor agrupados por grupo (28 sep 2026): un bloque por
+  // cada grupo actual (módulo, horario y ciclo) y después sus grupos anteriores
+  // (Completado), para distinguir a quién tuvo, en qué módulo y en qué fechas.
+  function teacherStudentSections(main, ctx, enrs, makeCard, nameById) {
+    var any = false;
+    var byName = function (a, b) { return String(a.name || "").localeCompare(String(b.name || ""), "es"); };
+    function ini(n) { return String(n || "?").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase(); }
+    function section(title, sub, chips, list, lineFor, done) {
+      var sec = h('<section class="tst-group' + (done ? " is-done" : "") + '"><div class="tst-group__head"><div class="tst-group__t"><strong>' + esc(title) + "</strong>" +
+        (sub ? "<span>" + esc(sub) + "</span>" : "") + '</div><div class="tst-group__chips">' + chips + "</div></div></section>");
+      var grid = h('<div class="tst-grid"></div>');
+      list.slice().sort(byName).forEach(function (x) {
+        var line = lineFor ? lineFor(x) : null;
+        if (makeCard[x.id]) { grid.appendChild(makeCard[x.id](line)); return; }
+        grid.appendChild(h('<article class="tst-card"><div class="tst-card__top"><span class="tst-av">' + esc(ini(x.name)) + "</span>" +
+          '<div class="tst-card__who"><strong>' + esc(x.name || "—") + "</strong><span>" + esc(line || "") + "</span></div></div></article>"));
+      });
+      if (!list.length) grid.appendChild(h('<p class="muted">Sin estudiantes en este grupo.</p>'));
+      sec.appendChild(grid);
+      main.appendChild(sec);
+      any = true;
+    }
+    ctx.groups.forEach(function (g) {
+      var sc = g.schedules || {}, cy = sc.cycles, seen = {}, list = [];
+      enrs.forEach(function (e) {
+        if (e.group_id !== g.id || e.status === "Cancelled" || seen[e.student_id]) return;
+        seen[e.student_id] = true;
+        list.push({ id: e.student_id, name: nameById[e.student_id] || "" });
+      });
+      section(g.modules ? g.modules.level + " — " + g.modules.title : "Grupo",
+        (sc.days ? days(sc.days).split(" ").join(" · ") + " · " + time(sc.start_time) + " – " + time(sc.end_time) : ""),
+        '<span class="rs-chip is-info">' + esc(rcCount(list.length, "estudiante", "estudiantes")) + "</span>" +
+        (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : ""), list, null, false);
+    });
+    if (ctx.hist.length) {
+      main.appendChild(h('<h2 class="ex-h2">Grupos anteriores</h2>'));
+      ctx.hist.forEach(function (hg) {
+        var list = (Array.isArray(hg.students) ? hg.students : []).map(function (x) { return { id: x.student_id, name: x.name, result: x.result }; });
+        var lvl = hg.module_level || "";
+        section(lvl + (hg.module_title ? " — " + hg.module_title : ""),
+          (hg.days && hg.days.length ? days(hg.days).split(" ").join(" · ") : "") + (hg.start_time ? " · " + time(hg.start_time) + " – " + time(hg.end_time) : ""),
+          '<span class="rs-chip is-ok">Completado</span>' + (hg.cycle_start ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(hg.cycle_start, hg.cycle_end)) + "</span>" : ""),
+          list, function (x) { return x.result === "cancelado" ? "No completó " + lvl + " (no pagó el módulo)" : "Completó " + lvl + " contigo"; }, true);
+      });
+    }
+    if (!any) main.appendChild(h('<div class="home-empty">Todavía no tienes estudiantes asignados.</div>'));
   }
 
   var PRE_STATUS_BADGE = {
@@ -1846,17 +1961,15 @@
     }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
-  // Ruta hasta "Recursos compartidos": el admin entra directo; el profesor llega
-  // desde "Recursos de la clase" (S.ro = solo ver, sin crear/editar/eliminar).
-  function rcBase(main, S) {
-    return S.ro ? [["Recursos de la clase", function () { rcClaseRoot(main, S); }]] : [];
-  }
+  // Raíz de los recursos: el admin la ve como "Recursos compartidos"; el profesor
+  // (S.ro = solo ver) la ve directo al abrir su pestaña "Recursos de la clase".
+  function rcBase() { return []; }
   function rcHome(main, S) {
-    return rcBase(main, S).concat([["Recursos compartidos", function () { rcRoot(main, S); }]]);
+    return [[S.ro ? "Recursos de la clase" : "Recursos compartidos", function () { rcRoot(main, S); }]];
   }
 
   function rcRoot(main, S) {
-    var body = rcPage(main, rcBase(main, S), "Recursos compartidos", S.ro
+    var body = rcPage(main, [], S.ro ? "Recursos de la clase" : "Recursos compartidos", S.ro
       ? "Los recursos que LEF carga para todas las clases. Aquí los puedes ver y abrir; los agrega y edita el administrador."
       : "Recursos que se usan igual en todas las clases, sin importar el profesor. Los estudiantes los ven en Mis recursos cuando pagan su módulo.");
     var grid = h('<div class="rs-grid"></div>');
@@ -3133,23 +3246,14 @@
   // compartidos" del admin, pero solo para ver (S.ro): el profesor no crea,
   // no edita ni sube archivos. "Materiales" pasó a llamarse Recursos compartidos
   // y el Libro de trabajo quedó dentro de Libros → Libros principales.
+  // 28 sep 2026: la pestaña abre directo en las tarjetas (Libros, Talleres,
+  // Ejercicios, Examen de validación); programar/revisar exámenes está en Mis grupos.
   function secRecursosClase(main) {
     head(main, "Recursos de la clase", "Cargando…");
     q("modules").select("*").eq("active", true).order("module_number").then(function (r) {
       if (r.error) throw r.error;
-      var S = { mods: r.data || [], ro: true };
-      rcClaseRoot(main, S);
+      rcRoot(main, { mods: r.data || [], ro: true });
     }).catch(function (e) { main.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
-  }
-
-  // Programar, revisar y dar OK a los exámenes pasó a Mis grupos (28 sep 2026);
-  // aquí solo quedan los recursos para ver.
-  function rcClaseRoot(main, S) {
-    var body = rcPage(main, [], "Recursos de la clase", "Material de apoyo para tus clases.");
-    var grid = h('<div class="rs-grid"></div>');
-    grid.appendChild(rcCard({ tone: "ink", icon: "books", title: "Recursos compartidos", sub: "Libros, talleres, ejercicios por habilidad y exámenes de validación",
-      onOpen: function () { rcRoot(main, S); } }));
-    body.appendChild(grid);
   }
 
   /* ============ CALENDARIO (admin y profesor) ============ */
