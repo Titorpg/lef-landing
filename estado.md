@@ -32,6 +32,19 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
     (`check_makeup_slot` en el Dashboard, mensaje en el mismo recuadro; trigger en la base).
   - Editar las fechas de un Sin clase NO manda correo (solo borra reposiciones sobrantes).
 
+### ▶ Chequeo general del 29 sep 2026 (noche)
+- OK: todas las páginas 200, 11 Edge Functions activas, cierre automático de ciclos funcionó
+  (cerró "Sep-Sep 2026" de prueba el 29 sep 00:08), pagos al día de los 5 activos.
+- **Primer pago real por Wompi** (Juan Echenique, B1.1, RC16, 29 sep): activó su inscripción bien.
+  Pero entró por **PSE**, no tarjeta (el widget no filtra; ver proyecto-wompi-solo-tarjeta).
+- **BUG:** `record_wompi_payment` no guarda los datos del pagador ni del estudiante en el pago
+  (payer_*, student_name, student_reg quedan vacíos; `record_payment` sí los copia de la
+  mensualidad). Afecta RC1 y RC16. Pendiente de aprobación del usuario para arreglarlo.
+- Keidy Vergara: A1.3 pagada (Active) SIN grupo → no ve Clase de hoy ni calendario.
+- 5 estudiantes sin pagar en grupos que empezaron hoy (A2.2: Maybelline, Geovanny, Katherine;
+  B1.1: Salen, Melannye): no ven agenda ni Meet hasta pagar.
+- Grupo B1.1 del profesor Luis Caballero: aún no hay examen de validación B1.1.
+
 ### ▶ Recordatorio a la profesora María Rada (29 sep 2026)
 - En su Classroom solo tiene publicadas las agendas de los niveles A1 y A2 (el profesor Luis
   Caballero tiene todas). Los estudiantes solo ven las PUBLICADAS (el profesor ve también
