@@ -3967,6 +3967,7 @@
     "payment.delete": "Pago eliminado", "payment.update": "Pago editado",
     "payment.reverse": "Pago reversado", "subscription.delete": "Suscripción eliminada",
     "payment.receipt_backfill": "Recibo corregido (error del sistema, ya resuelto)",
+    "payment.payer_backfill": "Datos del pagador completados (error del sistema, ya resuelto)",
     "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)",
     "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)",
     "exam_submission.delete": "Respuesta de examen de validación borrada",
@@ -3975,7 +3976,8 @@
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
   var AUDIT_REASON_ES = {
-    "payment.receipt_backfill": "Un error de programación dejaba el número de recibo vacío en los pagos hechos con Wompi. Ya se corrigió."
+    "payment.receipt_backfill": "Un error de programación dejaba el número de recibo vacío en los pagos hechos con Wompi. Ya se corrigió.",
+    "payment.payer_backfill": "Un error de programación dejaba vacíos los datos del pagador en los pagos hechos con Wompi. Ya se corrigió."
   };
   // Explicación completa para el botón "Ver" de acciones del sistema — se agrega ANTES del detalle
   // técnico (que se conserva igual, por si alguien de soporte técnico lo necesita).
@@ -3990,7 +3992,15 @@
       "ningún monto, fecha, estudiante ni otro dato del pago — solo se llenó el campo del recibo. También se " +
       "corrigió el sistema para que esto no vuelva a pasar con los próximos pagos de Wompi.\n\n" +
       "¿Hay algo que hacer? No. Este registro queda aquí solo como comprobante permanente de que se hizo " +
-      "esa corrección — nadie, ni el admin, puede borrar este historial."
+      "esa corrección — nadie, ni el admin, puede borrar este historial.",
+    "payment.payer_backfill":
+      "¿Qué pasó? Cuando un estudiante pagaba en línea con Wompi, el pago quedaba registrado y con su número de " +
+      "recibo, pero sin los datos de quién pagó (nombre, documento, correo y teléfono) ni el nombre y el registro " +
+      "del estudiante, que los pagos manuales sí copian de la mensualidad.\n\n" +
+      "¿Qué se corrigió? Se completaron esos datos en el pago, copiándolos de la mensualidad del estudiante. No se " +
+      "cambió ningún monto, fecha, método ni número de recibo. También se corrigió el sistema para que los próximos " +
+      "pagos de Wompi guarden esos datos desde el principio.\n\n" +
+      "¿Hay algo que hacer? No. Este registro queda aquí solo como comprobante permanente de esa corrección."
   };
   // Explicación en palabras de un evento, armada con los datos que guardó el
   // registro (el código técnico queda aparte, en un desplegable para soporte).
@@ -4833,7 +4843,7 @@
           var activos = counts[g.id] || 0;
           var msg = activos > 0
             ? "Tiene " + activos + " inscripción(es) activa(s) en este grupo. Cámbialas de módulo (Estudiantes > Editar) o cancélalas (Dashboard > Inscripciones) antes de eliminar."
-            : "Se eliminará el grupo. Las inscripciones canceladas que lo referenciaban quedarán sin grupo (no se borran).";
+            : "Se eliminará el grupo. Si tuvo estudiantes, queda guardado en \"Grupos anteriores\" del profesor con su lista de estudiantes; las inscripciones que lo referenciaban quedan sin grupo (no se borran).";
           confirmDelete("Eliminar grupo", msg, function () {
             if (activos > 0) throw new Error(msg);
             return q("groups").delete().eq("id", g.id).then(function (d) { if (d.error) throw d.error; toast("Grupo eliminado."); acGrupos(box); });
