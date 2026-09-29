@@ -5,6 +5,22 @@
 Sesión del 28 sep cerrada con TODO publicado en Vercel y TODOS los SQL aplicados (el usuario los
 pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpeta.
 
+### ▶ 29 sep 2026 — Pausa del ciclo por grupo (SQL `20260929000000_pausa_ciclo_grupo.sql` POR APLICAR)
+- Pedido: para recesos largos (semana de receso de octubre, grupo A2.2 de María Rada, mar–vie) el
+  "Sin clase" de UN grupo trae el interruptor **"Pausar el ciclo de este grupo"** (admin y profesor,
+  en el calendario). Días en pausa: no consumen agenda, no quedan por reponer, al volver sigue la
+  DAY que tocaba. El fin del grupo se corre tantas CLASES como se pausaron (no días de calendario),
+  calculado (`lef_group_end`); el ciclo compartido se cierra cuando termina su último grupo.
+  Correo nuevo `classPausedEmail` (motivo, rango, día en que retoman, nuevo fin).
+- Sin pausa todo sigue igual (Sin clase consume agenda + reposición). Pausa solo desde hoy en
+  adelante (`LEF_PAUSE_PAST`), todo el día, nunca para "todos".
+- Probado en Postgres local (PGlite) con el caso de María: DAY 4 el 2 oct, pausa 6–9 oct, DAY 5 el
+  13 oct, fin 6 nov (DAY 20); el grupo B1.1 de Luis del mismo ciclo sigue terminando el 30 oct.
+- Límite conocido: el control de cruce de horarios del profesor usa las fechas del ciclo, no el fin
+  extendido del grupo.
+- Dato raro visto hoy: el grupo A1.3 de Luis Manga tiene una reposición (14 oct, DAY 2) de la clase
+  del 29 sep, pero ya no existe el "Sin clase" de ese día → ese DAY 2 se verá dos veces.
+
 ### ▶ Lo siguiente (depende del usuario)
 1. **Probar un pago real con Wompi** (celular y computador): "Pague aquí" abre el Web Checkout
    (`checkout.wompi.co/p/`) en una pestaña nueva con `redirect-url` = /portal; Wompi vuelve con

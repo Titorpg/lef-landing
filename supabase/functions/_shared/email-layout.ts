@@ -174,6 +174,38 @@ ${reasonBox(c.reason, c.details)}
   return { subject, html, text };
 }
 
+// Pausa del ciclo de un grupo (29 sep 2026): las clases de esos días no se
+// reponen; al volver sigue la agenda donde quedó y el ciclo se extiende.
+export function classPausedEmail(c: ClassInfo & { reason: string; details: string; fromDate: string; toDate: string;
+  resumeDate: string; newEnd: string; count: number }, portalUrl: string) {
+  const range = c.fromDate === c.toDate ? `el ${c.fromDate}` : `del ${c.fromDate} al ${c.toDate}`;
+  const subject = `Tus clases se pausan ${range} — ${c.module.split(" — ")[0]}`;
+  const heading = "Tus clases entran en pausa";
+  const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
+  const add = c.count === 1 ? "Se agrega al final la clase que no tendrás" : `Se agregan al final las ${c.count} clases que no tendrás`;
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">Te escribimos para avisarte que las clases de tu grupo de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> se pausan <strong style="color:${INK};font-weight:600">${escHtml(range)}</strong>.</p>
+${reasonBox(c.reason, c.details)}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+<td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Tu ciclo se extiende hasta</p>
+<p style="margin:0;font-family:${FONT};font-size:18px;font-weight:700;color:${INK}">${escHtml(c.newEnd)}</p>
+<p style="margin:4px 0 0;font-family:${FONT};font-size:15px;color:${GRAFITO}">${escHtml(add)} durante la pausa.</p>
+</td></tr></table>
+<p style="margin:0 0 14px">No pierdes ninguna clase y no hay que reprogramar nada: ${c.resumeDate ? `retomamos el <strong style="color:${INK};font-weight:600">${escHtml(c.resumeDate)}</strong>${c.classTime ? ` a las <strong style="color:${INK};font-weight:600">${escHtml(c.classTime)}</strong>` : ""} y seguimos` : "al volver de la pausa seguimos"} justo en la agenda donde quedamos${c.teacher ? `, con ${escHtml(c.teacher)}` : ""}.</p>
+<p style="margin:0">Las nuevas fechas ya aparecen en el calendario de tu portal.</p>`;
+  const html = lefEmail({
+    preheader: `Clases en pausa ${range}. Motivo: ${c.reason}. Tu ciclo se extiende hasta el ${c.newEnd}.`,
+    eyebrow: "Pausa de clases", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
+  });
+  const text = `${hi}\n\nLas clases de tu grupo de ${c.module} se pausan ${range}.\n\n` +
+    `Motivo: ${c.reason}${c.details ? `\n${c.details}` : ""}\n\n` +
+    `Tu ciclo se extiende hasta el ${c.newEnd}. ${add} durante la pausa. ` +
+    `No pierdes ninguna clase y no hay que reprogramar nada: ${c.resumeDate ? `retomamos el ${c.resumeDate}${c.classTime ? ` a las ${c.classTime}` : ""} y seguimos` : "al volver seguimos"} ` +
+    `justo en la agenda donde quedamos. Las nuevas fechas ya aparecen en tu calendario: ${portalUrl}#calendario` + LEF_TEXT_FOOTER;
+  return { subject, html, text };
+}
+
 export function classMakeupEmail(c: ClassInfo & { makeupDate: string; makeupTime: string; holiday?: string }, portalUrl: string) {
   // Clase que cayó en festivo: "que no hubo el lunes 12 de octubre por el festivo (…)".
   const why = c.holiday ? `que no hubo el ${c.classDate} por el festivo (${c.holiday})` : `que no se realizó el ${c.classDate}`;

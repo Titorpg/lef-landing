@@ -746,6 +746,9 @@
         if (it.category === "reposicion" && it.makeup_of) {
           rows.push(["redo", "Recupera la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase() + (it.holiday ? " (festivo)" : ""), it.session_number ? "Agenda DAY " + it.session_number : ""]);
         }
+        if (it.category === "sin_clase" && it.paused) {
+          rows.push(["layers", "Pausa el ciclo de este grupo", it.group_end ? "El grupo ahora termina el " + longDay(parseKey(it.group_end)).toLowerCase() : "No consume agenda ni hay que reponer"]);
+        }
         var aud = audienceLabel(it, role);
         if (aud) rows.push([it.audience === "personal" ? "lock" : it.audience === "group" ? "users" : "globe", aud, "Para"]);
         rows.push(["user", it.author, "Publicado por"]);
@@ -756,6 +759,9 @@
             "<small>" + (role === "student"
               ? "Esta clase no se dicta por ser festivo. Tu profesor acordará contigo la nueva fecha y te llegará un correo cuando la programe."
               : "Esta clase no se dicta por ser festivo y queda pendiente por reprogramar en el Dashboard del profesor.") + "</small></span></div>"
+          : it.item_type === "class" && it.paused
+            ? '<div class="lcal-note">' + ic("calx") + "<span>Clases en pausa: este día no hay clase, no consume agenda y no hay que reponerla. Al volver, el grupo sigue con la agenda donde quedó" +
+              (it.group_end ? " y termina el " + esc(longDay(parseKey(it.group_end)).toLowerCase()) : "") + ".</span></div>"
           : it.cancelled ? '<div class="lcal-note">' + ic("calx") + "<span>Este día no hay clase.</span></div>" : "") +
         '<ul class="lcal-meta">' + rows.map(function (r) {
           return "<li>" + ic(r[0]) + "<span><strong>" + esc(r[1]) + "</strong>" + (r[2] ? "<small>" + esc(r[2]) + "</small>" : "") + "</span></li>";
@@ -868,6 +874,10 @@
             }).join("") : '<option value="">No hay grupos activos</option>') + "</select></label>" : "") +
           (role === "teacher" && !groups.length ? '<p class="lcal-f__hint">Todavía no tienes grupos asignados: por ahora solo puedes crear notas personales.</p>' : "") +
           "</div>" +
+          // Pausa del ciclo (29 sep 2026): solo "Sin clase" de UN grupo.
+          '<div class="lcal-f" data-pause-box style="display:none"><span class="lcal-f__l">Pausa del ciclo</span>' +
+          '<label class="lcal-switch"><input type="checkbox" name="pauses_cycle"' + (e.paused ? " checked" : "") + '><i></i><span>Pausar el ciclo de este grupo</span></label>' +
+          '<p class="lcal-f__hint" data-pause-hint></p></div>' +
           '<label class="lcal-f"><span class="lcal-f__l">Detalles <em>opcional</em></span><textarea name="details" rows="3" maxlength="2000" placeholder="Instrucciones, páginas, materiales…">' + esc(e.details || "") + "</textarea></label>" +
           '<label class="lcal-f"><span class="lcal-f__l">Enlace <em>opcional</em></span><span class="lcal-in">' + ic("link") + '<input name="link_url" inputmode="url" placeholder="https://" value="' + esc(e.link_url || "") + '"></span></label>' +
           "</div>");
@@ -884,7 +894,27 @@
           var isExam = curCat() === "examen";
           if (examBox) examBox.style.display = isExam ? "" : "none";
           stdBlocks.forEach(function (el) { el.style.display = isExam ? "none" : ""; });
+          syncPause();
         }
+        // La pausa solo aplica a un "Sin clase" dirigido a UN grupo. Con la pausa
+        // marcada el evento es de todo el día (se ocultan las horas).
+        var pauseBox = f.querySelector("[data-pause-box]"), pauseChk = f.querySelector("[name=pauses_cycle]");
+        function pauseEligible() {
+          var x = f.querySelector("[name=aud]:checked"), a = x ? x.value : "";
+          return curCat() === "sin_clase" && (a.indexOf("g:") === 0 || a === "group");
+        }
+        function syncPause() {
+          var ok = pauseEligible();
+          pauseBox.style.display = ok ? "" : "none";
+          var on = ok && pauseChk.checked;
+          f.querySelector("[data-pause-hint]").innerHTML = on
+            ? "Esos días <strong>no consumen agenda</strong> y <strong>no hay que reponer</strong> las clases: al volver, el grupo sigue con la agenda donde quedó. " +
+              "El fin del grupo se corre tantas clases como se pausen (solo este grupo). Los estudiantes reciben un correo con el motivo, las fechas y el nuevo fin del ciclo."
+            : "Déjalo apagado para un día suelto: la clase consume su agenda y la repones desde el Dashboard. Enciéndelo para recesos largos (p. ej. una semana de receso).";
+          if (on) { allBox.checked = true; allBox.disabled = true; allBox.onchange(); }
+          else allBox.disabled = false;
+        }
+        pauseChk.onchange = syncPause;
         f.querySelectorAll("[name=category]").forEach(function (r) { r.onchange = syncCat; }); syncCat();
         if (examBox) {
           var today = keyOf(new Date()), op = dayKey && dayKey > today ? dayKey : today;
@@ -906,7 +936,7 @@
         }
         var gp = f.querySelector("[data-group-pick]");
         function curAud() { var x = f.querySelector("[name=aud]:checked"); return x ? x.value : ""; }
-        function syncAud() { if (gp) gp.style.display = curAud() === "group" ? "" : "none"; }
+        function syncAud() { if (gp) gp.style.display = curAud() === "group" ? "" : "none"; syncPause(); }
         f.querySelectorAll("[name=aud]").forEach(function (r) { r.onchange = syncAud; }); syncAud();
 
         function save() {
@@ -949,6 +979,16 @@
             row.audience = "group"; row.group_id = val("group_id");
             if (!row.group_id) throw new Error("Elige el grupo.");
           } else { row.audience = a; row.group_id = null; }
+          // Solo se manda cuando aplica (o para quitarla), así no depende de la columna nueva.
+          if (pauseEligible() && pauseChk.checked) row.pauses_cycle = true;
+          else if (ev && ev.paused) row.pauses_cycle = false;
+          if (row.pauses_cycle) {
+            row.start_time = null; row.end_time = null;
+            var todayK = keyOf(new Date());
+            if (starts < todayK && (!ev || !ev.paused || ev.starts_on !== starts || ev.ends_on !== ends || ev.group_id !== row.group_id)) {
+              throw new Error("La pausa del ciclo debe empezar hoy o después.");
+            }
+          }
 
           var op = ev ? sb.from("calendar_events").update(row).eq("id", ev.id).select("id")
                       : sb.from("calendar_events").insert(row).select("id");
@@ -957,8 +997,9 @@
             if (!r.data || !r.data.length) throw new Error("No se pudo guardar (revisa tus permisos).");
             if (!ev && row.category === "sin_clase" && ["group", "students", "all"].indexOf(row.audience) !== -1) {
               notifyClassChange(sb, r.data[0].id).then(function (res) {
-                toast(res && res.sent ? "Agregado. Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.")
-                  : "Agregado al calendario (no había estudiantes a quienes avisar ese día).");
+                var what = row.pauses_cycle ? "Ciclo del grupo en pausa" + (res && res.new_end ? " (ahora termina el " + longDay(parseKey(res.new_end)).toLowerCase() + ")" : "") : "Agregado";
+                toast(res && res.sent ? what + ". Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.")
+                  : what + (row.pauses_cycle ? "." : " al calendario") + " (no había estudiantes a quienes avisar esos días).");
               }).catch(function () { toast("Agregado, pero no se pudo enviar el correo a los estudiantes.", "err"); });
             } else toast(ev ? "Cambios guardados." : "Agregado al calendario.");
             cursor = parseKey(starts);

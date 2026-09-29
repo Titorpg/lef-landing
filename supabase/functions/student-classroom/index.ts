@@ -45,11 +45,12 @@ function toMin(t: string | null | undefined) { if (!t) return 0; const p = Strin
 function hm(min: number) { return String(Math.floor(min / 60)).padStart(2, "0") + ":" + String(min % 60).padStart(2, "0"); }
 function addDays(ymd: string, n: number) { const d = new Date(ymd + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function weekday(ymd: string) { return DOW[new Date(ymd + "T12:00:00Z").getUTCDay()]; }
-// Número de clase: días del horario desde el inicio del ciclo hasta esa fecha (inclusive).
-function sessionNumber(days: string[], start: string | null, ymd: string) {
+// Número de clase: días del horario desde el inicio del ciclo hasta esa fecha
+// (inclusive), sin contar los días en que el ciclo del grupo está en pausa.
+function sessionNumber(days: string[], start: string | null, ymd: string, paused: (ymd: string) => boolean) {
   if (!start || ymd < start) return 0;
   let n = 0;
-  for (let d = start; d <= ymd; d = addDays(d, 1)) if (days.includes(weekday(d))) n++;
+  for (let d = start; d <= ymd; d = addDays(d, 1)) if (days.includes(weekday(d)) && !paused(d)) n++;
   return n;
 }
 function dayNum(t: string) { const m = /\b(?:DAY|D[IÍ]A)\s*(\d+)/i.exec(t || ""); return m ? +m[1] : null; }
@@ -104,12 +105,25 @@ Deno.serve(async (req) => {
   const today = dateFmt.format(now);
   const nowMin = toMin(hmFmt.format(now));
   const startMin = toMin(sch.start_time), endMin = sch.end_time ? toMin(sch.end_time) : startMin + 60;
-  const inCycle = (ymd: string) => (!cyc.start_date || cyc.start_date <= ymd) && (!cyc.end_date || ymd <= cyc.end_date);
+  // Pausas del ciclo de ESTE grupo (29 sep 2026): esos días no consumen agenda
+  // y el fin del grupo se corre tantas clases como se pausaron (lef_group_end).
+  const { data: pauseRows } = await admin.from("calendar_events")
+    .select("title, details, starts_on, ends_on").eq("pauses_cycle", true).eq("group_id", grp.id);
+  const pauses = (pauseRows || []) as { title: string; details: string; starts_on: string; ends_on: string }[];
+  const pauseOf = (ymd: string) => pauses.find((x) => x.starts_on <= ymd && ymd <= x.ends_on) || null;
+  const isPaused = (ymd: string) => !!pauseOf(ymd);
+  let groupEnd: string | null = cyc.end_date || null;
+  if (pauses.length) {
+    const { data: ge } = await admin.rpc("lef_group_end", { p_group: grp.id });
+    if (ge) groupEnd = String(ge);
+  }
+  const inCycle = (ymd: string) => (!cyc.start_date || cyc.start_date <= ymd) && (!groupEnd || ymd <= groupEnd);
   const isClassDate = (ymd: string) => days.includes(weekday(ymd)) && inCycle(ymd);
 
   const group = {
     module_level: mod.level, module_title: mod.title, days, start_time: sch.start_time, end_time: sch.end_time,
-    teacher: grp.teachers?.full_name || "", cycle_start: cyc.start_date || null, cycle_end: cyc.end_date || null,
+    teacher: grp.teachers?.full_name || "", cycle_start: cyc.start_date || null, cycle_end: groupEnd,
+    cycle_extended: !!groupEnd && !!cyc.end_date && groupEnd > cyc.end_date,
   };
   // Festivos de Colombia (fijos, lef_holidays): esa clase no se dicta y queda
   // por reprogramar, igual que un día "Sin clase" (pedido del usuario, 26 sep 2026).
@@ -120,8 +134,8 @@ Deno.serve(async (req) => {
   let nextClass: string | null = null;
   for (let i = 1; i <= 60; i++) {
     const d = addDays(today, i);
-    if (cyc.end_date && d > cyc.end_date) break;
-    if (isClassDate(d) && !holidays.has(d)) { nextClass = d; break; }
+    if (groupEnd && d > groupEnd) break;
+    if (isClassDate(d) && !holidays.has(d) && !isPaused(d)) { nextClass = d; break; }
   }
   const beforeCycle = !!cyc.start_date && today < cyc.start_date;
   const base = { group, today, now: hm(nowMin), next_class: nextClass, before_cycle: beforeCycle };
@@ -176,7 +190,9 @@ Deno.serve(async (req) => {
     const evs = ((evRows || []) as Ev[]).filter((x) =>
       x.category === "reposicion" ? x.group_id === grp.id
         : (x.audience === "students" || x.audience === "all" || (x.audience === "group" && x.group_id === grp.id)));
-    const cancelOf = (ymd: string): { title: string; details: string; holiday?: boolean } | null => {
+    const cancelOf = (ymd: string): { title: string; details: string; holiday?: boolean; paused?: boolean } | null => {
+      const pz = pauseOf(ymd);
+      if (pz) return { title: pz.title, details: pz.details || "", paused: true };
       const hol = holidays.get(ymd);
       if (hol) return { title: "Día festivo: " + hol.name, details: hol.blurb, holiday: true };
       return evs.find((x) => x.category === "sin_clase" && x.starts_on <= ymd && ymd <= x.ends_on) || null;
@@ -184,15 +200,16 @@ Deno.serve(async (req) => {
 
     type Slot = { kind: "clase" | "reposicion"; day: number; start: number; end: number };
     const slots: Slot[] = [];
-    let cancel: { reason: string; details: string; holiday: boolean } | null = null;
+    let cancel: { reason: string; details: string; holiday: boolean; paused: boolean; pause_until: string | null } | null = null;
     if (isClassDate(today)) {
       const c = cancelOf(today);
-      if (c) cancel = { reason: c.title, details: c.details || "", holiday: !!c.holiday };
-      else slots.push({ kind: "clase", day: sessionNumber(days, cyc.start_date, today), start: startMin, end: endMin });
+      if (c) cancel = { reason: c.title, details: c.details || "", holiday: !!c.holiday, paused: !!c.paused,
+        pause_until: c.paused ? pauseOf(today)!.ends_on : null };
+      else slots.push({ kind: "clase", day: sessionNumber(days, cyc.start_date, today, isPaused), start: startMin, end: endMin });
     }
     evs.filter((x) => x.category === "reposicion" && x.starts_on === today && x.makeup_of).forEach((x) => {
       const s = toMin(x.start_time);
-      slots.push({ kind: "reposicion", day: sessionNumber(days, cyc.start_date, x.makeup_of!), start: s, end: x.end_time ? toMin(x.end_time) : s + 60 });
+      slots.push({ kind: "reposicion", day: sessionNumber(days, cyc.start_date, x.makeup_of!, isPaused), start: s, end: x.end_time ? toMin(x.end_time) : s + 60 });
     });
     slots.sort((a, b) => a.start - b.start);
     // antes → (10 min antes) en_curso: agenda + Meet → (hora de fin) terminada: solo agenda, hasta medianoche.
@@ -203,11 +220,11 @@ Deno.serve(async (req) => {
     const prevDays = new Map<number, string>(); // DAY → fecha en que se vio
     if (cyc.start_date) {
       for (let d = cyc.start_date; d < today; d = addDays(d, 1)) {
-        if (isClassDate(d) && !cancelOf(d)) prevDays.set(sessionNumber(days, cyc.start_date, d), d);
+        if (isClassDate(d) && !cancelOf(d)) prevDays.set(sessionNumber(days, cyc.start_date, d, isPaused), d);
       }
     }
     evs.filter((x) => x.category === "reposicion" && x.makeup_of && x.starts_on < today)
-      .forEach((x) => prevDays.set(sessionNumber(days, cyc.start_date, x.makeup_of!), x.starts_on));
+      .forEach((x) => prevDays.set(sessionNumber(days, cyc.start_date, x.makeup_of!, isPaused), x.starts_on));
 
     // Agendas del módulo en Classroom (solo si hay algo que mostrar).
     const needAgendas = prevDays.size > 0 || slots.some((s) => phaseOf(s) !== "antes");

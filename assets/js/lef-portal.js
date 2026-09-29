@@ -1119,7 +1119,7 @@
       var state = "off", pill = "";
       if (d.status !== "ok") { state = "off"; pill = ""; }
       else if (d.before_cycle) { state = "off"; pill = "Tu ciclo aún no empieza"; }
-      else if (d.cancel && !cur) { state = "off"; pill = d.cancel.holiday ? "Hoy es festivo" : "Hoy no hay clase"; }
+      else if (d.cancel && !cur) { state = "off"; pill = d.cancel.paused ? "Clases en pausa" : d.cancel.holiday ? "Hoy es festivo" : "Hoy no hay clase"; }
       else if (cur) {
         var started = nowMin() >= hmToMin(cur.start);
         state = cur.phase === "en_curso" ? (started ? "live" : "ok") : cur.phase === "antes" ? "wait" : "off";
@@ -1207,6 +1207,13 @@
         rb.addEventListener("click", function () { go("recursos"); });
         bc.appendChild(rb);
         col.appendChild(bc);
+      } else if (d.cancel && d.cancel.paused && !cur) {
+        // Pausa del ciclo del grupo: no hay reposición; al volver sigue la agenda que tocaba.
+        col.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>Tus clases están en pausa</h2>" +
+          '<div class="today-reason"><span>Motivo</span><strong>' + esc(d.cancel.reason) + "</strong>" + (d.cancel.details ? "<p>" + esc(d.cancel.details) + "</p>" : "") + "</div>" +
+          "<p>" + (d.cancel.pause_until ? "La pausa va hasta el <strong>" + esc(longYmd(d.cancel.pause_until)) + "</strong>. " : "") +
+          (nextTxt ? "Retomas el " + nextTxt + " y sigues justo en la agenda donde quedaste. " : "Al volver, retomas justo en la agenda donde quedaste. ") +
+          "No pierdes ninguna clase" + (g.cycle_end ? ": tu ciclo se extiende hasta el <strong>" + esc(longYmd(g.cycle_end)) + "</strong>." : ".") + "</p></div>"));
       } else if (d.cancel && !cur) {
         col.appendChild(h('<div class="today-empty is-cancel"><span class="today-empty__ic">' + mcIc("calx") + "</span><h2>" + (d.cancel.holiday ? "Hoy es festivo: no hay clase" : "Hoy no hay clase") + "</h2>" +
           '<div class="today-reason"><span>Motivo</span><strong>' + esc(d.cancel.reason) + "</strong>" + (d.cancel.details ? "<p>" + esc(d.cancel.details) + "</p>" : "") + "</div>" +
