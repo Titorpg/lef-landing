@@ -651,6 +651,25 @@
         '<div class="pnl-alert err" data-err style="display:none;margin:10px 0 0"></div>' +
         '<div class="mk-card__acts"><button type="button" class="btn btn-dark" data-save>' + (done ? "Cambiar fecha" : "Programar reposición") + "</button></div>";
       var err = panel.querySelector("[data-err]"), save = panel.querySelector("[data-save]");
+      // Ni festivos ni cruces con otra clase del profesor (29 sep 2026): se
+      // revisa al cambiar la fecha o la hora, y otra vez al guardar.
+      function slotProblem(d, st, en) {
+        if (!d) return Promise.resolve("");
+        return rpc("check_makeup_slot", { p_group: r.group_id, p_date: d, p_start: st || null, p_end: en || null, p_exclude: r.makeup_id || null })
+          .then(function (v) {
+            if (!v) return "";
+            if (v.reason === "holiday") return "No se puede programar el " + longDate(d).toLowerCase() + " porque es festivo (" + v.holiday + "). Elige otro día.";
+            return "No es posible programar en esa franja horaria: ese día ya está " + (v.kind === "reposicion" ? "la reposición de " : "la clase ") +
+              v.level + " de " + time(v.start) + " a " + time(v.end) + ". Elige otra hora u otro día.";
+          }, function () { return ""; });
+      }
+      function liveCheck() {
+        var d = panel.querySelector("[name=d]").value, st = panel.querySelector("[name=s]").value, en = panel.querySelector("[name=e]").value;
+        slotProblem(d, st, en).then(function (p) {
+          err.textContent = p; err.style.display = p ? "block" : "none"; save.disabled = !!p;
+        });
+      }
+      ["d", "s", "e"].forEach(function (n) { panel.querySelector("[name=" + n + "]").addEventListener("change", liveCheck); });
       save.addEventListener("click", function () {
         var d = panel.querySelector("[name=d]").value, st = panel.querySelector("[name=s]").value, en = panel.querySelector("[name=e]").value;
         err.style.display = "none";
@@ -658,6 +677,12 @@
           : en && en <= st ? "La hora de fin debe ser después de la de inicio." : "";
         if (problem) { err.textContent = problem; err.style.display = "block"; return; }
         save.disabled = true;
+        slotProblem(d, st, en).then(function (p) {
+          if (p) { err.textContent = p; err.style.display = "block"; return; }
+          doSave(d, st, en);
+        });
+      });
+      function doSave(d, st, en) {
         var ev = { title: "Clase " + r.module_level + " · reposición (DAY " + r.session_number + ")", category: "reposicion", audience: "group", group_id: r.group_id,
           starts_on: d, ends_on: d, start_time: st, end_time: en || null, makeup_of: r.class_date,
           details: "Recupera la clase del " + longDate(r.class_date).toLowerCase() + " (" + r.reason + ")." };
@@ -671,9 +696,11 @@
           toast("Reposición programada" + (res && res.sent ? ". Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.") : "."));
           renderPendingMakeups(box);
         }).catch(function (e) {
-          err.textContent = friendly(e); err.style.display = "block"; save.disabled = false;
+          var m = String((e && e.message) || "");
+          err.textContent = /^LEF_MAKEUP_/.test(m) ? m.replace(/^LEF_[A-Z_]+:\s*/, "").replace(/^./, function (c) { return c.toUpperCase(); }) : friendly(e);
+          err.style.display = "block"; save.disabled = false;
         });
-      });
+      }
     }
     return card;
   }

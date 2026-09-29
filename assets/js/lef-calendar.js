@@ -780,6 +780,7 @@
     }
 
     function confirmRemove(it) {
+      if (it.category === "sin_clase" || it.category === "reposicion") return confirmRemoveClassEvent(it);
       return new Promise(function (resolve, reject) {
         var b = h('<p class="lcal-confirm">Se borra “' + esc(it.title) + "” del calendario" +
           (it.audience === "personal" ? "." : " y deja de verse para las personas a las que iba dirigido.") + "</p>");
@@ -795,6 +796,44 @@
             });
           } }
         ] });
+      }).then(null, function (e) { if (e && e.message === "Cancelado.") return true; throw e; });
+    }
+
+    // "Sin clase" (normal o pausa) y reposición (29 sep 2026): se borran desde el
+    // servidor (remove-class-event), que borra también las reposiciones que
+    // quedan sobrando y avisa a los estudiantes con una disculpa.
+    function confirmRemoveClassEvent(it) {
+      var linked = it.category === "sin_clase" && it.audience !== "personal"
+        ? sb.from("calendar_events").select("starts_on,start_time,end_time,group_id").eq("category", "reposicion")
+            .gte("makeup_of", it.starts_on).lte("makeup_of", it.ends_on).then(function (r) {
+              return (r.data || []).filter(function (x) { return !it.group_id || x.group_id === it.group_id; });
+            }, function () { return []; })
+        : Promise.resolve([]);
+      return linked.then(function (mk) {
+        return new Promise(function (resolve, reject) {
+          var range = it.ends_on !== it.starts_on ? "del " + longDay(parseKey(it.starts_on)).toLowerCase() + " al " + longDay(parseKey(it.ends_on)).toLowerCase()
+            : "del " + longDay(parseKey(it.starts_on)).toLowerCase();
+          var lines = it.category === "reposicion"
+            ? ["Se cancela esta reposición" + (it.makeup_of ? " y la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase() + " vuelve a quedar pendiente por reprogramar en el Dashboard." : ".")]
+            : [it.paused
+                ? "Se quita la pausa: las clases " + range + " vuelven a dictarse en su horario normal, la agenda vuelve a contar esos días y el grupo vuelve a su fecha de fin."
+                : "Las clases " + range + " vuelven a quedar como clases normales."];
+          if (mk.length) lines.push((mk.length === 1 ? "También se borra la reposición del " : "También se borran las reposiciones del ") +
+            mk.map(function (x) { return longDay(parseKey(x.starts_on)).toLowerCase() + " (" + fmtTime(x.start_time) + ")"; }).join(", ") + ".");
+          if (it.audience !== "personal") lines.push("Los estudiantes que ya habían recibido el aviso reciben un correo con una disculpa, explicando el cambio.");
+          var b = h('<div class="lcal-confirm">' + lines.map(function (l) { return "<p>" + esc(l) + "</p>"; }).join("") + "</div>");
+          openSheet({ color: "#8a2b2b", icon: "trash", label: "Eliminar", title: "¿Eliminar “" + it.title + "”?", body: b,
+            onClose: function () { reject(new Error("Cancelado.")); }, actions: [
+            { label: "Cancelar" },
+            { label: "Eliminar", cls: "btn-danger", fn: function () {
+              return removeClassEvent(sb, it.id).then(function (res) {
+                var extra = res && res.removed_makeups ? (res.removed_makeups === 1 ? " y su reposición" : " y sus " + res.removed_makeups + " reposiciones") : "";
+                toast("Eliminado del calendario" + extra + (res && res.sent ? ". Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.") : "."));
+                resolve(); refresh();
+              });
+            } }
+          ] });
+        });
       }).then(null, function (e) { if (e && e.message === "Cancelado.") return true; throw e; });
     }
 
@@ -993,7 +1032,7 @@
           var op = ev ? sb.from("calendar_events").update(row).eq("id", ev.id).select("id")
                       : sb.from("calendar_events").insert(row).select("id");
           return op.then(function (r) {
-            if (r.error) throw r.error;
+            if (r.error) throw new Error(String(r.error.message || "").replace(/^LEF_[A-Z_]+:\s*/, "") || "No se pudo guardar.");
             if (!r.data || !r.data.length) throw new Error("No se pudo guardar (revisa tus permisos).");
             if (!ev && row.category === "sin_clase" && ["group", "students", "all"].indexOf(row.audience) !== -1) {
               notifyClassChange(sb, r.data[0].id).then(function (res) {
@@ -1030,5 +1069,21 @@
     });
   }
 
-  window.LEFCalendar = { mount: mount, notifyClassChange: notifyClassChange };
+  // Borrar un "Sin clase" o una reposición y avisar el cambio (remove-class-event).
+  function removeClassEvent(sb, eventId) {
+    return sb.auth.getSession().then(function (r) {
+      var tok = r.data && r.data.session ? r.data.session.access_token : "";
+      return fetch(window.LEF_SUPABASE.url + "/functions/v1/remove-class-event", {
+        method: "POST", headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: eventId })
+      }).then(function (res) {
+        return res.json().then(function (j) {
+          if (!res.ok) throw new Error(j.error === "no_autorizado" ? "Solo quien lo creó (o un admin) puede eliminarlo." : "No se pudo eliminar. Intenta de nuevo.");
+          return j;
+        });
+      });
+    });
+  }
+
+  window.LEFCalendar = { mount: mount, notifyClassChange: notifyClassChange, removeClassEvent: removeClassEvent };
 })();

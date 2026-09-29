@@ -18,8 +18,19 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
   13 oct, fin 6 nov (DAY 20); el grupo B1.1 de Luis del mismo ciclo sigue terminando el 30 oct.
 - Límite conocido: el control de cruce de horarios del profesor usa las fechas del ciclo, no el fin
   extendido del grupo.
-- Dato raro visto hoy: el grupo A1.3 de Luis Manga tiene una reposición (14 oct, DAY 2) de la clase
-  del 29 sep, pero ya no existe el "Sin clase" de ese día → ese DAY 2 se verá dos veces.
+- **Cuentas de PRUEBA:** el profesor Luis Manga y el estudiante Liam Caballero (dicho por el usuario
+  el 29 sep). Movimientos raros en ellos (reinscripciones, pagos borrados, reposiciones) son normales.
+- Bug encontrado con esas cuentas: se borró el "Sin clase" del 29 sep del A1.3 del profesor Luis Manga
+  y su reposición (14 oct, DAY 2) quedó huérfana. Arreglado con el SQL
+  `20260929010000_reposiciones_sin_huerfanas_ni_cruces.sql` (POR APLICAR, después del de la pausa):
+  - Borrar/editar un "Sin clase" (normal o pausa) borra solas sus reposiciones (trigger), salvo que
+    ese día siga sin clase (festivo u otro Sin clase). El SQL limpia además la huérfana de Liam.
+  - "Eliminar" de Sin clase/pausa/reposición en el calendario pasa por la función nueva
+    `remove-class-event`: borra y manda correo con disculpa (classRestoredEmail /
+    classMakeupCancelledEmail) solo si el aviso original se había enviado y solo fechas desde hoy.
+  - Reposición: no en festivo ni cruzada con otra clase/reposición del mismo profesor
+    (`check_makeup_slot` en el Dashboard, mensaje en el mismo recuadro; trigger en la base).
+  - Editar las fechas de un Sin clase NO manda correo (solo borra reposiciones sobrantes).
 
 ### ▶ Lo siguiente (depende del usuario)
 1. **Probar un pago real con Wompi** (celular y computador): "Pague aquí" abre el Web Checkout
