@@ -47,6 +47,16 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
   B1.1: Salen, Melannye): no ven agenda ni Meet hasta pagar.
 - Grupo B1.1 del profesor Luis Caballero: aún no hay examen de validación B1.1.
 
+### ▶ Limpieza de residuos (29 sep 2026)
+- SQL `20260929030000_cerrar_funciones_viejas_publicas.sql` (POR APLICAR): `create_enrollment` seguía
+  abierto al público (anon) desde antes de las pre-inscripciones → se podía crear estudiante +
+  inscripción sin revisión del admin. Se quita el permiso (admin_convert_preinscripcion lo sigue usando
+  por dentro). También get_enrollment_confirmation y get_public_modules (sin uso).
+- Borradas 5 imágenes sin uso (icon-checklist, icon-handshake, photo-founder, photo-live-class,
+  wompi-pagos; siguen en el historial de git). `*.ps1` y `*.mp4` ya no se publican en la web.
+- Quedan en la base, sin uso pero inofensivas: lef_session_number (reemplazada por
+  lef_group_session), is_staff, freeze_overdue_subscriptions (exige admin).
+
 ### ▶ Recordatorio a la profesora María Rada (29 sep 2026)
 - En su Classroom solo tiene publicadas las agendas de los niveles A1 y A2 (el profesor Luis
   Caballero tiene todas). Los estudiantes solo ven las PUBLICADAS (el profesor ve también

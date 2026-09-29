@@ -13,3 +13,6 @@ scripts
 # Páginas internas de referencia (no enlazadas): quedan en el repo, no en la web.
 reference-brand-guide.html
 reference-handbook.html
+# Scripts locales y videos sin usar: no se publican
+*.ps1
+*.mp4

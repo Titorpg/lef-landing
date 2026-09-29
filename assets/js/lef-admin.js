@@ -2093,7 +2093,6 @@
 
   // Raíz de los recursos: el admin la ve como "Recursos compartidos"; el profesor
   // (S.ro = solo ver) la ve directo al abrir su pestaña "Recursos de la clase".
-  function rcBase() { return []; }
   function rcHome(main, S) {
     return [[S.ro ? "Recursos de la clase" : "Recursos compartidos", function () { rcRoot(main, S); }]];
   }
