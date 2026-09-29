@@ -32,6 +32,12 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
     (`check_makeup_slot` en el Dashboard, mensaje en el mismo recuadro; trigger en la base).
   - Editar las fechas de un Sin clase NO manda correo (solo borra reposiciones sobrantes).
 
+### ▶ Recordatorio a la profesora María Rada (29 sep 2026)
+- En su Classroom solo tiene publicadas las agendas de los niveles A1 y A2 (el profesor Luis
+  Caballero tiene todas). Los estudiantes solo ven las PUBLICADAS (el profesor ve también
+  borradores): cuando le toque un módulo B1 en adelante, debe publicar esas agendas. Su grupo
+  actual (A2.2) está cubierto. No es un error del sistema.
+
 ### ▶ Lo siguiente (depende del usuario)
 1. **Probar un pago real con Wompi** (celular y computador): "Pague aquí" abre el Web Checkout
    (`checkout.wompi.co/p/`) en una pestaña nueva con `redirect-url` = /portal; Wompi vuelve con
