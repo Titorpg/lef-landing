@@ -5,7 +5,7 @@
 Sesión del 28 sep cerrada con TODO publicado en Vercel y TODOS los SQL aplicados (el usuario los
 pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpeta.
 
-### ▶ 29 sep 2026 — Pausa del ciclo por grupo (SQL `20260929000000_pausa_ciclo_grupo.sql` POR APLICAR)
+### ▶ 29 sep 2026 — Pausa del ciclo por grupo (SQL `20260929000000_pausa_ciclo_grupo.sql` APLICADO por el usuario, 29 sep)
 - Pedido: para recesos largos (semana de receso de octubre, grupo A2.2 de María Rada, mar–vie) el
   "Sin clase" de UN grupo trae el interruptor **"Pausar el ciclo de este grupo"** (admin y profesor,
   en el calendario). Días en pausa: no consumen agenda, no quedan por reponer, al volver sigue la
@@ -22,7 +22,7 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
   el 29 sep). Movimientos raros en ellos (reinscripciones, pagos borrados, reposiciones) son normales.
 - Bug encontrado con esas cuentas: se borró el "Sin clase" del 29 sep del A1.3 del profesor Luis Manga
   y su reposición (14 oct, DAY 2) quedó huérfana. Arreglado con el SQL
-  `20260929010000_reposiciones_sin_huerfanas_ni_cruces.sql` (POR APLICAR, después del de la pausa):
+  `20260929010000_reposiciones_sin_huerfanas_ni_cruces.sql` (APLICADO 29 sep; verificado: la huérfana de Liam se borró, festivo y cruce responden):
   - Borrar/editar un "Sin clase" (normal o pausa) borra solas sus reposiciones (trigger), salvo que
     ese día siga sin clase (festivo u otro Sin clase). El SQL limpia además la huérfana de Liam.
   - "Eliminar" de Sin clase/pausa/reposición en el calendario pasa por la función nueva
