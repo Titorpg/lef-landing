@@ -9,6 +9,18 @@ Hecho hoy: pausa del ciclo por grupo; reposiciones sin huérfanas, sin festivos 
 correos de disculpa; recibos de Wompi con datos del pagador; historial del grupo al borrarlo;
 cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso. Detalle abajo.
 
+### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` POR APLICAR)
+- El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
+  A2.2 y B1.1 tienen 20 días de clase). Verificado con la pausa REAL "SEMANA DE RECESO" del B1.1 del
+  profesor Luis Caballero (6–9 oct, creada y avisada el 29 sep): DAY 16 cae el 30 oct, fin del ciclo.
+- `lef_group_end` ahora devuelve el fin del ciclo (la pausa solo congela la numeración). Quitados
+  los textos y etiquetas de "extendido" (calendario, portal, Mis grupos, correos).
+- Correo de pausa reescrito, informativo ("Novedad en tu calendario de clases"); el Sin clase
+  normal también cambió solo su título/asunto. Los estudiantes del B1.1 (Salen, Melannye, Juan)
+  YA recibieron el correo viejo que decía "tu ciclo se extiende hasta el 6 nov".
+- ⚠ Grupos cuyo ciclo NO alcanza para 16 clases: A1.2 del profesor Luis Caballero (14 días, vacío),
+  A2.1 del profesor Luis Caballero (9, vacío) y A1.3 del profesor Luis Manga (9, prueba).
+
 ### ▶ Tareas del usuario (dadas al cierre del 29 sep, en orden)
 1. **Keidy Vergara**: asignarle grupo (A1.3 pagada, sin grupo; el A1.3 del profesor Luis Caballero
    lun–vie 2:00 p. m. está vacío). Preguntarle el horario primero.

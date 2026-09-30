@@ -9,8 +9,8 @@
 //   sin_clase → a los estudiantes de cada grupo que tenía clase ese día (del
 //               grupo elegido, o de todos los grupos si fue para estudiantes/todos).
 //   reposicion → a los estudiantes del grupo, con la nueva fecha y hora.
-//   sin_clase que pausa el ciclo → a los estudiantes de ESE grupo: fechas de la
-//               pausa, cuándo retoman y hasta cuándo se extiende su ciclo.
+//   sin_clase que pausa el ciclo → a los estudiantes de ESE grupo: fechas, motivo
+//               y cuándo retoman (tono informativo).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getAllowedOrigins, corsFor } from "../_shared/google-auth.ts";
 import { classCancelledEmail, classMakeupEmail, classPausedEmail } from "../_shared/email-layout.ts";
@@ -96,26 +96,26 @@ Deno.serve(async (req) => {
   if (!apiKey || !from) return json(req, { error: "correo_no_configurado" }, 500);
   const portalUrl = (Deno.env.get("LEF_LOGIN_URL") || "https://www.lefcenter.com/login").replace(/\/login\/?$/, "") + "/portal";
 
-  // Pausa del ciclo de UN grupo (29 sep 2026): un solo correo con el rango, el
-  // motivo, el día en que retoman y el nuevo fin del grupo. Los festivos dentro
-  // de la pausa también quedan pausados (cuentan en la extensión).
-  let pause: { count: number; newEnd: string; resume: string } | null = null;
+  // Pausa del ciclo de UN grupo (29 sep 2026): un solo correo informativo con el
+  // rango, el motivo y el día en que retoman (desde el 30 sep no se habla de
+  // extender el ciclo: el fin del grupo es el del ciclo).
+  let pause: { resume: string } | null = null;
   if (ev.pauses_cycle && ev.group_id) {
     pairs.length = 0;
     // deno-lint-ignore no-explicit-any
     const g: any = (groups || [])[0];
     const { data: ge } = await admin.rpc("lef_group_end", { p_group: ev.group_id });
     if (g && ge) {
-      const newEnd = String(ge), sch = g.schedules || {}, cyc = sch.cycles || {}, days: string[] = sch.days || [];
+      const end = String(ge), sch = g.schedules || {}, cyc = sch.cycles || {}, days: string[] = sch.days || [];
       const isDay = (d: string) => days.includes(DOW[new Date(d + "T12:00:00Z").getUTCDay()]) && (!cyc.start_date || cyc.start_date <= d);
       const dates: string[] = [];
       for (let d = ev.starts_on; d <= ev.ends_on; d = addDays(d, 1)) if (isDay(d)) dates.push(d);
       const after = addDays(ev.ends_on, 1);
-      const { data: hr } = after <= newEnd ? await admin.rpc("lef_holidays", { p_from: after, p_to: newEnd }) : { data: [] };
+      const { data: hr } = after <= end ? await admin.rpc("lef_holidays", { p_from: after, p_to: end }) : { data: [] };
       const hol = new Set(((hr || []) as { day: string }[]).map((x) => x.day));
       let resume = "";
-      for (let d = after; d <= newEnd; d = addDays(d, 1)) if (isDay(d) && !hol.has(d)) { resume = d; break; }
-      if (dates.length) { pairs.push({ g, dates }); pause = { count: dates.length, newEnd, resume }; }
+      for (let d = after; d <= end; d = addDays(d, 1)) if (isDay(d) && !hol.has(d)) { resume = d; break; }
+      if (dates.length) { pairs.push({ g, dates }); pause = { resume }; }
     }
   }
 
@@ -138,8 +138,7 @@ Deno.serve(async (req) => {
       };
       const m = pause
         ? classPausedEmail({ ...info, reason: ev.title, details: ev.details || "", fromDate: longDate(ev.starts_on),
-            toDate: longDate(ev.ends_on), resumeDate: pause.resume ? longDate(pause.resume) : "", newEnd: longDate(pause.newEnd),
-            count: pause.count }, portalUrl)
+            toDate: longDate(ev.ends_on), resumeDate: pause.resume ? longDate(pause.resume) : "" }, portalUrl)
         : ev.category === "sin_clase"
         ? classCancelledEmail({ ...info, reason: ev.title, details: ev.details || "", plural: dates.length > 1 }, portalUrl)
         : classMakeupEmail({ ...info, makeupDate: longDate(ev.starts_on), holiday: (ev.makeup_of && holidays.get(ev.makeup_of)) || "",
@@ -165,5 +164,5 @@ Deno.serve(async (req) => {
   if (sent > 0 || emails.length === 0) {
     await admin.from("calendar_events").update({ notified_at: new Date().toISOString() }).eq("id", ev.id);
   }
-  return json(req, { sent, total: emails.length, errors, new_end: pause ? pause.newEnd : null });
+  return json(req, { sent, total: emails.length, errors });
 });

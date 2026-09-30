@@ -705,23 +705,6 @@
     return card;
   }
 
-  // Grupos con el ciclo en pausa (29 sep 2026): su fin se corre tantas clases
-  // como se pausaron (lef_group_end). Se reemplaza el fin que se muestra del
-  // ciclo de ESE grupo (copia: el ciclo lo comparten otros grupos).
-  function withPausedEnds(groups) {
-    var ids = groups.map(function (g) { return g.id; });
-    return q("calendar_events").select("group_id").eq("pauses_cycle", true).in("group_id", ids).then(function (r) {
-      var paused = {};
-      (r.data || []).forEach(function (x) { paused[x.group_id] = true; });
-      return Promise.all(groups.filter(function (g) { return paused[g.id] && g.schedules && g.schedules.cycles; }).map(function (g) {
-        return rpc("lef_group_end", { p_group: g.id }).then(function (end) {
-          if (!end || end <= g.schedules.cycles.end_date) return;
-          g.schedules = Object.assign({}, g.schedules, { cycles: Object.assign({}, g.schedules.cycles, { end_date: end, extended: true }) });
-        }).catch(function () { /* sin extensión */ });
-      }));
-    }, function () { /* columna aún no creada */ });
-  }
-
   // Grupos activos del profesor + sus inscripciones (Active/PendingPayment).
   // Usado por el Dashboard (resumen) y por "Mis grupos" (detalle).
   function loadMyGroups() {
@@ -732,11 +715,8 @@
         var groups = gr.data || [];
         if (!groups.length) return { groups: [], enrollments: [] };
         var groupIds = groups.map(function (g) { return g.id; });
-        return Promise.all([
-          q("enrollments").select("student_id,group_id,status,students(full_name)").in("group_id", groupIds),
-          withPausedEnds(groups)
-        ]).then(function (r) {
-            var er = r[0];
+        return q("enrollments").select("student_id,group_id,status,students(full_name)").in("group_id", groupIds)
+          .then(function (er) {
             if (er.error) throw er.error;
             var enr = (er.data || []).filter(function (e) { return e.status === "Active" || e.status === "PendingPayment"; });
             return { groups: groups, enrollments: enr };
@@ -959,7 +939,7 @@
           '<div class="tg-card__t"><strong>' + (g.modules ? esc(g.modules.level + " — " + g.modules.title) : "—") + "</strong>" +
           "<span>" + (sc ? esc(days(sc.days).split(" ").join(" · ")) : "Sin horario asignado") + "</span></div></div>" +
           '<div class="tg-chips">' + (sc ? "<span>" + rcIc("cal") + esc(days(sc.days).split(" ").join(", ")) + "</span><span>" + esc(time(sc.start_time) + " – " + time(sc.end_time)) + "</span>" : "") +
-          (cy ? "<span>Ciclo " + esc(fmtCycle(cy.start_date, cy.end_date)) + (cy.extended ? " (extendido por pausa)" : "") + "</span>" : "") + "</div>" +
+          (cy ? "<span>Ciclo " + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : "") + "</div>" +
           '<div class="tg-cap"><div class="tg-cap__top"><span>Estudiantes</span><strong>' + n + " / " + g.capacity + "</strong></div>" +
           '<div class="ex-bar"><i style="width:' + pct + '%"></i></div></div>' +
           '<ul class="tg-names">' + (n ? names.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") : '<li class="muted">Sin estudiantes inscritos todavía.</li>') + "</ul>" +
@@ -1287,7 +1267,7 @@
       section(g.modules ? g.modules.level + " — " + g.modules.title : "Grupo",
         (sc.days ? days(sc.days).split(" ").join(" · ") + " · " + time(sc.start_time) + " – " + time(sc.end_time) : ""),
         '<span class="rs-chip is-info">' + esc(rcCount(list.length, "estudiante", "estudiantes")) + "</span>" +
-        (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + (cy.extended ? " (extendido)" : "") + "</span>" : ""), list, null, false,
+        (cy ? '<span class="rs-chip is-soon">Ciclo ' + esc(fmtCycle(cy.start_date, cy.end_date)) + "</span>" : ""), list, null, false,
         { groupId: g.id, current: true });
     });
     // Grupos anteriores: una carpeta por ciclo (opción B); al abrirla, sus grupos

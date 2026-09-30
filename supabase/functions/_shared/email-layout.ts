@@ -154,9 +154,8 @@ ${details ? `<p style="margin:6px 0 0;font-family:${FONT};font-size:14.5px;color
 
 // Varios días (p. ej. semana de receso): un solo correo con todas las fechas (plural).
 export function classCancelledEmail(c: ClassInfo & { reason: string; details: string; plural?: boolean }, portalUrl: string) {
-  const subject = c.plural ? `No habrá clases: ${c.classDate} — ${c.module.split(" — ")[0]}`
-    : `No habrá clase el ${c.classDate} — ${c.module.split(" — ")[0]}`;
-  const heading = c.plural ? "Tus próximas clases no se realizarán" : `Tu clase del ${c.classDate} no se realizará`;
+  const subject = `Información sobre ${c.plural ? "tus clases" : `tu clase del ${c.classDate}`} — ${c.module.split(" — ")[0]}`;
+  const heading = "Novedad en tu calendario de clases";
   const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
   const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
 <p style="margin:0 0 22px">Te escribimos para avisarte que ${c.plural ? "tus clases" : "tu clase"} de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> del <strong style="color:${INK};font-weight:600">${escHtml(c.classDate)}</strong>${c.classTime ? ` a las <strong style="color:${INK};font-weight:600">${escHtml(c.classTime)}</strong>` : ""} no se ${c.plural ? "van" : "va"} a realizar.</p>
@@ -165,7 +164,7 @@ ${reasonBox(c.reason, c.details)}
 <p style="margin:0">Cuando ${c.plural ? "queden programadas" : "quede programada"}, te avisaremos por este medio y la verás también en el calendario de tu portal.</p>`;
   const html = lefEmail({
     preheader: `${c.plural ? "Tus clases" : "Tu clase"} del ${c.classDate} no se ${c.plural ? "realizarán" : "realizará"}. Motivo: ${c.reason}.`,
-    eyebrow: "Aviso de clase", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
+    eyebrow: "Información académica", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
   });
   const text = `${hi}\n\n${c.plural ? "Tus clases" : "Tu clase"} de ${c.module} del ${c.classDate}${c.classTime ? ` a las ${c.classTime}` : ""} no se ${c.plural ? "van" : "va"} a realizar.\n\n` +
     `Motivo: ${c.reason}${c.details ? `\n${c.details}` : ""}\n\nLamentamos mucho los inconvenientes. ${c.teacher ? `Tu profesor(a) ${c.teacher}` : "Tu profesor(a)"} ` +
@@ -174,35 +173,35 @@ ${reasonBox(c.reason, c.details)}
   return { subject, html, text };
 }
 
-// Pausa del ciclo de un grupo (29 sep 2026): las clases de esos días no se
-// reponen; al volver sigue la agenda donde quedó y el ciclo se extiende.
+// Pausa del ciclo de un grupo (29 sep 2026; tono ajustado el 30 sep a pedido del
+// cliente): informativo y académico, sin resaltarlo como algo negativo ni hablar de
+// correr el calendario. Solo: esos días no hay sesiones, el motivo y cuándo retoman.
 export function classPausedEmail(c: ClassInfo & { reason: string; details: string; fromDate: string; toDate: string;
-  resumeDate: string; newEnd: string; count: number }, portalUrl: string) {
+  resumeDate: string }, portalUrl: string) {
   const range = c.fromDate === c.toDate ? `el ${c.fromDate}` : `del ${c.fromDate} al ${c.toDate}`;
-  const subject = `Tus clases se pausan ${range} — ${c.module.split(" — ")[0]}`;
-  const heading = "Tus clases entran en pausa";
+  const subject = `Información sobre tu calendario de clases — ${c.module.split(" — ")[0]}`;
+  const heading = "Novedad en tu calendario de clases";
   const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
-  const add = c.count === 1 ? "Se agrega al final la clase que no tendrás" : `Se agregan al final las ${c.count} clases que no tendrás`;
-  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
-<p style="margin:0 0 22px">Te escribimos para avisarte que las clases de tu grupo de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> se pausan <strong style="color:${INK};font-weight:600">${escHtml(range)}</strong>.</p>
-${reasonBox(c.reason, c.details)}
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+  const resumeSub = [c.classTime, c.teacher ? "con tu profesor(a) " + c.teacher : ""].filter(Boolean).join(" · ");
+  const resumeBox = c.resumeDate ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
 <td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
-<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Tu ciclo se extiende hasta</p>
-<p style="margin:0;font-family:${FONT};font-size:18px;font-weight:700;color:${INK}">${escHtml(c.newEnd)}</p>
-<p style="margin:4px 0 0;font-family:${FONT};font-size:15px;color:${GRAFITO}">${escHtml(add)} durante la pausa.</p>
-</td></tr></table>
-<p style="margin:0 0 14px">No pierdes ninguna clase y no hay que reprogramar nada: ${c.resumeDate ? `retomamos el <strong style="color:${INK};font-weight:600">${escHtml(c.resumeDate)}</strong>${c.classTime ? ` a las <strong style="color:${INK};font-weight:600">${escHtml(c.classTime)}</strong>` : ""} y seguimos` : "al volver de la pausa seguimos"} justo en la agenda donde quedamos${c.teacher ? `, con tu profesor(a) ${escHtml(c.teacher)}` : ""}.</p>
-<p style="margin:0">Las nuevas fechas ya aparecen en el calendario de tu portal.</p>`;
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Retomamos</p>
+<p style="margin:0;font-family:${FONT};font-size:18px;font-weight:700;color:${INK}">${escHtml(c.resumeDate)}</p>
+${resumeSub ? `<p style="margin:4px 0 0;font-family:${FONT};font-size:15px;color:${GRAFITO}">${escHtml(resumeSub)}</p>` : ""}
+</td></tr></table>` : "";
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">Te informamos que ${escHtml(range)} no habrá sesiones de tu grupo de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong>.</p>
+${reasonBox(c.reason, c.details)}
+${resumeBox}
+<p style="margin:0">Las clases continúan en el punto del programa donde quedamos. Puedes consultar tu calendario en el portal.</p>`;
   const html = lefEmail({
-    preheader: `Clases en pausa ${range}. Motivo: ${c.reason}. Tu ciclo se extiende hasta el ${c.newEnd}.`,
-    eyebrow: "Pausa de clases", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
+    preheader: `${range.charAt(0).toUpperCase() + range.slice(1)} no habrá sesiones de tu grupo. Motivo: ${c.reason}.`,
+    eyebrow: "Información académica", heading, bodyHtml, cta: { label: "Ver mi calendario", url: portalUrl + "#calendario" },
   });
-  const text = `${hi}\n\nLas clases de tu grupo de ${c.module} se pausan ${range}.\n\n` +
+  const text = `${hi}\n\nTe informamos que ${range} no habrá sesiones de tu grupo de ${c.module}.\n\n` +
     `Motivo: ${c.reason}${c.details ? `\n${c.details}` : ""}\n\n` +
-    `Tu ciclo se extiende hasta el ${c.newEnd}. ${add} durante la pausa. ` +
-    `No pierdes ninguna clase y no hay que reprogramar nada: ${c.resumeDate ? `retomamos el ${c.resumeDate}${c.classTime ? ` a las ${c.classTime}` : ""} y seguimos` : "al volver seguimos"} ` +
-    `justo en la agenda donde quedamos. Las nuevas fechas ya aparecen en tu calendario: ${portalUrl}#calendario` + LEF_TEXT_FOOTER;
+    (c.resumeDate ? `Retomamos el ${c.resumeDate}${c.classTime ? `, a las ${c.classTime}` : ""}${c.teacher ? `, con tu profesor(a) ${c.teacher}` : ""}. ` : "") +
+    `Las clases continúan en el punto del programa donde quedamos. Puedes consultar tu calendario en el portal: ${portalUrl}#calendario` + LEF_TEXT_FOOTER;
   return { subject, html, text };
 }
 
@@ -229,7 +228,7 @@ export function classMakeupCancelledEmail(c: ClassInfo & { makeupDate: string; m
 }
 
 // Se borró un "Sin clase" (o la pausa del ciclo): las clases de esos días sí se dictan.
-export function classRestoredEmail(c: ClassInfo & { plural?: boolean; pause?: boolean; cycleEnd?: string; droppedMakeups?: string[] }, portalUrl: string) {
+export function classRestoredEmail(c: ClassInfo & { plural?: boolean; pause?: boolean; droppedMakeups?: string[] }, portalUrl: string) {
   const what = c.pause ? "la pausa de tus clases" : "tu día sin clases";
   const subject = (c.pause ? "Cambio en la pausa: tus clases sí se realizarán"
     : c.plural ? "Cambio: tus clases sí se realizarán" : `Cambio: tu clase del ${c.classDate} sí se realizará`) + ` — ${c.module.split(" — ")[0]}`;
@@ -240,7 +239,7 @@ export function classRestoredEmail(c: ClassInfo & { plural?: boolean; pause?: bo
     : "";
   const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
 <p style="margin:0 0 22px">Lo sentimos mucho: hay un cambio en ${what}. ${c.plural ? "Tus clases" : "Tu clase"} de <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong> del <strong style="color:${INK};font-weight:600">${escHtml(c.classDate)}</strong> <strong style="color:${INK};font-weight:600">sí se ${c.plural ? "van" : "va"} a realizar</strong>, en tu horario normal${c.classTime ? ` de las ${escHtml(c.classTime)}` : ""}.</p>
-${dropped}${c.pause && c.cycleEnd ? `<p style="margin:0 0 14px">Como ya no hay pausa, tu ciclo vuelve a terminar el <strong style="color:${INK};font-weight:600">${escHtml(c.cycleEnd)}</strong>.</p>` : ""}
+${dropped}
 <p style="margin:0">Te pedimos disculpas por el cambio. En el calendario de tu portal ya aparecen tus clases actualizadas${c.teacher ? `, con tu profesor(a) ${escHtml(c.teacher)}` : ""}.</p>`;
   const html = lefEmail({
     preheader: `Lo sentimos: hubo un cambio. ${c.plural ? "Tus clases" : "Tu clase"} del ${c.classDate} sí se ${c.plural ? "realizarán" : "realizará"}.`,
@@ -250,7 +249,6 @@ ${dropped}${c.pause && c.cycleEnd ? `<p style="margin:0 0 14px">Como ya no hay p
   const text = `${hi}\n\nLo sentimos mucho: hay un cambio en ${what}. ${c.plural ? "Tus clases" : "Tu clase"} de ${c.module} del ${c.classDate} ` +
     `sí se ${c.plural ? "van" : "va"} a realizar, en tu horario normal${c.classTime ? ` de las ${c.classTime}` : ""}.\n\n` +
     ((c.droppedMakeups || []).length ? `Por eso, ${c.droppedMakeups!.length === 1 ? `la reposición del ${c.droppedMakeups![0]} queda cancelada` : `las reposiciones programadas (${c.droppedMakeups!.join("; ")}) quedan canceladas`}.\n\n` : "") +
-    (c.pause && c.cycleEnd ? `Como ya no hay pausa, tu ciclo vuelve a terminar el ${c.cycleEnd}.\n\n` : "") +
     `Te pedimos disculpas por el cambio. En tu calendario ya aparecen tus clases actualizadas: ${portalUrl}#calendario` + LEF_TEXT_FOOTER;
   return { subject, html, text };
 }

@@ -105,25 +105,20 @@ Deno.serve(async (req) => {
   const today = dateFmt.format(now);
   const nowMin = toMin(hmFmt.format(now));
   const startMin = toMin(sch.start_time), endMin = sch.end_time ? toMin(sch.end_time) : startMin + 60;
-  // Pausas del ciclo de ESTE grupo (29 sep 2026): esos días no consumen agenda
-  // y el fin del grupo se corre tantas clases como se pausaron (lef_group_end).
+  // Pausas del ciclo de ESTE grupo (29 sep 2026): esos días no consumen agenda.
+  // El fin del grupo es el del ciclo (el admin deja días de sobra; 30 sep 2026).
   const { data: pauseRows } = await admin.from("calendar_events")
     .select("title, details, starts_on, ends_on").eq("pauses_cycle", true).eq("group_id", grp.id);
   const pauses = (pauseRows || []) as { title: string; details: string; starts_on: string; ends_on: string }[];
   const pauseOf = (ymd: string) => pauses.find((x) => x.starts_on <= ymd && ymd <= x.ends_on) || null;
   const isPaused = (ymd: string) => !!pauseOf(ymd);
-  let groupEnd: string | null = cyc.end_date || null;
-  if (pauses.length) {
-    const { data: ge } = await admin.rpc("lef_group_end", { p_group: grp.id });
-    if (ge) groupEnd = String(ge);
-  }
+  const groupEnd: string | null = cyc.end_date || null;
   const inCycle = (ymd: string) => (!cyc.start_date || cyc.start_date <= ymd) && (!groupEnd || ymd <= groupEnd);
   const isClassDate = (ymd: string) => days.includes(weekday(ymd)) && inCycle(ymd);
 
   const group = {
     module_level: mod.level, module_title: mod.title, days, start_time: sch.start_time, end_time: sch.end_time,
     teacher: grp.teachers?.full_name || "", cycle_start: cyc.start_date || null, cycle_end: groupEnd,
-    cycle_extended: !!groupEnd && !!cyc.end_date && groupEnd > cyc.end_date,
   };
   // Festivos de Colombia (fijos, lef_holidays): esa clase no se dicta y queda
   // por reprogramar, igual que un día "Sin clase" (pedido del usuario, 26 sep 2026).

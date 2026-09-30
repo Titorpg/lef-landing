@@ -747,7 +747,7 @@
           rows.push(["redo", "Recupera la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase() + (it.holiday ? " (festivo)" : ""), it.session_number ? "Agenda DAY " + it.session_number : ""]);
         }
         if (it.category === "sin_clase" && it.paused) {
-          rows.push(["layers", "Pausa el ciclo de este grupo", it.group_end ? "El grupo ahora termina el " + longDay(parseKey(it.group_end)).toLowerCase() : "No consume agenda ni hay que reponer"]);
+          rows.push(["layers", "Pausa el ciclo de este grupo", "No consume agenda ni hay que reponer"]);
         }
         var aud = audienceLabel(it, role);
         if (aud) rows.push([it.audience === "personal" ? "lock" : it.audience === "group" ? "users" : "globe", aud, "Para"]);
@@ -760,8 +760,7 @@
               ? "Esta clase no se dicta por ser festivo. Tu profesor acordará contigo la nueva fecha y te llegará un correo cuando la programe."
               : "Esta clase no se dicta por ser festivo y queda pendiente por reprogramar en el Dashboard del profesor.") + "</small></span></div>"
           : it.item_type === "class" && it.paused
-            ? '<div class="lcal-note">' + ic("calx") + "<span>Clases en pausa: este día no hay clase, no consume agenda y no hay que reponerla. Al volver, el grupo sigue con la agenda donde quedó" +
-              (it.group_end ? " y termina el " + esc(longDay(parseKey(it.group_end)).toLowerCase()) : "") + ".</span></div>"
+            ? '<div class="lcal-note">' + ic("calx") + "<span>Ciclo en pausa: este día no hay sesión, no consume agenda y no hay que reponerla. Al volver, el grupo sigue con la agenda donde quedó.</span></div>"
           : it.cancelled ? '<div class="lcal-note">' + ic("calx") + "<span>Este día no hay clase.</span></div>" : "") +
         '<ul class="lcal-meta">' + rows.map(function (r) {
           return "<li>" + ic(r[0]) + "<span><strong>" + esc(r[1]) + "</strong>" + (r[2] ? "<small>" + esc(r[2]) + "</small>" : "") + "</span></li>";
@@ -816,7 +815,7 @@
           var lines = it.category === "reposicion"
             ? ["Se cancela esta reposición" + (it.makeup_of ? " y la clase del " + longDay(parseKey(it.makeup_of)).toLowerCase() + " vuelve a quedar pendiente por reprogramar en el Dashboard." : ".")]
             : [it.paused
-                ? "Se quita la pausa: las clases " + range + " vuelven a dictarse en su horario normal, la agenda vuelve a contar esos días y el grupo vuelve a su fecha de fin."
+                ? "Se quita la pausa: las clases " + range + " vuelven a dictarse en su horario normal y la agenda vuelve a contar esos días."
                 : "Las clases " + range + " vuelven a quedar como clases normales."];
           if (mk.length) lines.push((mk.length === 1 ? "También se borra la reposición del " : "También se borran las reposiciones del ") +
             mk.map(function (x) { return longDay(parseKey(x.starts_on)).toLowerCase() + " (" + fmtTime(x.start_time) + ")"; }).join(", ") + ".");
@@ -948,7 +947,7 @@
           var on = ok && pauseChk.checked;
           f.querySelector("[data-pause-hint]").innerHTML = on
             ? "Esos días <strong>no consumen agenda</strong> y <strong>no hay que reponer</strong> las clases: al volver, el grupo sigue con la agenda donde quedó. " +
-              "El fin del grupo se corre tantas clases como se pausen (solo este grupo). Los estudiantes reciben un correo con el motivo, las fechas y el nuevo fin del ciclo."
+              "Solo afecta a este grupo y la fecha de fin del ciclo no cambia. Los estudiantes reciben un correo informativo con las fechas, el motivo y el día en que retoman."
             : "Déjalo apagado para un día suelto: la clase consume su agenda y la repones desde el Dashboard. Enciéndelo para recesos largos (p. ej. una semana de receso).";
           if (on) { allBox.checked = true; allBox.disabled = true; allBox.onchange(); }
           else allBox.disabled = false;
@@ -1036,7 +1035,7 @@
             if (!r.data || !r.data.length) throw new Error("No se pudo guardar (revisa tus permisos).");
             if (!ev && row.category === "sin_clase" && ["group", "students", "all"].indexOf(row.audience) !== -1) {
               notifyClassChange(sb, r.data[0].id).then(function (res) {
-                var what = row.pauses_cycle ? "Ciclo del grupo en pausa" + (res && res.new_end ? " (ahora termina el " + longDay(parseKey(res.new_end)).toLowerCase() + ")" : "") : "Agregado";
+                var what = row.pauses_cycle ? "Ciclo del grupo en pausa" : "Agregado";
                 toast(res && res.sent ? what + ". Se avisó por correo a " + res.sent + (res.sent === 1 ? " estudiante." : " estudiantes.")
                   : what + (row.pauses_cycle ? "." : " al calendario") + " (no había estudiantes a quienes avisar esos días).");
               }).catch(function () { toast("Agregado, pero no se pudo enviar el correo a los estudiantes.", "err"); });

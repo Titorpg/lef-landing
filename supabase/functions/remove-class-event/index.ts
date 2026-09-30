@@ -5,7 +5,7 @@
 // evento o un admin. Se borra con la llave de servicio; la base borra sola las
 // reposiciones que quedan huérfanas (trigger calendar_events_drop_orphan_makeups).
 //   sin_clase  → "tu clase del … sí se realizará" (+ reposiciones que se cancelan;
-//                si era una pausa, el ciclo vuelve a su fecha de fin).
+//                si era una pausa, las clases de esos días vuelven a dictarse).
 //   reposicion → "la reposición del … ya no se realizará" (la clase vuelve a
 //                quedar por reprogramar en el Dashboard del profesor).
 // Solo se avisa lo que se había avisado (notified_at) y solo fechas de hoy en adelante.
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
         .map((c) => `${longDate(c.starts_on)} de ${time12(c.start_time)}${c.end_time ? ` a ${time12(c.end_time)}` : ""}`);
       if (!announce || !dates.length) continue;
       perGroup.push({ g, build: (info) => classRestoredEmail({ ...info, classDate: joinEs(dates.map(longDate)), plural: dates.length > 1,
-        pause: !!ev.pauses_cycle, cycleEnd: ev.pauses_cycle && end ? longDate(end) : "", droppedMakeups: dropped } as never, portal) });
+        pause: !!ev.pauses_cycle, droppedMakeups: dropped } as never, portal) });
     }
   }
 
