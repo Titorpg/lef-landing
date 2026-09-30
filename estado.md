@@ -9,7 +9,7 @@ Hecho hoy: pausa del ciclo por grupo; reposiciones sin huérfanas, sin festivos 
 correos de disculpa; recibos de Wompi con datos del pagador; historial del grupo al borrarlo;
 cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso. Detalle abajo.
 
-### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` POR APLICAR)
+### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` APLICADO y verificado 30 sep: B1.1 termina 30 oct con DAY 16)
 - El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
   A2.2 y B1.1 tienen 20 días de clase). Verificado con la pausa REAL "SEMANA DE RECESO" del B1.1 del
   profesor Luis Caballero (6–9 oct, creada y avisada el 29 sep): DAY 16 cae el 30 oct, fin del ciclo.
