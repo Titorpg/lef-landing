@@ -1,9 +1,32 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (cierre 28 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (cierre 29 sep 2026 — esta lista manda sobre notas viejas de abajo)
 
-Sesión del 28 sep cerrada con TODO publicado en Vercel y TODOS los SQL aplicados (el usuario los
-pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpeta.
+Sesión del 29 sep cerrada con TODO publicado (Vercel + Edge Functions student-classroom,
+notify-class-change y la nueva remove-class-event) y los 4 SQL del día APLICADOS y verificados por
+REST (`20260929000000` a `20260929030000`, pegados por el usuario en 10 bloques). Nada sin subir.
+Hecho hoy: pausa del ciclo por grupo; reposiciones sin huérfanas, sin festivos ni cruces, con
+correos de disculpa; recibos de Wompi con datos del pagador; historial del grupo al borrarlo;
+cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso. Detalle abajo.
+
+### ▶ Tareas del usuario (dadas al cierre del 29 sep, en orden)
+1. **Keidy Vergara**: asignarle grupo (A1.3 pagada, sin grupo; el A1.3 del profesor Luis Caballero
+   lun–vie 2:00 p. m. está vacío). Preguntarle el horario primero.
+2. **Cobrar a 5 pendientes de pago** cuyas clases empezaron el 29 sep (A2.2: Maybelline de la Hoz,
+   Geovanny Mendoza, Katherine Zapata; B1.1: Salen Vásquez, Melannye Perez). 4 de ellos y Lauren
+   Vanegas aún no han entrado nunca (contraseña temporal).
+3. **Probar con las cuentas de prueba** (A1.3 del profesor Luis Manga + Liam): Sin clase +
+   reposición + borrar (correo de disculpa, reposición desaparece); Sin clase con pausa (correo y
+   nuevo fin); reposición el 12 oct (debe bloquear por festivo). Luego revisar la BD.
+4. **Pausa real de la semana de receso** del A2.2 de la profesora María Rada, ANTES del lun 5 oct:
+   Sin clase 5–9 oct, Todo el día, grupo A2.2, "Pausar el ciclo de este grupo" + motivo → retoma
+   DAY 5 el 13 oct, termina 6 nov.
+5. Antes del 30 oct: **cargar el examen de validación B1.1** (grupo B1.1 del profesor Luis Caballero).
+6. **Soporte de Wompi**: pedir que solo acepte tarjeta (el 1.er pago real entró por PSE).
+7. Recordar a la profesora María Rada publicar agendas de B1 en adelante cuando le toque.
+8. Opcional: borrar grupos vacíos del profesor Luis Caballero (A1.2, A1.3 2:00 p. m. si no es para
+   Keidy, A2.1 de 8:28 a. m.) y decidir si borra el video .mp4 suelto de la raíz (6 MB, 23 ago, nombre
+   de descarga de Instagram/Facebook; no está en git ni se publica).
 
 ### ▶ 29 sep 2026 — Pausa del ciclo por grupo (SQL `20260929000000_pausa_ciclo_grupo.sql` APLICADO por el usuario, 29 sep)
 - Pedido: para recesos largos (semana de receso de octubre, grupo A2.2 de María Rada, mar–vie) el
@@ -64,7 +87,8 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
   actual (A2.2) está cubierto. No es un error del sistema.
 
 ### ▶ Lo siguiente (depende del usuario)
-1. **Probar un pago real con Wompi** (celular y computador): "Pague aquí" abre el Web Checkout
+1. ✅ **Pago real con Wompi probado** (Juan Echenique, 29 sep, RC16: activó su inscripción). Queda
+   por probar desde computador. "Pague aquí" abre el Web Checkout
    (`checkout.wompi.co/p/`) en una pestaña nueva con `redirect-url` = /portal; Wompi vuelve con
    `?id=&env=` → Facturación con aviso del resultado (consulta la API pública de Wompi). Si el
    navegador bloquea la pestaña, se paga en la misma y vuelve igual. Antes el widget incrustado
