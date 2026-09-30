@@ -48,7 +48,7 @@ pegó en el SQL Editor). No queda nada sin subir ni scripts sueltos en la carpet
 - Grupo B1.1 del profesor Luis Caballero: aún no hay examen de validación B1.1.
 
 ### ▶ Limpieza de residuos (29 sep 2026)
-- SQL `20260929030000_cerrar_funciones_viejas_publicas.sql` (POR APLICAR): `create_enrollment` seguía
+- SQL `20260929030000_cerrar_funciones_viejas_publicas.sql` (APLICADO y verificado 29 sep: responde "permission denied" al público): `create_enrollment` seguía
   abierto al público (anon) desde antes de las pre-inscripciones → se podía crear estudiante +
   inscripción sin revisión del admin. Se quita el permiso (admin_convert_preinscripcion lo sigue usando
   por dentro). También get_enrollment_confirmation y get_public_modules (sin uso).
