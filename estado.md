@@ -34,6 +34,16 @@ cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso.
 - Falta: que el usuario pruebe con el profesor Luis Manga y diga qué ajustar
   (textos, PDF, si el profesor puede editar el texto, abrirlo al estudiante).
 
+### ▶ 1 oct 2026 — Informe de progreso: envío al estudiante (publicado; SQL `20261001000000` APLICADO y verificado)
+- Profesor: con TODOS los informes del grupo guardados, "Enviar los N informes" → novedad personal en el Inicio
+  del estudiante (hasta `lef_group_end`) + correo con el PDF adjunto (Edge Function `notify-progress-report`,
+  el panel arma el PDF con `LEFInforme.pdf`). Ya enviado queda bloqueado; el admin lo desbloquea (motivo,
+  Registro de eventos `progress_report.unlock`) y el profesor lo reenvía. "Reenviar correos pendientes" si falla.
+- Estudiante: novedad "Tu informe de progreso A1.x" (`kind = progress_report`, imagen
+  `noticia-informe-progreso.jpg`, Pexels 6170191) con "Descargar mi informe (PDF)" (`get_my_progress_report`).
+- "Revisión de exámenes pendiente" (profesor) se quita cuando todos tienen OK; si alguien no presenta, al cerrar la franja.
+- Pendiente: el usuario lo prueba con el estudiante de prueba Liam Caballero (solo en su A1.3 del profesor Luis Manga).
+
 ### ▶ Tareas del usuario (dadas al cierre del 29 sep, en orden)
 1. **Keidy Vergara**: asignarle grupo (A1.3 pagada, sin grupo; el A1.3 del profesor Luis Caballero
    lun–vie 2:00 p. m. está vacío). Preguntarle el horario primero.
