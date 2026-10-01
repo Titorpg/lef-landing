@@ -1580,7 +1580,8 @@ body.is-modal-open{overflow:hidden;}
 .ip-result__n strong{font-size:34px;line-height:1;}
 .ip-result__n small{font-size:12px;color:var(--grafito);}
 .ip-result p{font-size:12.5px;color:var(--grafito);font-style:italic;}
-.ip-sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;}
+/* Espacio sobre la línea para firmar a mano (1 oct 2026: firmas de cualquier tamaño). */
+.ip-sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:110px;}
 .ip-sign div{display:flex;flex-direction:column;gap:4px;border-top:1.5px solid var(--ink);padding-top:6px;}
 .ip-sign span{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--plata);}
 .ip-sign .ip-sign__v{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:500;min-height:21px;}
@@ -1600,5 +1601,5 @@ body.is-modal-open{overflow:hidden;}
   .ip-skill{grid-column:1/-1;padding-left:2px;}
   .ip-opt{flex-direction:column;gap:4px;font-size:11.5px;padding:7px 2px;min-height:52px;text-align:center;line-height:1.15;}
   .ip-result{grid-template-columns:1fr;}
-  .ip-sign{gap:14px;}
+  .ip-sign{gap:14px;margin-top:96px;}
 }
