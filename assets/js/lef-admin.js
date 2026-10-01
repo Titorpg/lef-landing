@@ -2001,6 +2001,8 @@
     grammar: '<path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 16 2 2 4-4"/>',
     cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
     exam: '<path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',
+    report: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-4"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     headph: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'
   };
   function rcIc(n) {
@@ -2087,6 +2089,8 @@
     grid.appendChild(rcCard({ tone: "green", icon: "spark", title: "Ejercicios por habilidad", sub: "Varias actividades por módulo", onOpen: function () { rcEjercicios(main, S); } }));
     grid.appendChild(rcCard({ tone: "blue", icon: "exam", title: "Examen de validación",
       sub: S.ro ? "Todos los exámenes, por nivel y módulo" : "Un examen al final de cada módulo y sus resultados", onOpen: function () { rcExamenes(main, S); } }));
+    grid.appendChild(rcCard({ tone: "rose", icon: "report", title: "Informe de progreso",
+      sub: S.ro ? "Llena el informe de cada estudiante de tus grupos" : "La plantilla y los informes que guardan los profesores", onOpen: function () { rcInforme(main, S); } }));
     body.appendChild(grid);
   }
 
@@ -3349,6 +3353,244 @@
       var again = rows.filter(function (r) { return r.submission_id === reopen; })[0];
       if (again) exDetail(again, ctx);
     }
+  }
+
+  /* ---- Informe de progreso (30 sep 2026, plantilla de prueba) ----
+     Pedido del usuario: quinta carpeta de Recursos compartidos. El admin ve la
+     plantilla (réplica interactiva del Word, para probar la redacción) y los
+     informes que guardan los profesores. El profesor, en Recursos de la clase:
+     busca uno de sus grupos activos → estudiante → "Rellenar informe de
+     progreso". Solo marca opciones; la plataforma redacta (lef-informe.js). El %
+     sale del examen de validación revisado y el comentario de sus anotaciones;
+     la base de datos los vuelve a tomar al guardar. El estudiante aún no lo ve. */
+  var IP_SQL_MISSING = "Falta aplicar en Supabase la actualización del Informe de progreso (20260930010000_informe_progreso.sql).";
+  function ipCrumbs(main, S) { return rcHome(main, S).concat([["Informe de progreso", function () { rcInforme(main, S); }]]); }
+  function ipToday() { return date(ymd(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())); }
+  function ipGroupCycle(g) {
+    var c = (g.schedules && g.schedules.cycles) || {};
+    return exCycleLabel({ cycle_name: c.name, cycle_start: c.start_date, cycle_end: c.end_date });
+  }
+  // Lo que dice debajo del % según cómo esté el examen de validación.
+  function ipExamNote(state, ro) {
+    return {
+      revisado: "Nota del examen de validación del módulo, revisado por el profesor.",
+      aprobado: "Nota del examen de validación del módulo, revisado por el profesor.",
+      pendiente: ro ? "El examen está sin revisar: revísalo en Mis grupos para que aparezca el porcentaje." : "El examen estaba sin revisar cuando se guardó el informe.",
+      abierto: "El estudiante todavía no ha presentado el examen de validación.",
+      programado: "El estudiante todavía no ha presentado el examen de validación.",
+      no_presento: "No presentó el examen de validación.",
+      sin_examen: "Sin examen de validación presentado."
+    }[state || "sin_examen"] || "";
+  }
+
+  function rcInforme(main, S) {
+    if (S.ro) { ipTeacherGroups(main, S); return; }
+    var body = rcPage(main, rcHome(main, S), "Informe de progreso",
+      "Un informe por estudiante al terminar el módulo. El profesor solo marca las opciones y la plataforma redacta las observaciones. Por ahora lo ven solo el admin y los profesores.");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    q("progress_reports").select("id,module_level,student_name,teacher_name,group_label,cycle_name,cycle_start,cycle_end,updated_at")
+      .order("updated_at", { ascending: false }).then(function (r) {
+        body.innerHTML = "";
+        var grid = h('<div class="rs-grid"></div>');
+        grid.appendChild(rcCard({ tone: "rose", icon: "report", title: "Plantilla del informe", sub: "El formulario que llenan los profesores · versión de prueba",
+          chip: ["warn", "En prueba"], onOpen: function () { ipTemplate(main, S); } }));
+        if (!r.error) {
+          var rows = r.data || [];
+          grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Informes guardados", sub: "Por ciclo y grupo, de todos los profesores",
+            chip: rows.length ? ["ok", rcCount(rows.length, "informe", "informes")] : ["soon", "Vacío"], onOpen: function () { ipAdminList(main, S, rows); } }));
+        }
+        body.appendChild(grid);
+        if (r.error) body.appendChild(h('<div class="pnl-alert warn" style="margin-top:14px">' + IP_SQL_MISSING + "</div>"));
+      });
+  }
+
+  // Barra fija de abajo con los botones del formulario.
+  function ipBar(msg) {
+    return h('<div class="ip-bar"><span class="ip-bar__msg">' + esc(msg || "") + "</span></div>");
+  }
+
+  function ipTemplate(main, S) {
+    var body = rcPage(main, ipCrumbs(main, S), "Plantilla del informe",
+      "Así lo ve el profesor. Marca opciones para probar cómo se redacta el texto; aquí no se guarda nada.");
+    var variant = 0, ans = {};
+    var holder = h("<div></div>");
+    body.appendChild(holder);
+    function draw() {
+      holder.innerHTML = "";
+      holder.appendChild(LEFInforme.render({
+        editable: true, answers: ans, seed: "plantilla:" + variant, pct: 85,
+        examNote: "Ejemplo. En el informe real sale del examen de validación revisado por el profesor.",
+        note: "Ejemplo. Aquí aparece la anotación que el profesor escribió del estudiante en Estudiantes → Mis anotaciones.",
+        meta: { student: "Andrea Pérez (ejemplo)", level: "A1.1", cycle: "Ciclo de ejemplo", teacher: "Nombre del profesor", date: ipToday() },
+        onChange: function (a) { ans = a; }
+      }));
+    }
+    draw();
+    var bar = ipBar("Prueba distintas combinaciones: cada respuesta cambia el texto.");
+    bar.appendChild(rcBtn("Otra redacción", "spark", "btn-ghost", function () { variant++; draw(); }));
+    bar.appendChild(rcBtn("Limpiar", "trash", "btn-ghost", function () { ans = {}; variant = 0; draw(); }));
+    body.appendChild(bar);
+  }
+
+  function ipAdminList(main, S, rows) {
+    var crumbs = ipCrumbs(main, S);
+    var here = crumbs.concat([["Informes guardados", function () { ipAdminList(main, S, rows); }]]);
+    var body = rcPage(main, crumbs, "Informes guardados", "Los informes de progreso que han guardado los profesores, por ciclo y grupo.");
+    if (!rows.length) { body.appendChild(h('<div class="pnl-alert ok">Todavía ningún profesor ha guardado un informe de progreso.</div>')); return; }
+    var byCycle = {}, order = [];
+    rows.slice().sort(function (a, b) {
+      return String(b.cycle_start || "").localeCompare(String(a.cycle_start || "")) || String(a.group_label || "").localeCompare(String(b.group_label || "")) ||
+        String(a.student_name).localeCompare(String(b.student_name), "es");
+    }).forEach(function (r) {
+      var k = exCycleLabel(r);
+      if (!byCycle[k]) { byCycle[k] = {}; order.push(k); }
+      var g = (r.group_label || "Sin grupo") + (r.teacher_name ? " · Prof. " + r.teacher_name : "");
+      (byCycle[k][g] = byCycle[k][g] || []).push(r);
+    });
+    order.forEach(function (k) {
+      body.appendChild(h('<h2 class="ex-h2">' + esc(k) + "</h2>"));
+      Object.keys(byCycle[k]).forEach(function (g) {
+        body.appendChild(h('<h4 class="ex-h4">' + esc(g) + "</h4>"));
+        var list = h('<div class="rs-files"></div>');
+        byCycle[k][g].forEach(function (r) {
+          var row = h('<div class="rs-file is-rose"><span class="rs-file__ic">' + rcIc("report") + '</span><span class="rs-file__t">' + esc(r.student_name) +
+            "<small>" + esc(r.module_level) + " · Guardado el " + esc(date(r.updated_at)) + '</small></span><span class="rc-ws__acts"></span></div>');
+          row.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver informe", "read", "btn-dark", function () { ipView(main, here, r.id); }));
+          list.appendChild(row);
+        });
+        body.appendChild(list);
+      });
+    });
+  }
+
+  // Informe guardado, solo para leer (admin).
+  function ipView(main, crumbs, id) {
+    var body = rcPage(main, crumbs, "Informe de progreso");
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    q("progress_reports").select("*").eq("id", id).maybeSingle().then(function (r) {
+      body.innerHTML = "";
+      if (r.error || !r.data) { body.appendChild(h('<div class="pnl-alert err">No se encontró el informe.</div>')); return; }
+      var x = r.data;
+      main.querySelector(".pnl-h").textContent = x.student_name;
+      body.appendChild(LEFInforme.render({
+        editable: false, answers: x.answers, texts: x.texts, pct: x.exam_pct == null ? null : Number(x.exam_pct),
+        examNote: ipExamNote(x.exam_state, false), note: x.teacher_note,
+        meta: { student: x.student_name, level: x.module_level, cycle: exCycleLabel(x), teacher: x.teacher_name, date: date(x.updated_at) }
+      }));
+    });
+  }
+
+  // Profesor: buscador de sus grupos activos.
+  function ipTeacherGroups(main, S) {
+    var body = rcPage(main, rcHome(main, S), "Informe de progreso", "Elige uno de tus grupos activos y luego el estudiante. Solo marcas las opciones; la plataforma redacta las observaciones.");
+    if (!ME.teacher_id) { body.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>')); return; }
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([loadMyGroups(), q("progress_reports").select("id,student_id,group_id,updated_at").eq("teacher_id", ME.teacher_id)]).then(function (res) {
+      body.innerHTML = "";
+      S.tg = res[0];
+      if (res[1].error) { body.appendChild(h('<div class="pnl-alert warn">El informe de progreso todavía no está disponible.</div>')); return; }
+      S.ipRows = res[1].data || [];
+      var groups = S.tg.groups.slice().sort(function (a, b) { return exGroupLabel(a).localeCompare(exGroupLabel(b)); });
+      if (!groups.length) { body.appendChild(h('<div class="pnl-alert ok">No tienes grupos activos.</div>')); return; }
+      var search = h('<label class="ip-search">' + rcIc("search") + '<input type="search" placeholder="Buscar grupo (módulo, día u hora)" aria-label="Buscar grupo"></label>');
+      var grid = h('<div class="rs-grid"></div>');
+      var cards = groups.map(function (g) {
+        var n = S.tg.enrollments.filter(function (e) { return e.group_id === g.id; }).length;
+        var done = S.ipRows.filter(function (x) { return x.group_id === g.id; }).length;
+        var c = rcCard({ tone: "lvl", badge: g.modules ? g.modules.level : "", title: exGroupLabel(g),
+          sub: (g.modules ? g.modules.title + " · " : "") + rcCount(n, "estudiante", "estudiantes"),
+          chip: n && done >= n ? ["ok", "Informes completos"] : [done ? "warn" : "soon", done + " de " + n + " informes"],
+          onOpen: function () { ipTeacherGroup(main, S, g); } });
+        c.dataset.q = (exGroupLabel(g) + " " + (g.modules ? g.modules.title : "") + " " + ipGroupCycle(g)).toLowerCase();
+        grid.appendChild(c);
+        return c;
+      });
+      var none = h('<p class="muted" hidden>Ningún grupo coincide con la búsqueda.</p>');
+      search.querySelector("input").addEventListener("input", function () {
+        var t = this.value.trim().toLowerCase(), shown = 0;
+        cards.forEach(function (c) { var ok = !t || c.dataset.q.indexOf(t) >= 0; c.hidden = !ok; if (ok) shown++; });
+        none.hidden = shown > 0;
+      });
+      body.appendChild(search);
+      body.appendChild(grid);
+      body.appendChild(none);
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
+  }
+
+  function ipTeacherGroup(main, S, g) {
+    var crumbs = ipCrumbs(main, S);
+    var body = rcPage(main, crumbs, exGroupLabel(g), (g.modules ? g.modules.level + " — " + g.modules.title + " · " : "") + ipGroupCycle(g));
+    var enr = S.tg.enrollments.filter(function (e) { return e.group_id === g.id; })
+      .sort(function (a, b) { return String(a.students ? a.students.full_name : "").localeCompare(String(b.students ? b.students.full_name : ""), "es"); });
+    if (!enr.length) { body.appendChild(h('<div class="pnl-alert ok">Este grupo no tiene estudiantes.</div>')); return; }
+    var list = h('<div class="rs-files"></div>');
+    enr.forEach(function (e) {
+      var st = { id: e.student_id, name: e.students ? e.students.full_name : "Estudiante" };
+      var rep = S.ipRows.filter(function (x) { return x.group_id === g.id && x.student_id === st.id; })[0];
+      var row = h('<div class="rs-file is-rose"><span class="rs-file__ic">' + rcIc("report") + '</span><span class="rs-file__t">' + esc(st.name) +
+        "<small>" + (rep ? "Informe guardado el " + esc(date(rep.updated_at)) : "Sin informe") + "</small></span>" +
+        (rep ? '<span class="rs-chip is-ok">Guardado</span>' : "") + '<span class="rc-ws__acts"></span></div>');
+      row.querySelector(".rc-ws__acts").appendChild(rep
+        ? rcBtn("Ver o editar informe", "edit", "btn-ghost", function () { ipForm(main, S, g, st); })
+        : rcBtn("Rellenar informe de progreso", "report", "btn-dark", function () { ipForm(main, S, g, st); }));
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+  }
+
+  // Formulario del profesor: carga el informe guardado (si hay), el resultado
+  // del examen de validación y su anotación del estudiante.
+  function ipForm(main, S, g, st) {
+    var crumbs = ipCrumbs(main, S).concat([[exGroupLabel(g), function () { ipTeacherGroup(main, S, g); }]]);
+    var body = rcPage(main, crumbs, st.name, "Informe de progreso · " + (g.modules ? g.modules.level : ""));
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([
+      q("progress_reports").select("answers,texts").eq("student_id", st.id).eq("group_id", g.id).maybeSingle(),
+      rpc("exam_results", { p_group: g.id }).catch(function () { return []; }),
+      q("teacher_student_notes").select("note").eq("teacher_id", ME.teacher_id).eq("student_id", st.id).maybeSingle()
+    ]).then(function (res) {
+      body.innerHTML = "";
+      var saved = res[0].data, ex = (res[1] || []).filter(function (r) { return r.student_id === st.id; })[0];
+      var state = ex ? ex.state : "sin_examen";
+      var pct = ex && (state === "revisado" || state === "aprobado") && Number(ex.max_score) > 0 ? Math.round(Number(ex.score) / Number(ex.max_score) * 100) : null;
+      var note = res[2].data && String(res[2].data.note || "").trim() ? res[2].data.note.trim() : null;
+      var variant = saved && saved.texts && saved.texts.seed ? Number(saved.texts.seed) || 0 : 0;
+      var ans = saved ? saved.answers || {} : {}, texts = {}, sheet;
+      var holder = h("<div></div>");
+      body.appendChild(holder);
+      function draw() {
+        holder.innerHTML = "";
+        sheet = LEFInforme.render({
+          editable: true, answers: ans, seed: st.id + ":" + variant, pct: pct, note: note,
+          examNote: ipExamNote(state, true) + (pct != null ? " (" + exNum(ex.score) + " de " + exNum(ex.max_score) + " puntos)" : ""),
+          meta: { student: st.name, level: g.modules ? g.modules.level : "", cycle: ipGroupCycle(g), teacher: ME.full_name || "", date: ipToday() },
+          onChange: function (a, t) { ans = a; texts = t; msg.textContent = ipLeft(); }
+        });
+        holder.appendChild(sheet);
+      }
+      function ipLeft() {
+        var left = LEFInforme.ALL.filter(function (id) { return !(ans[id] >= 1); }).length;
+        return left ? "Faltan " + left + (left === 1 ? " habilidad" : " habilidades") + " por marcar." : "Listo: revisa el texto y guarda el informe.";
+      }
+      var bar = ipBar(""), msg = bar.querySelector(".ip-bar__msg");
+      draw();
+      bar.appendChild(rcBtn("Otra redacción", "spark", "btn-ghost", function () { variant++; draw(); }));
+      var save = rcBtn(saved ? "Guardar cambios" : "Guardar informe", "exam", "btn-dark", function () {
+        var left = sheet.lefMissing();
+        if (left) { msg.textContent = "Faltan " + left + (left === 1 ? " habilidad" : " habilidades") + " por marcar (en rojo)."; return; }
+        save.disabled = true;
+        rpc("teacher_save_progress_report", { p_group: g.id, p_student: st.id, p_answers: ans,
+          p_texts: Object.assign({}, texts, { seed: String(variant) }) }).then(function () {
+          toast("Informe de progreso de " + st.name + " guardado.");
+          return q("progress_reports").select("id,student_id,group_id,updated_at").eq("teacher_id", ME.teacher_id);
+        }).then(function (r) {
+          S.ipRows = (r && r.data) || S.ipRows;
+          ipTeacherGroup(main, S, g);
+        }).catch(function (e) { save.disabled = false; toast(friendly(e), "err"); });
+      });
+      bar.appendChild(save);
+      body.appendChild(bar);
+    }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
   // Pedido del usuario (27 sep 2026): mismo diseño y carpetas que "Recursos

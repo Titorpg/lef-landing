@@ -1528,3 +1528,77 @@ button.rs-file:hover,button.rs-file:focus-visible{transform:translateY(-1px);box
 .exr-modal .exm-head{box-shadow:none;}
 body.is-modal-open{overflow:hidden;}
 @media(max-width:520px){.exr-modal{padding:14px 12px 2px;border-radius:16px;max-height:calc(100vh - 24px);}.exr-modal-bg{padding:12px 8px;}}
+
+/* ---- Informe de progreso (30 sep 2026, plantilla de prueba): réplica interactiva
+   de PLANTILLA_INFORME_PROGRESO.docx. Hoja blanca flotante; cada habilidad con
+   4 botones que se activan con el color de su nivel (lef-informe.js). ---- */
+.rs-card.is-rose{--c:#b4475f;--cbg:#fbe9ee;}
+.rs-file.is-rose{--c:#b4475f;--cbg:#fbe9ee;}
+.ip-sheet{background:#fff;border:1px solid var(--niebla);border-radius:18px;box-shadow:var(--card-shadow);padding:26px 28px;max-width:920px;}
+.ip-head{display:flex;align-items:center;gap:18px;padding-bottom:16px;border-bottom:2px solid var(--ink);}
+.ip-head img{width:150px;height:auto;flex:none;}
+.ip-head h2{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:19px;line-height:1.15;letter-spacing:.02em;}
+.ip-head p{font-size:13px;color:var(--grafito);}
+.ip-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:16px 0 6px;}
+.ip-meta div{display:flex;flex-direction:column;border-bottom:1px solid var(--niebla);padding-bottom:6px;min-width:0;}
+.ip-meta dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--plata);font-weight:600;}
+.ip-meta dd{margin:0;font-weight:500;overflow-wrap:anywhere;}
+.ip-sec{margin-top:20px;}
+.ip-sec__h{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:12px;padding:9px 14px;}
+.ip-sec__h h3{font-size:14.5px;font-weight:600;letter-spacing:.02em;}
+.ip-sec__n{flex:none;width:26px;height:26px;border-radius:50%;background:#fff;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+.ip-grid{display:flex;flex-direction:column;}
+.ip-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(4,118px);gap:8px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line);border-radius:10px;transition:background .15s;}
+.ip-row.is-missing{background:var(--bad-bg);box-shadow:inset 3px 0 0 var(--bad);}
+.ip-skill{display:flex;flex-direction:column;min-width:0;padding-left:6px;}
+.ip-skill strong{font-weight:600;font-size:14.5px;}
+.ip-skill small{font-size:12.5px;color:var(--grafito);}
+.ip-opt{--c:var(--grafito);--cbg:#f4f4f2;display:flex;align-items:center;gap:7px;justify-content:center;min-height:40px;padding:6px 8px;border:1.5px solid var(--niebla);border-radius:11px;background:#fff;font:inherit;font-size:12.5px;font-weight:500;color:var(--grafito);cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .1s;}
+.ip-opt.is-l1{--c:#b4533a;--cbg:#fbece7;}
+.ip-opt.is-l2{--c:#b26a00;--cbg:#fdf1dc;}
+.ip-opt.is-l3{--c:#1f7a5a;--cbg:#e3f4ec;}
+.ip-opt.is-l4{--c:var(--azul);--cbg:#eaf0fb;}
+.ip-sheet.is-edit .ip-opt:hover{border-color:var(--c);color:var(--c);}
+.ip-sheet.is-edit .ip-opt:active{transform:scale(.97);}
+.ip-opt:disabled{cursor:default;}
+.ip-opt.is-on{background:var(--cbg);border-color:var(--c);color:var(--c);font-weight:600;}
+.ip-box{flex:none;width:17px;height:17px;border-radius:5px;border:1.5px solid #c9c9c5;display:inline-flex;align-items:center;justify-content:center;background:#fff;}
+.ip-box svg{width:12px;height:12px;opacity:0;color:#fff;}
+.ip-opt.is-on .ip-box{background:var(--c);border-color:var(--c);}
+.ip-opt.is-on .ip-box svg{opacity:1;}
+.ip-sheet:not(.is-edit) .ip-opt:not(.is-on){opacity:.55;}
+.ip-obs,.ip-note{margin-top:12px;background:#f7f7f5;border:1px solid var(--line);border-radius:14px;padding:12px 16px;}
+.ip-obs__h{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px;font-weight:600;color:var(--carbon);}
+.ip-obs__h svg{width:15px;height:15px;flex:none;}
+.ip-obs__h small{flex-basis:100%;font-weight:400;font-size:11.5px;color:var(--plata);}
+.ip-obs__t{margin-top:6px;font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-line;}
+.ip-obs__t.is-empty{color:var(--plata);font-style:italic;}
+.ip-note{background:#fff;border-left:4px solid var(--azul);}
+.ip-result{display:grid;grid-template-columns:minmax(0,260px) 1fr;gap:18px;align-items:center;margin-top:20px;padding:16px 18px;border-radius:14px;background:#f5f7fb;}
+.ip-result__n{display:flex;flex-direction:column;gap:6px;}
+.ip-result__n span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--plata);font-weight:600;}
+.ip-result__n strong{font-size:34px;line-height:1;}
+.ip-result__n small{font-size:12px;color:var(--grafito);}
+.ip-result p{font-size:12.5px;color:var(--grafito);font-style:italic;}
+.ip-sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;}
+.ip-sign div{display:flex;flex-direction:column;gap:4px;border-top:1.5px solid var(--ink);padding-top:6px;}
+.ip-sign span{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--plata);}
+.ip-sign .ip-sign__v{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:500;min-height:21px;}
+.ip-foot{margin-top:22px;text-align:center;font-size:11.5px;color:var(--plata);}
+.ip-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;padding:12px 14px;max-width:920px;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border:1px solid var(--niebla);border-radius:14px;box-shadow:var(--card-shadow-hover);}
+.ip-bar__msg{flex:1;min-width:160px;font-size:13px;color:var(--grafito);}
+.ip-search{display:flex;align-items:center;gap:8px;max-width:420px;margin-bottom:16px;background:#fff;border:1px solid var(--niebla);border-radius:12px;padding:0 12px;box-shadow:var(--card-shadow);}
+.ip-search svg{width:17px;height:17px;color:var(--plata);flex:none;}
+.ip-search input{flex:1;border:none;outline:none;background:none;font:inherit;font-size:14.5px;padding:11px 0;min-width:0;}
+@media(max-width:760px){
+  .ip-sheet{padding:18px 14px;border-radius:16px;}
+  .ip-head{gap:12px;}
+  .ip-head img{width:104px;}
+  .ip-head h2{font-size:15px;}
+  .ip-meta{grid-template-columns:1fr;}
+  .ip-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:12px 2px;}
+  .ip-skill{grid-column:1/-1;padding-left:2px;}
+  .ip-opt{flex-direction:column;gap:4px;font-size:11.5px;padding:7px 2px;min-height:52px;text-align:center;line-height:1.15;}
+  .ip-result{grid-template-columns:1fr;}
+  .ip-sign{gap:14px;}
+}
