@@ -3409,27 +3409,39 @@
     return h('<div class="ip-bar"><span class="ip-bar__msg">' + esc(msg || "") + "</span></div>");
   }
 
+  // Talleres y Ejercicios por habilidad cargados para el módulo: las
+  // recomendaciones del informe sugieren solo lo que existe (1 oct 2026).
+  function ipMaterials(level) {
+    return Promise.all([q("skill_activities").select("skill").eq("module_level", level), q("workshops").select("slot,title").eq("module_level", level)])
+      .then(function (res) {
+        if (res[0].error || res[1].error) return null;
+        var ex = {};
+        (res[0].data || []).forEach(function (a) { ex[a.skill] = (ex[a.skill] || 0) + 1; });
+        return { ex: ex, talleres: res[1].data || [] };
+      }).catch(function () { return null; });
+  }
+  function ipSeeds(texts) { try { return texts && texts.seeds ? JSON.parse(texts.seeds) : {}; } catch (e) { return {}; } }
+
   function ipTemplate(main, S) {
     var body = rcPage(main, ipCrumbs(main, S), "Plantilla del informe",
-      "Así lo ve el profesor. Marca opciones para probar cómo se redacta el texto; aquí no se guarda nada.");
-    var variant = 0, ans = {};
-    var holder = h("<div></div>");
+      "Así lo ve el profesor. Marca opciones para probar cómo se redacta el texto; aquí no se guarda nada. Los materiales sugeridos son los que hay cargados para A1.1.");
+    var holder = h('<div><p class="muted">Cargando…</p></div>');
     body.appendChild(holder);
-    function draw() {
-      holder.innerHTML = "";
-      holder.appendChild(LEFInforme.render({
-        editable: true, answers: ans, seed: "plantilla:" + variant, pct: 85,
-        examNote: "Ejemplo. En el informe real sale del examen de validación revisado por el profesor.",
-        note: "Ejemplo. Aquí aparece la anotación que el profesor escribió del estudiante en Estudiantes → Mis anotaciones.",
-        meta: { student: "Andrea Pérez (ejemplo)", level: "A1.1", cycle: "Ciclo de ejemplo", teacher: "Nombre del profesor", date: ipToday() },
-        onChange: function (a) { ans = a; }
-      }));
-    }
-    draw();
-    var bar = ipBar("Prueba distintas combinaciones: cada respuesta cambia el texto.");
-    bar.appendChild(rcBtn("Otra redacción", "spark", "btn-ghost", function () { variant++; draw(); }));
-    bar.appendChild(rcBtn("Limpiar", "trash", "btn-ghost", function () { ans = {}; variant = 0; draw(); }));
-    body.appendChild(bar);
+    ipMaterials("A1.1").then(function (mats) {
+      var draw = function () {
+        holder.innerHTML = "";
+        holder.appendChild(LEFInforme.render({
+          editable: true, answers: {}, seed: "plantilla", pct: 85, materials: mats,
+          examNote: "Ejemplo. En el informe real sale del examen de validación revisado por el profesor.",
+          note: "Ejemplo. Aquí aparece la anotación que el profesor escribió del estudiante en Estudiantes → Mis anotaciones.",
+          meta: { student: "Andrea Pérez (ejemplo)", level: "A1.1", cycle: "Ciclo de ejemplo", teacher: "Nombre del profesor", date: ipToday() }
+        }));
+      };
+      draw();
+      var bar = ipBar("Prueba distintas combinaciones: cada respuesta cambia el texto. Cada recuadro tiene su botón Otra redacción.");
+      bar.appendChild(rcBtn("Limpiar", "trash", "btn-ghost", draw));
+      body.appendChild(bar);
+    });
   }
 
   function ipAdminList(main, S, rows) {
@@ -3547,24 +3559,25 @@
     Promise.all([
       q("progress_reports").select("answers,texts").eq("student_id", st.id).eq("group_id", g.id).maybeSingle(),
       rpc("exam_results", { p_group: g.id }).catch(function () { return []; }),
-      q("teacher_student_notes").select("note").eq("teacher_id", ME.teacher_id).eq("student_id", st.id).maybeSingle()
+      q("teacher_student_notes").select("note").eq("teacher_id", ME.teacher_id).eq("student_id", st.id).maybeSingle(),
+      ipMaterials(g.modules ? g.modules.level : "")
     ]).then(function (res) {
       body.innerHTML = "";
       var saved = res[0].data, ex = (res[1] || []).filter(function (r) { return r.student_id === st.id; })[0];
       var state = ex ? ex.state : "sin_examen";
       var pct = ex && (state === "revisado" || state === "aprobado") && Number(ex.max_score) > 0 ? Math.round(Number(ex.score) / Number(ex.max_score) * 100) : null;
       var note = res[2].data && String(res[2].data.note || "").trim() ? res[2].data.note.trim() : null;
-      var variant = saved && saved.texts && saved.texts.seed ? Number(saved.texts.seed) || 0 : 0;
+      var seeds = ipSeeds(saved && saved.texts);
       var ans = saved ? saved.answers || {} : {}, texts = {}, sheet;
       var holder = h("<div></div>");
       body.appendChild(holder);
       function draw() {
         holder.innerHTML = "";
         sheet = LEFInforme.render({
-          editable: true, answers: ans, seed: st.id + ":" + variant, pct: pct, note: note,
+          editable: true, answers: ans, seed: st.id, seeds: seeds, materials: res[3], pct: pct, note: note,
           examNote: ipExamNote(state, true) + (pct != null ? " (" + exNum(ex.score) + " de " + exNum(ex.max_score) + " puntos)" : ""),
           meta: { student: st.name, level: g.modules ? g.modules.level : "", cycle: ipGroupCycle(g), teacher: ME.full_name || "", date: ipToday() },
-          onChange: function (a, t) { ans = a; texts = t; msg.textContent = ipLeft(); }
+          onChange: function (a, t, sd) { ans = a; texts = t; seeds = sd; msg.textContent = ipLeft(); }
         });
         holder.appendChild(sheet);
       }
@@ -3574,13 +3587,12 @@
       }
       var bar = ipBar(""), msg = bar.querySelector(".ip-bar__msg");
       draw();
-      bar.appendChild(rcBtn("Otra redacción", "spark", "btn-ghost", function () { variant++; draw(); }));
       var save = rcBtn(saved ? "Guardar cambios" : "Guardar informe", "exam", "btn-dark", function () {
         var left = sheet.lefMissing();
         if (left) { msg.textContent = "Faltan " + left + (left === 1 ? " habilidad" : " habilidades") + " por marcar (en rojo)."; return; }
         save.disabled = true;
         rpc("teacher_save_progress_report", { p_group: g.id, p_student: st.id, p_answers: ans,
-          p_texts: Object.assign({}, texts, { seed: String(variant) }) }).then(function () {
+          p_texts: Object.assign({}, texts, { seeds: JSON.stringify(seeds) }) }).then(function () {
           toast("Informe de progreso de " + st.name + " guardado.");
           return q("progress_reports").select("id,student_id,group_id,updated_at").eq("teacher_id", ME.teacher_id);
         }).then(function (r) {

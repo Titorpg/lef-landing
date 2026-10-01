@@ -4,14 +4,16 @@
    redacta las observaciones y las recomendaciones con frases armadas por reglas
    (sin IA): cada texto depende de lo marcado, del nombre y del nivel.
      LEFInforme.TEMPLATE              → secciones y habilidades
-     LEFInforme.generate(answers, ctx) → { part, speaking, writing, recom }
-       ctx: { name, level, pct, seed }  (seed cambia la redacción, no el sentido)
+     LEFInforme.generate(answers, ctx) → { part, speaking, writing, comprension, recom }
+       ctx: { name, level, pct, seed, seeds, materials }  (seeds = variante de cada recuadro)
+       materials: { ex: {vocabulario: n, gramatica: n, listening: n, reading: n}, talleres: [{slot, title}] }
      LEFInforme.render(opts)           → nodo con el informe (hoja)
        opts.meta { student, level, cycle, teacher, date }
        opts.answers {skillId: 1..4}   opts.texts (guardados; si no, se generan)
        opts.editable  → botones que se activan al clic
        opts.pct (null = sin resultado) · opts.examNote · opts.note (anotación)
-       opts.seed · opts.onChange(answers, texts) */
+       opts.seed · opts.seeds · opts.materials · opts.onChange(answers, texts, seeds)
+       Cada recuadro redactado tiene su propio botón "Otra redacción". */
 (function () {
   function h(html) { var t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
   function esc(s) {
@@ -113,7 +115,7 @@
         area: "la expresión oral", items: ["fluidez", "estructuras", "vocabOral", "pronunciacion"] },
       { id: "writing", n: 3, title: "Producción Escrita — Writing", obs: true, focus: "la producción escrita",
         area: "la expresión escrita", items: ["oraciones", "vocabEscrito", "ortografia"] },
-      { id: "comprension", n: 4, title: "Comprensión — Listening & Reading", obs: false, focus: "la comprensión",
+      { id: "comprension", n: 4, title: "Comprensión — Listening & Reading", obs: true, focus: "la comprensión auditiva y lectora",
         area: "la comprensión (listening y reading)", items: ["auditiva", "lectora"] }
     ]
   };
@@ -176,11 +178,12 @@
   }
 
   var R_OPEN = {
-    4: "culmina el módulo {lv} con un desempeño destacado.",
-    3: "culmina el módulo {lv} cumpliendo los objetivos propuestos.",
-    2: "culmina el módulo {lv} con avances, aunque varias habilidades siguen en proceso.",
-    1: "culmina el módulo {lv} en una etapa inicial en varias habilidades."
+    4: ["culmina el módulo {lv} con un desempeño destacado.", "cierra el módulo {lv} con resultados sobresalientes."],
+    3: ["culmina el módulo {lv} cumpliendo los objetivos propuestos.", "cierra el módulo {lv} con los objetivos del ciclo cumplidos."],
+    2: ["culmina el módulo {lv} con avances, aunque varias habilidades siguen en proceso.", "cierra el módulo {lv} con progresos que aún necesita afianzar."],
+    1: ["culmina el módulo {lv} en una etapa inicial en varias habilidades.", "cierra el módulo {lv} con varias habilidades que requieren refuerzo."]
   };
+  var R_GOALS = ["Metas para el siguiente ciclo:", "Metas sugeridas para el próximo ciclo:", "Para el siguiente ciclo le propongo estas metas:"];
   function examSentence(p) {
     if (p == null) return "";
     var s = "Su resultado en la validación formativa (" + p + " %) ";
@@ -189,7 +192,7 @@
     if (p >= 60) return s + "muestra un manejo aceptable, con aspectos por reforzar.";
     return s + "indica que conviene repasar los contenidos del módulo.";
   }
-  // Áreas más fuertes y más débiles (promedio por sección), para que el
+  // Áreas más fuertes y más débiles (promedio por sección, las 4), para que el
   // resumen cambie con cada respuesta y no solo con el promedio general.
   function areasSentence(ans) {
     var secs = TEMPLATE.sections.map(function (s) { return { area: s.area, avg: avgOf(s.items, ans) }; });
@@ -201,7 +204,7 @@
     var b = (best.length > 1 ? "Sus mayores fortalezas están en " : "Su mayor fortaleza está en ") + joinY(best);
     var w = worst.length > 1 ? "las áreas que más requieren refuerzo son " + joinY(worst) : "el área que más requiere refuerzo es " + worst[0];
     if (hi < 2.75) return cap(w) + ".";
-    if (lo >= 3) return b + "; aun así, " + (worst.length > 1 ? "puede seguir fortaleciendo " : "puede seguir fortaleciendo ") + joinY(worst) + ".";
+    if (lo >= 3) return b + "; aun así, puede seguir fortaleciendo " + joinY(worst) + ".";
     return b + ", y " + w + ".";
   }
   // Habilidades en Destacado: si son muchas, solo cuántas.
@@ -216,8 +219,56 @@
     "asumir retos mayores, como exposiciones cortas o textos auténticos"
   ];
 
-  function recomText(ans, v) {
-    var open = fill(R_OPEN[band(avgOf(ALL, ans))], { lv: v.lv });
+  // Material de la plataforma para cada habilidad (1 oct 2026, pedido del
+  // usuario): Ejercicios por habilidad (vocabulario, gramatica, listening,
+  // reading) y Talleres (semana 1–4 y repaso) del módulo del informe. Solo se
+  // nombra lo que de verdad está cargado (ctx.materials).
+  var SKILL_MAT = {
+    asistencia: "taller", participacion: "taller", actitud: "taller",
+    fluidez: "listening", estructuras: "gramatica", vocabOral: "vocabulario", pronunciacion: "listening",
+    oraciones: "gramatica", vocabEscrito: "vocabulario", ortografia: "gramatica",
+    auditiva: "listening", lectora: "reading"
+  };
+  var EX_NAME = { vocabulario: "Vocabulario", gramatica: "Gramática", listening: "Listening", reading: "Reading" };
+  var R_MAT = [
+    "Para reforzar estas áreas, le sugiero practicar en la plataforma (Mis recursos → {lv}) con {x}.",
+    "En la plataforma (Mis recursos → {lv}) tiene disponibles {x}, que le ayudarán a reforzar estas áreas.",
+    "Le recomiendo apoyarse en los recursos del módulo {lv} en la plataforma (Mis recursos): {x}."
+  ];
+  var R_MAT_UP = [
+    "Para seguir avanzando, puede practicar en la plataforma (Mis recursos → {lv}) con {x}.",
+    "Para mantener su progreso, en la plataforma (Mis recursos → {lv}) tiene disponibles {x}."
+  ];
+  function materialsSentence(ans, v, pick, order) {
+    var mats = v.mats;
+    if (!mats) return "";
+    var weak = order(ALL.filter(function (id) { return ans[id] <= 2; }));
+    var pool = weak.length ? weak : order(ALL.filter(function (id) { return ans[id] === 3; }));
+    var cats = [];
+    pool.forEach(function (id) { if (cats.indexOf(SKILL_MAT[id]) < 0) cats.push(SKILL_MAT[id]); });
+    // Hablar y escribir también se trabajan en los talleres del módulo.
+    if (pool.some(function (id) { return /^(fluidez|estructuras|vocabOral|pronunciacion|oraciones|vocabEscrito|ortografia)$/.test(id); }) && cats.indexOf("taller") < 0) cats.push("taller");
+    var ex = [], taller = "";
+    cats.forEach(function (c) {
+      if (c === "taller") {
+        var ws = mats.talleres || [];
+        var rep = ws.filter(function (w) { return w.slot === 5; })[0];
+        if (rep) taller = "el taller de repaso «" + rep.title + "»";
+        else if (ws.length) taller = ws.length === 1 ? "el taller «" + ws[0].title + "»" : "los " + ws.length + " talleres del módulo";
+      } else {
+        var n = (mats.ex || {})[c] || 0;
+        if (n) ex.push(EX_NAME[c]);
+      }
+    });
+    // "los ejercicios de Gramática y Listening, además del taller de repaso «…»"
+    var x = ex.length ? "los ejercicios de " + joinY(ex.slice(0, 3)) : "";
+    if (taller) x = x ? x + ", además " + taller.replace(/^el /, "del ").replace(/^los /, "de los ") : taller;
+    if (!x) return "";
+    return fill(pick(weak.length ? R_MAT : R_MAT_UP), { lv: v.lv, x: x });
+  }
+
+  function recomText(ans, v, pick) {
+    var open = fill(pick(R_OPEN[band(avgOf(ALL, ans))]), { lv: v.lv });
     var out = [v.n ? v.n + ", " + open : cap(open), areasSentence(ans), topSentence(ans)].filter(Boolean);
     var ex = examSentence(v.pct);
     if (ex) out.push(ex);
@@ -225,31 +276,37 @@
     var goals = order(ALL.filter(function (id) { return ans[id] <= 2; })).map(function (id) { return SKILLS[id].goal; })
       .concat(order(ALL.filter(function (id) { return ans[id] === 3; })).map(function (id) { return SKILLS[id].up; }))
       .concat(R_GENERIC).slice(0, 3);
-    return out.join(" ") + "\nMetas para el siguiente ciclo:\n" + goals.map(function (g, i) { return (i + 1) + ". " + cap(g) + "."; }).join("\n");
+    var txt = out.join(" ") + "\n" + pick(R_GOALS) + "\n" + goals.map(function (g, i) { return (i + 1) + ". " + cap(g) + "."; }).join("\n");
+    var mat = materialsSentence(ans, v, pick, order);
+    return mat ? txt + "\n" + mat : txt;
   }
 
   function complete(ans) { return ALL.every(function (id) { return ans && ans[id] >= 1 && ans[id] <= 4; }); }
 
+  // ctx.seeds { part: 2, recom: 1… }: "Otra redacción" de cada recuadro por separado.
   function generate(ans, ctx) {
     ctx = ctx || {};
-    var v = { n: firstName(ctx.name), lv: ctx.level || "", pct: ctx.pct, seed: String(ctx.seed || 0) };
+    var v = { n: firstName(ctx.name), lv: ctx.level || "", pct: ctx.pct, seed: String(ctx.seed || 0), mats: ctx.materials || null };
+    var seeds = ctx.seeds || {};
+    function seedOf(id) { return v.seed + "|" + id + (seeds[id] ? "|" + seeds[id] : ""); }
     var out = {};
     TEMPLATE.sections.forEach(function (sec) {
       if (!sec.obs) return;
       var done = sec.items.every(function (id) { return ans[id] >= 1; });
-      out[sec.id] = done ? sectionText(sec, ans, v, picker(v.seed + "|" + sec.id)) : "";
+      out[sec.id] = done ? sectionText(sec, ans, { n: v.n, seed: seedOf(sec.id) }, picker(seedOf(sec.id))) : "";
     });
-    out.recom = complete(ans) ? recomText(ans, v) : "";
+    out.recom = complete(ans) ? recomText(ans, v, picker(seedOf("recom"))) : "";
     return out;
   }
 
   /* ---------------- Hoja del informe ---------------- */
   var PEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+  var SPARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>';
   var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
 
   function render(opts) {
     var m = opts.meta || {}, ans = Object.assign({}, opts.answers || {}), ed = !!opts.editable;
-    var texts = opts.texts || null;
+    var texts = opts.texts || null, seeds = Object.assign({}, opts.seeds || {});
     var root = h('<article class="ip-sheet' + (ed ? " is-edit" : "") + '"></article>');
     root.appendChild(h('<header class="ip-head"><img src="assets/logo-horizontal.png" alt="LEF Learn English Fluently">' +
       '<div><h2>Informe de progreso académico</h2><p>Learn English Fluently · @lefcenter</p></div></header>'));
@@ -262,8 +319,16 @@
     var boxes = {};
     function obsBox(id, label, hint) {
       var b = h('<div class="ip-obs"><div class="ip-obs__h">' + PEN + "<span>" + esc(label) + "</span>" +
-        (ed ? '<small>La redacta la plataforma según lo que marques</small>' : "") + '</div><p class="ip-obs__t"></p></div>');
-      boxes[id] = { el: b.querySelector(".ip-obs__t"), hint: hint };
+        (ed ? '<button type="button" class="ip-redo" hidden>' + SPARK + "<span>Otra redacción</span></button>" +
+          '<small>La redacta la plataforma según lo que marques</small>' : "") + '</div><p class="ip-obs__t"></p></div>');
+      var redo = b.querySelector(".ip-redo");
+      // Avanza la variante hasta que el texto cambie de verdad (algunas coinciden).
+      if (redo) redo.addEventListener("click", function () {
+        var before = gen()[id], tries = 0;
+        do { seeds[id] = (seeds[id] || 0) + 1; tries++; } while (gen()[id] === before && tries < 12);
+        texts = null; refresh();
+      });
+      boxes[id] = { el: b.querySelector(".ip-obs__t"), hint: ed ? hint : "Sin observación.", redo: redo };
       return b;
     }
 
@@ -314,14 +379,16 @@
       '<div><span class="ip-sign__v">' + esc(m.date || "") + "</span><span>Fecha de emisión</span></div></div>"));
     root.appendChild(h('<footer class="ip-foot">LEF Center · Learn English Fluently · @lefcenter · Barranquilla, Colombia</footer>'));
 
+    function gen() { return generate(ans, { name: m.student, level: m.level, pct: pct, seed: opts.seed, seeds: seeds, materials: opts.materials }); }
     function refresh() {
-      var t = texts || generate(ans, { name: m.student, level: m.level, pct: pct, seed: opts.seed });
+      var t = texts || gen();
       Object.keys(boxes).forEach(function (k) {
         var bx = boxes[k];
         bx.el.textContent = t[k] || bx.hint;
         bx.el.classList.toggle("is-empty", !t[k]);
+        if (bx.redo) bx.redo.hidden = !t[k];
       });
-      if (opts.onChange) opts.onChange(Object.assign({}, ans), t);
+      if (opts.onChange) opts.onChange(Object.assign({}, ans), t, Object.assign({}, seeds));
     }
     refresh();
 

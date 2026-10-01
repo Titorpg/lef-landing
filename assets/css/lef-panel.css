@@ -1571,6 +1571,13 @@ body.is-modal-open{overflow:hidden;}
 .ip-obs__h{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px;font-weight:600;color:var(--carbon);}
 .ip-obs__h svg{width:15px;height:15px;flex:none;}
 .ip-obs__h small{flex-basis:100%;font-weight:400;font-size:11.5px;color:var(--plata);}
+/* "Otra redacción" de cada recuadro (1 oct 2026: se corrige cada texto por separado). */
+.ip-redo{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--niebla);border-radius:999px;background:#fff;font:inherit;font-size:12px;font-weight:600;color:var(--carbon);cursor:pointer;box-shadow:var(--card-shadow);transition:border-color .15s,color .15s,transform .1s;}
+.ip-redo:hover{border-color:#b4475f;color:#b4475f;}
+.ip-redo:active{transform:scale(.96);}
+.ip-redo svg{width:13px;height:13px;}
+.ip-redo[hidden]{display:none;}
+.ip-redo + small{order:5;}
 .ip-obs__t{margin-top:6px;font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-line;}
 .ip-obs__t.is-empty{color:var(--plata);font-style:italic;}
 .ip-note{background:#fff;border-left:4px solid var(--azul);}
