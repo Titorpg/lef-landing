@@ -1,13 +1,12 @@
 ﻿# Estado del proyecto — Landing LEF
 
-## 📌 PENDIENTES VIGENTES (cierre 29 sep 2026 — esta lista manda sobre notas viejas de abajo)
+## 📌 PENDIENTES VIGENTES (cierre 1 oct 2026 — esta lista manda sobre notas viejas de abajo)
 
-Sesión del 29 sep cerrada con TODO publicado (Vercel + Edge Functions student-classroom,
-notify-class-change y la nueva remove-class-event) y los 4 SQL del día APLICADOS y verificados por
-REST (`20260929000000` a `20260929030000`, pegados por el usuario en 10 bloques). Nada sin subir.
-Hecho hoy: pausa del ciclo por grupo; reposiciones sin huérfanas, sin festivos ni cruces, con
-correos de disculpa; recibos de Wompi con datos del pagador; historial del grupo al borrarlo;
-cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso. Detalle abajo.
+Sesión del 30 sep – 1 oct cerrada con TODO publicado (Vercel + Edge Function nueva notify-progress-report)
+y los SQL APLICADOS y verificados por REST: `20260930010000_informe_progreso` y
+`20261001000000_informe_progreso_envio` (este último pegado en 6 bloques; el bloque 3 hubo que rehacerlo con
+renglones cortos y chr(10) porque se dañó al copiar desde el teléfono). Nada sin subir.
+Hecho: Informe de progreso completo (plantilla, formulario del profesor, envío al estudiante con PDF). Detalle abajo.
 
 ### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` APLICADO y verificado 30 sep: B1.1 termina 30 oct con DAY 16)
 - El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
@@ -21,28 +20,35 @@ cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso.
 - ⚠ Grupos cuyo ciclo NO alcanza para 16 clases: A1.2 del profesor Luis Caballero (14 días, vacío),
   A2.1 del profesor Luis Caballero (9, vacío) y A1.3 del profesor Luis Manga (9, prueba).
 
-### ▶ 30 sep 2026 — Informe de progreso (PLANTILLA DE PRUEBA, publicado; SQL `20260930010000` APLICADO y verificado por REST)
-- Quinta carpeta de Recursos compartidos (admin: Plantilla del informe para probar + Informes
-  guardados por ciclo → grupo) y de Recursos de la clase (profesor: buscador de grupos activos →
-  estudiantes → "Rellenar informe de progreso"). Réplica interactiva de PLANTILLA_INFORME_PROGRESO.docx
-  (`assets/js/lef-informe.js`): 12 habilidades en 4 secciones + recomendaciones; el profesor solo marca.
-- Texto por REGLAS (sin IA; la clave de Anthropic de Claude Code es personal y no se usa en la
-  plataforma). "Otra redacción" cambia la variante. Tabla `progress_reports`, un informe por
-  estudiante y grupo; RPC `teacher_save_progress_report` toma de la BD el % (examen de validación
-  del módulo en estado revisado/aprobado) y el comentario (`teacher_student_notes`).
-- Solo admin y profesores lo ven; el estudiante NO hasta la versión final (pedido del usuario).
-- Falta: que el usuario pruebe con el profesor Luis Manga y diga qué ajustar
-  (textos, PDF, si el profesor puede editar el texto, abrirlo al estudiante).
-
-### ▶ 1 oct 2026 — Informe de progreso: envío al estudiante (publicado; SQL `20261001000000` APLICADO y verificado)
-- Profesor: con TODOS los informes del grupo guardados, "Enviar los N informes" → novedad personal en el Inicio
-  del estudiante (hasta `lef_group_end`) + correo con el PDF adjunto (Edge Function `notify-progress-report`,
-  el panel arma el PDF con `LEFInforme.pdf`). Ya enviado queda bloqueado; el admin lo desbloquea (motivo,
-  Registro de eventos `progress_report.unlock`) y el profesor lo reenvía. "Reenviar correos pendientes" si falla.
-- Estudiante: novedad "Tu informe de progreso A1.x" (`kind = progress_report`, imagen
-  `noticia-informe-progreso.jpg`, Pexels 6170191) con "Descargar mi informe (PDF)" (`get_my_progress_report`).
-- "Revisión de exámenes pendiente" (profesor) se quita cuando todos tienen OK; si alguien no presenta, al cerrar la franja.
-- Pendiente: el usuario lo prueba con el estudiante de prueba Liam Caballero (solo en su A1.3 del profesor Luis Manga).
+### ▶ 30 sep – 1 oct 2026 — Informe de progreso (TERMINADO y probado con Liam Caballero)
+- Quinta carpeta "Informe de progreso" en Recursos compartidos (admin: Plantilla del informe + Informes
+  guardados por ciclo → grupo, con estado Enviado / Sin enviar) y en Recursos de la clase (profesor: buscador
+  de grupos activos → estudiantes → "Rellenar informe de progreso"). Réplica interactiva de
+  PLANTILLA_INFORME_PROGRESO.docx (`assets/js/lef-informe.js`): 12 habilidades en 4 secciones, CADA sección con
+  Observación del docente (la 4 faltaba en el Word original) + 5. Recomendaciones.
+- Texto por REGLAS (sin IA; la clave de Anthropic de Claude Code es personal). Le habla al estudiante por su
+  NOMBRE, formal pero SIN "usted" ("Carlos, su desempeño en…"); textos concisos; botón "Otra redacción" en
+  CADA recuadro (variante por recuadro, `texts.seeds`). Las recomendaciones cambian con cada respuesta (área
+  más fuerte/débil, habilidades en Destacado, 3 metas) y sugieren los Ejercicios por habilidad y el taller de
+  repaso del módulo según las habilidades más bajas (solo lo que esté cargado).
+- % de validación formativa = examen de validación del módulo revisado (revisado/aprobado); comentario = anotación
+  del profesor (Estudiantes → Mis anotaciones). La BD los toma al guardar (`teacher_save_progress_report`).
+- Envío: con TODOS los informes del grupo guardados, "Enviar los N informes" → novedad personal en el Inicio del
+  estudiante (hasta `lef_group_end`, `kind = progress_report`, imagen `noticia-informe-progreso.jpg`, Pexels
+  6170191, botón "Descargar mi informe (PDF)") + correo con el PDF adjunto (`notify-progress-report`; el panel
+  arma el PDF con `LEFInforme.pdf`). Ya enviado queda bloqueado; el admin lo desbloquea (motivo, Registro de
+  eventos `progress_report.unlock`) y el profesor lo reenvía. "Reenviar correos pendientes" si falla un correo.
+- PDF (2 hojas normalmente): la firma baja hasta donde alcance la última hoja y nunca queda sola en otra hoja
+  (aprobado por el usuario el 1 oct).
+- "Revisión de exámenes pendiente" (profesor) ahora se quita cuando todos tienen su resultado con OK; si alguien
+  no presenta, al cerrar la franja.
+- Datos actuales: informe de Liam Caballero ENVIADO (su correo trae el PDF viejo con la firma en hoja aparte; el
+  que descarga del Inicio ya sale bien). Informe de "Prueba Luis" (A1.3 del profesor Luis Caballero) guardado,
+  sin enviar.
+- Materiales verificados en BD (1 oct): A1.1 → B2.3 tienen 5 talleres + 10 ejercicios por habilidad cada uno;
+  C1.1–C1.3 no tienen ninguno todavía.
+- Posibles siguientes pasos (el usuario decide): cargar materiales de C1; dejar que el profesor corrija a mano
+  el texto generado; informe en una sola hoja (letra más pequeña).
 
 ### ▶ Tareas del usuario (dadas al cierre del 29 sep, en orden)
 1. **Keidy Vergara**: asignarle grupo (A1.3 pagada, sin grupo; el A1.3 del profesor Luis Caballero
