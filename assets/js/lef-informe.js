@@ -24,14 +24,15 @@
     { v: 1, t: "Inicial" }, { v: 2, t: "En proceso" }, { v: 3, t: "Logrado" }, { v: 4, t: "Destacado" }
   ];
 
-  // Frases cortas (1 oct 2026: el usuario pidió textos más concisos).
+  // Frases cortas (1 oct 2026: el usuario pidió textos más concisos) y dirigidas
+  // al estudiante de "usted" (el informe lo leerá el estudiante; el docente le habla).
   // s = fortaleza (3 y 4) · w = cómo está (1 y 2) · a = qué se recomienda (1 y 2)
   // goal = meta del siguiente ciclo si está bajo · up = meta para pasar de Logrado a Destacado
   var SKILLS = {
     asistencia: { t: "Asistencia", d: "Regularidad en las sesiones del ciclo", n: "la asistencia",
       s: { 4: "asiste con total regularidad", 3: "mantiene una asistencia regular" },
-      w: { 2: "algunas ausencias interrumpen la continuidad del proceso", 1: "las ausencias frecuentes han limitado su avance" },
-      a: { 2: "asistir a todas las sesiones y repasar el material de las que pierda", 1: "priorizar la asistencia y recuperar con el docente los temas perdidos" },
+      w: { 2: "algunas ausencias han interrumpido la continuidad de su proceso", 1: "sus ausencias frecuentes han limitado su avance" },
+      a: { 2: "asistir a todas las sesiones y repasar el material de las que pierda", 1: "priorizar la asistencia y recuperar con su docente los temas perdidos" },
       goal: "asistir a todas las sesiones y repasar las que pierda",
       up: "llegar a cada clase con la anterior repasada" },
     participacion: { t: "Participación", d: "Iniciativa para intervenir en clase", n: "la participación",
@@ -42,13 +43,13 @@
       up: "liderar la conversación en las actividades en parejas" },
     actitud: { t: "Actitud y motivación", d: "Disposición y compromiso durante las actividades", n: "la actitud",
       s: { 4: "muestra una actitud ejemplar", 3: "muestra buena disposición" },
-      w: { 2: "la disposición varía de una sesión a otra", 1: "se observa poca disposición ante las actividades" },
-      a: { 2: "fijarse metas semanales cortas para sostener la motivación", 1: "conversar con el docente sobre sus intereses y dificultades" },
+      w: { 2: "su disposición varía de una sesión a otra", 1: "se observa poca disposición de su parte ante las actividades" },
+      a: { 2: "fijarse metas semanales cortas para sostener la motivación", 1: "conversar con su docente sobre sus intereses y dificultades" },
       goal: "seguir una rutina semanal de estudio con metas concretas",
       up: "proponer temas de su interés para practicar" },
     fluidez: { t: "Fluidez y confianza", d: "Habla sin bloqueos frecuentes", n: "la fluidez",
       s: { 4: "se expresa con soltura", 3: "se comunica con relativa fluidez" },
-      w: { 2: "aún hay pausas y bloqueos frecuentes", 1: "le cuesta sostener un intercambio oral sin apoyo" },
+      w: { 2: "aún presenta pausas y bloqueos frecuentes", 1: "le cuesta sostener un intercambio oral sin apoyo" },
       a: { 2: "practicar en voz alta fuera de clase, por ejemplo con audios breves", 1: "ensayar a diario en voz alta frases de uso frecuente" },
       goal: "grabar cada semana un audio corto sobre un tema del módulo",
       up: "participar en el Conversation Club para hablar con más soltura" },
@@ -66,15 +67,15 @@
       up: "usar sinónimos y expresiones más precisas" },
     pronunciacion: { t: "Pronunciación", d: "Inteligibilidad general al hablar", n: "la pronunciación",
       s: { 4: "pronuncia con claridad", 3: "tiene una pronunciación inteligible" },
-      w: { 2: "algunos errores dificultan por momentos la comprensión", 1: "los errores dificultan con frecuencia la comprensión" },
+      w: { 2: "algunos errores dificultan por momentos que se le entienda", 1: "los errores dificultan con frecuencia que se le entienda" },
       a: { 2: "escuchar y repetir audios cortos imitando la entonación", 1: "practicar a diario los sonidos básicos con escucha y repetición" },
       goal: "practicar shadowing con audios del módulo tres veces por semana",
       up: "trabajar la entonación y el enlace entre palabras" },
     oraciones: { t: "Construcción de oraciones", d: "Coherencia y correcta sintaxis escrita", n: "la construcción de oraciones",
       s: { 4: "redacta oraciones coherentes y bien ordenadas", 3: "construye oraciones claras" },
-      w: { 2: "algunas presentan problemas de orden o coherencia", 1: "presenta dificultades frecuentes de orden y sentido" },
+      w: { 2: "algunas de sus oraciones presentan problemas de orden o coherencia", 1: "presenta dificultades frecuentes de orden y sentido al escribir" },
       a: { 2: "revisar el orden sujeto–verbo–complemento antes de entregar", 1: "escribir oraciones cortas a partir de modelos" },
-      goal: "escribir un párrafo corto por semana y revisarlo con el docente",
+      goal: "escribir un párrafo corto por semana y revisarlo con su docente",
       up: "enlazar ideas con conectores como because, but o so" },
     vocabEscrito: { t: "Uso de vocabulario", d: "Aplica el vocabulario del ciclo por escrito", n: "el vocabulario escrito",
       s: { 4: "emplea un vocabulario variado y preciso", 3: "aplica por escrito el vocabulario del ciclo" },
@@ -84,7 +85,7 @@
       up: "variar el vocabulario escrito con sinónimos" },
     ortografia: { t: "Ortografía y puntuación", d: "Precisión en la forma escrita", n: "la ortografía y la puntuación",
       s: { 4: "escribe con precisión ortográfica", 3: "comete pocos errores de ortografía" },
-      w: { 2: "aparecen algunos errores por corregir", 1: "los errores son frecuentes" },
+      w: { 2: "aún comete algunos errores por corregir", 1: "comete errores con frecuencia" },
       a: { 2: "releer cada texto antes de entregarlo", 1: "anotar las palabras en que se equivoca y practicarlas" },
       goal: "revisar su lista de errores frecuentes antes de cada entrega",
       up: "cuidar la puntuación en textos más largos" },
@@ -102,17 +103,18 @@
       up: "leer textos auténticos breves, como noticias sencillas" }
   };
 
+  // area = cómo se nombra la sección en las recomendaciones.
   var TEMPLATE = {
     version: 1,
     sections: [
       { id: "part", n: 1, title: "Participación y Compromiso", obs: true, focus: "la participación y el compromiso",
-        items: ["asistencia", "participacion", "actitud"] },
+        area: "la participación y el compromiso", items: ["asistencia", "participacion", "actitud"] },
       { id: "speaking", n: 2, title: "Producción Oral — Speaking", obs: true, focus: "la producción oral",
-        items: ["fluidez", "estructuras", "vocabOral", "pronunciacion"] },
+        area: "la expresión oral", items: ["fluidez", "estructuras", "vocabOral", "pronunciacion"] },
       { id: "writing", n: 3, title: "Producción Escrita — Writing", obs: true, focus: "la producción escrita",
-        items: ["oraciones", "vocabEscrito", "ortografia"] },
+        area: "la expresión escrita", items: ["oraciones", "vocabEscrito", "ortografia"] },
       { id: "comprension", n: 4, title: "Comprensión — Listening & Reading", obs: false, focus: "la comprensión",
-        items: ["auditiva", "lectora"] }
+        area: "la comprensión auditiva y lectora", items: ["auditiva", "lectora"] }
     ]
   };
   var ALL = [];
@@ -137,31 +139,30 @@
     return list.slice(0, -1).join(", ") + y + last;
   }
   function band(avg) { return avg >= 3.5 ? 4 : avg >= 2.75 ? 3 : avg >= 1.75 ? 2 : 1; }
-  function firstName(full) { var p = String(full || "").trim().split(/\s+/)[0] || "El estudiante"; return cap(p.toLowerCase()); }
+  function firstName(full) { var p = String(full || "").trim().split(/\s+/)[0]; return p ? cap(p.toLowerCase()) : ""; }
   function fill(s, v) { return s.replace(/\{(\w+)\}/g, function (_, k) { return v[k] != null ? v[k] : ""; }); }
+  function avgOf(ids, ans) { return ids.reduce(function (s, id) { return s + ans[id]; }, 0) / ids.length; }
 
   // Cada observación: apertura + fortalezas (una oración) + una oración por
-  // aspecto a mejorar (cómo está; qué se recomienda).
+  // aspecto a mejorar (cómo está; qué se le recomienda).
   var OPEN = {
-    4: ["{n} tiene un desempeño destacado en {f}.", "En {f}, {n} alcanza un nivel sobresaliente.", "{n} sobresale en {f} durante este ciclo."],
-    3: ["{n} cumple los objetivos del ciclo en {f}.", "En {f}, {n} muestra un desempeño sólido.", "{n} logra avances claros en {f}."],
-    2: ["{n} está en proceso de consolidar {f}.", "En {f}, {n} avanza, aunque todavía sin constancia.", "{n} muestra avances en {f} que aún requieren práctica."],
-    1: ["En {f}, {n} está en una etapa inicial y necesita acompañamiento cercano.", "{n} presenta dificultades en {f} que conviene atender.",
-        "{n} inicia su proceso en {f} y necesita refuerzo constante."]
+    4: ["Su desempeño en {f} es destacado.", "En {f}, usted alcanza un nivel sobresaliente.", "Usted sobresale en {f} durante este ciclo."],
+    3: ["Usted cumple los objetivos del ciclo en {f}.", "En {f}, su desempeño es sólido.", "Usted logra avances claros en {f}."],
+    2: ["Usted está en proceso de consolidar {f}.", "En {f}, usted avanza, aunque todavía sin constancia.", "Sus avances en {f} aún requieren práctica."],
+    1: ["En {f}, usted está en una etapa inicial y necesita acompañamiento cercano.", "Usted presenta dificultades en {f} que conviene atender.",
+        "Usted inicia su proceso en {f} y necesita refuerzo constante."]
   };
-  var STRONG = ["Se destaca que {x}.", "Como fortaleza{s}, {x}.", "Es de resaltar que {x}."];
+  var STRONG = ["Destaco que usted {x}.", "Entre sus fortalezas, usted {x}.", "Es de resaltar que usted {x}."];
   // [con "a", sin "a"]: "En cuanto a la…" / "En cuanto al vocabulario…"
   var WEAK_LEAD = [["En cuanto a", "En cuanto"], ["Respecto a", "Respecto"], ["Sobre", "Sobre"]];
-  var REC = ["se recomienda", "conviene", "se sugiere"];
+  var REC = ["le recomiendo", "le sugiero", "es importante"];
 
   function sectionText(sec, ans, v, pick) {
-    var vals = sec.items.map(function (id) { return ans[id]; });
-    var avg = vals.reduce(function (s, x) { return s + x; }, 0) / vals.length;
-    var out = [fill(pick(OPEN[band(avg)]), { n: v.n, f: sec.focus })];
+    var out = [fill(pick(OPEN[band(avgOf(sec.items, ans))]), { f: sec.focus })];
     var strong = sec.items.filter(function (id) { return ans[id] >= 3; })
       .sort(function (x, y) { return ans[y] - ans[x]; })
       .map(function (id) { return SKILLS[id].s[ans[id]]; });
-    if (strong.length) out.push(fill(pick(STRONG), { x: joinY(strong), s: strong.length > 1 ? "s" : "" }));
+    if (strong.length) out.push(fill(pick(STRONG), { x: joinY(strong) }));
     var first = hash(v.seed + sec.id) % 3;
     sec.items.filter(function (id) { return ans[id] <= 2; })
       .sort(function (x, y) { return ans[x] - ans[y]; })
@@ -174,18 +175,40 @@
   }
 
   var R_OPEN = {
-    4: "{n} culmina el módulo {lv} con un desempeño destacado.",
-    3: "{n} culmina el módulo {lv} cumpliendo los objetivos propuestos.",
-    2: "{n} culmina el módulo {lv} con avances, aunque varias habilidades siguen en proceso.",
-    1: "{n} culmina el módulo {lv} en una etapa inicial en varias habilidades."
+    4: "culmina el módulo {lv} con un desempeño destacado.",
+    3: "culmina el módulo {lv} cumpliendo los objetivos propuestos.",
+    2: "culmina el módulo {lv} con avances, aunque varias habilidades siguen en proceso.",
+    1: "culmina el módulo {lv} en una etapa inicial en varias habilidades."
   };
   function examSentence(p) {
     if (p == null) return "";
-    var s = "La validación formativa (" + p + " %) ";
+    var s = "Su resultado en la validación formativa (" + p + " %) ";
     if (p >= 90) return s + "confirma un dominio muy sólido de los contenidos.";
     if (p >= 75) return s + "refleja un buen manejo de los contenidos.";
     if (p >= 60) return s + "muestra un manejo aceptable, con aspectos por reforzar.";
     return s + "indica que conviene repasar los contenidos del módulo.";
+  }
+  // Áreas más fuertes y más débiles (promedio por sección), para que el
+  // resumen cambie con cada respuesta y no solo con el promedio general.
+  function areasSentence(ans) {
+    var secs = TEMPLATE.sections.map(function (s) { return { area: s.area, avg: avgOf(s.items, ans) }; });
+    var hi = Math.max.apply(null, secs.map(function (s) { return s.avg; }));
+    var lo = Math.min.apply(null, secs.map(function (s) { return s.avg; }));
+    if (hi - lo < 0.25) return "Mantiene un nivel parejo en todas las áreas evaluadas.";
+    var best = secs.filter(function (s) { return s.avg === hi; }).map(function (s) { return s.area; });
+    var worst = secs.filter(function (s) { return s.avg === lo; }).map(function (s) { return s.area; });
+    var b = (best.length > 1 ? "Sus mayores fortalezas están en " : "Su mayor fortaleza está en ") + joinY(best);
+    var w = worst.length > 1 ? "las áreas que más requieren refuerzo son " + joinY(worst) : "el área que más requiere refuerzo es " + worst[0];
+    if (hi < 2.75) return cap(w) + ".";
+    if (lo >= 3) return b + "; aun así, " + (worst.length > 1 ? "puede seguir fortaleciendo " : "puede seguir fortaleciendo ") + joinY(worst) + ".";
+    return b + ", y " + w + ".";
+  }
+  // Habilidades en Destacado: si son muchas, solo cuántas.
+  function topSentence(ans) {
+    var top = ALL.filter(function (id) { return ans[id] === 4; });
+    if (!top.length || top.length === ALL.length) return "";
+    if (top.length > 3) return "Alcanzó el nivel Destacado en " + top.length + " de las " + ALL.length + " habilidades evaluadas.";
+    return "Alcanzó el nivel Destacado en " + joinY(top.map(function (id) { return SKILLS[id].n.replace(/^(la|el|las) /, ""); })) + ".";
   }
   var R_GENERIC = [
     "mantener la práctica diaria fuera de clase",
@@ -193,8 +216,8 @@
   ];
 
   function recomText(ans, v) {
-    var avg = ALL.reduce(function (s, id) { return s + ans[id]; }, 0) / ALL.length;
-    var out = [fill(R_OPEN[band(avg)], { n: v.n, lv: v.lv })];
+    var open = fill(R_OPEN[band(avgOf(ALL, ans))], { lv: v.lv });
+    var out = [v.n ? v.n + ", usted " + open : cap("usted " + open), areasSentence(ans), topSentence(ans)].filter(Boolean);
     var ex = examSentence(v.pct);
     if (ex) out.push(ex);
     var order = function (list) { return list.slice().sort(function (x, y) { return ans[x] - ans[y] || ALL.indexOf(x) - ALL.indexOf(y); }); };
