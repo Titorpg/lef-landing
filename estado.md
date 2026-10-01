@@ -240,10 +240,10 @@ cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso.
   antes/después para aprobar, SQL que pega el usuario).
 
 ### Pendiente del usuario (probar / subir)
-- **Subir el taller de A1.1 semana 1** en Recursos compartidos → Talleres → A1 → A1.1 →
-  Taller semana 1 → "Crear taller" con su HTML (debe salir "Taller interactivo"). Hasta
-  entonces el estudiante ve "Próximamente" (el SQL de talleres ya está aplicado).
-  → Cuando confirme que lo ve un estudiante con A1.1 pagado: **borrar la versión vieja**
+- ✅ Materiales cargados (verificado en BD el 1 oct 2026): A1.1 → B2.3 (12 módulos) tienen los
+  5 talleres (semana 1–4 + repaso "Module review: …") y 10 ejercicios por habilidad (3 vocabulario,
+  3 gramática, 2 listening, 2 reading). C1.1–C1.3: sin talleres ni ejercicios todavía.
+  → Cuando el usuario confirme que lo ve un estudiante con A1.1 pagado: **borrar la versión vieja**
   (`npx supabase functions delete student-taller --project-ref cemrxcatbxbcipxmsnjf`,
   carpeta `supabase/functions/student-taller`, su bloque en `supabase/config.toml`, y en
   lef-portal.js `RS_TALLER_READY`, `rsTallerOpen` y la rama `legacy` de `rsTalleres`).
