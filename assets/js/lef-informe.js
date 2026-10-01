@@ -406,5 +406,153 @@
     return root;
   }
 
-  window.LEFInforme = { TEMPLATE: TEMPLATE, SKILLS: SKILLS, LEVELS: LEVELS, ALL: ALL, generate: generate, render: render, complete: complete };
+  /* ---------------- PDF (1 oct 2026) ----------------
+     Misma hoja en PDF (jsPDF, como el examen): va adjunto al correo del
+     estudiante y se descarga desde su novedad del Inicio.
+       LEFInforme.pdf(d, { base64: true }) → Promise(base64) · sin opción: descarga
+       d: { student, level, cycle, teacher, date, answers, texts, pct, note } */
+  var JSPDF = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+  function loadJsPdf() {
+    if (window.jspdf) return Promise.resolve(window.jspdf.jsPDF);
+    return new Promise(function (ok, bad) {
+      var s = document.createElement("script");
+      s.src = JSPDF; s.onload = function () { ok(window.jspdf.jsPDF); };
+      s.onerror = function () { bad(new Error("No se pudo preparar el PDF. Revisa tu conexión e intenta de nuevo.")); };
+      document.head.appendChild(s);
+    });
+  }
+  function logoData() {
+    return fetch("assets/logo-horizontal.png").then(function (r) { return r.blob(); }).then(function (b) {
+      return new Promise(function (ok) { var fr = new FileReader(); fr.onload = function () { ok(fr.result); }; fr.readAsDataURL(b); });
+    }).catch(function () { return null; });
+  }
+  // Las fuentes estándar del PDF solo traen Latin-1.
+  function pl(s) {
+    return String(s == null ? "" : s).replace(/[—–]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/→/g, "->").replace(/…/g, "...").replace(/[^\x00-\xFF]/g, "");
+  }
+  var LV_RGB = { 1: [180, 83, 58], 2: [178, 106, 0], 3: [31, 122, 90], 4: [46, 78, 158] };
+
+  function pdf(d, opt) {
+    opt = opt || {};
+    return Promise.all([loadJsPdf(), logoData()]).then(function (res) {
+      var JsPDF = res[0], logo = res[1];
+      var doc = new JsPDF({ unit: "pt", format: "a4" });
+      var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 42, y = M, CW = W - 2 * M;
+      var ans = d.answers || {}, texts = d.texts || {};
+      function need(hh) { if (y + hh > H - M - 18) { doc.addPage(); y = M; } }
+      function font(size, style, rgb) { doc.setFont("helvetica", style || "normal"); doc.setFontSize(size); doc.setTextColor.apply(doc, rgb || [16, 16, 16]); }
+      function lines(str, size, w) { font(size); return doc.splitTextToSize(pl(str), w); }
+
+      // Encabezado
+      if (logo) { try { doc.addImage(logo, "PNG", M, y, 118, 118 * 157 / 697, "logo", "FAST"); } catch (e) { /* sin logo */ } }
+      font(15, "bold"); doc.text(pl("INFORME DE PROGRESO ACADÉMICO"), M + 134, y + 13);
+      font(9, "normal", [110, 110, 110]); doc.text(pl("Learn English Fluently · @lefcenter"), M + 134, y + 27);
+      y += 40;
+      doc.setDrawColor(16, 16, 16); doc.setLineWidth(1.4); doc.line(M, y, W - M, y);
+      y += 16;
+      // Datos
+      [["Estudiante", d.student, "Nivel", d.level], ["Ciclo", d.cycle, "Docente", d.teacher]].forEach(function (row) {
+        [0, 2].forEach(function (k, i) {
+          var x = M + i * (CW / 2 + 8);
+          font(7.5, "bold", [140, 140, 140]); doc.text(pl(row[k]).toUpperCase(), x, y);
+          font(10.5, "normal"); doc.text(pl(row[k + 1] || "-"), x, y + 13);
+          doc.setDrawColor(231, 231, 228); doc.setLineWidth(0.6); doc.line(x, y + 19, x + CW / 2 - 8, y + 19);
+        });
+        y += 30;
+      });
+      y += 4;
+
+      function obsBox(label, txt) {
+        var ls = lines(txt || "-", 9.5, CW - 24), hh = 26 + ls.length * 12.6 + 6;
+        need(Math.min(hh, 120));
+        if (y + hh > H - M - 18) { // muy largo: lo parte en dos páginas
+          var fit = Math.max(1, Math.floor((H - M - 18 - y - 32) / 12.6));
+          var first = ls.slice(0, fit), rest = ls.slice(fit);
+          drawBox(label, first);
+          doc.addPage(); y = M;
+          drawBox(label + " (continuación)", rest);
+        } else drawBox(label, ls);
+      }
+      function drawBox(label, ls) {
+        var hh = 26 + ls.length * 12.6 + 6;
+        doc.setFillColor(247, 247, 245); doc.roundedRect(M, y, CW, hh, 8, 8, "F");
+        font(9, "bold", [38, 38, 38]); doc.text(pl(label), M + 12, y + 16);
+        font(9.5, "normal");
+        ls.forEach(function (ln, i) { doc.text(ln, M + 12, y + 32 + i * 12.6); });
+        y += hh + 8;
+      }
+      function secHead(n, title) {
+        need(70);
+        doc.setFillColor(16, 16, 16); doc.roundedRect(M, y, CW, 22, 6, 6, "F");
+        doc.setFillColor(255, 255, 255); doc.circle(M + 14, y + 11, 7.5, "F");
+        font(8.5, "bold"); doc.text(String(n), M + 14, y + 14, { align: "center" });
+        font(10, "bold", [255, 255, 255]); doc.text(pl(title), M + 28, y + 15);
+        y += 30;
+      }
+      var colW = 62, colX = W - M - 4 * colW;
+      TEMPLATE.sections.forEach(function (sec) {
+        secHead(sec.n, sec.title);
+        font(7, "bold", [140, 140, 140]);
+        doc.text("HABILIDAD", M + 6, y);
+        LEVELS.forEach(function (l, i) { doc.text(pl(l.t).toUpperCase(), colX + i * colW + colW / 2, y, { align: "center" }); });
+        y += 8;
+        sec.items.forEach(function (id) {
+          var sk = SKILLS[id];
+          need(30);
+          font(9.5, "bold"); doc.text(pl(sk.t), M + 6, y + 11);
+          font(8, "normal", [110, 110, 110]); doc.text(pl(sk.d), M + 6, y + 22);
+          LEVELS.forEach(function (l, i) {
+            var cx = colX + i * colW + colW / 2 - 6, cy = y + 8, on = ans[id] === l.v;
+            if (on) {
+              var c = LV_RGB[l.v];
+              doc.setFillColor(c[0], c[1], c[2]); doc.roundedRect(cx, cy, 12, 12, 2.5, 2.5, "F");
+              doc.setDrawColor(255, 255, 255); doc.setLineWidth(1.6);
+              doc.line(cx + 3, cy + 6.3, cx + 5.3, cy + 8.8); doc.line(cx + 5.3, cy + 8.8, cx + 9.3, cy + 3.6);
+            } else {
+              doc.setDrawColor(190, 190, 186); doc.setLineWidth(0.9); doc.roundedRect(cx, cy, 12, 12, 2.5, 2.5, "S");
+            }
+          });
+          y += 30;
+          doc.setDrawColor(236, 236, 234); doc.setLineWidth(0.6); doc.line(M, y - 2, W - M, y - 2);
+        });
+        y += 6;
+        if (sec.obs) obsBox("Observación del docente", texts[sec.id]);
+        y += 4;
+      });
+      secHead(5, "Recomendaciones para el Siguiente Ciclo");
+      obsBox("Observaciones y metas sugeridas", texts.recom);
+
+      // Resultado
+      need(70);
+      doc.setFillColor(245, 247, 251); doc.roundedRect(M, y, CW, 62, 8, 8, "F");
+      font(7.5, "bold", [140, 140, 140]); doc.text(pl("RESULTADO · VALIDACIÓN FORMATIVA"), M + 14, y + 16);
+      font(24, "bold"); doc.text(d.pct == null ? "- %" : d.pct + " %", M + 14, y + 44);
+      var dl = lines("Este resultado es una herramienta diagnóstica que orienta el proceso de aprendizaje. No es un juicio de valor sobre el estudiante.", 8.5, CW - 200);
+      font(8.5, "italic", [110, 110, 110]);
+      dl.forEach(function (ln, i) { doc.text(ln, M + 180, y + 26 + i * 11); });
+      y += 72;
+      if (d.note) obsBox("Comentario del docente", d.note);
+
+      // Firma: espacio libre sobre la línea para firmar a mano
+      need(110);
+      y += 70;
+      doc.setDrawColor(16, 16, 16); doc.setLineWidth(1);
+      doc.line(M, y, M + CW / 2 - 14, y); doc.line(M + CW / 2 + 14, y, W - M, y);
+      font(10, "normal"); doc.text(pl(d.teacher || ""), M, y + 14); doc.text(pl(d.date || ""), M + CW / 2 + 14, y + 14);
+      font(7.5, "bold", [140, 140, 140]); doc.text(pl("FIRMA DEL DOCENTE"), M, y + 26); doc.text(pl("FECHA DE EMISIÓN"), M + CW / 2 + 14, y + 26);
+
+      var pages = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= pages; p++) {
+        doc.setPage(p); font(8, "normal", [140, 140, 140]);
+        doc.text(pl("LEF Center · Learn English Fluently · @lefcenter · Barranquilla, Colombia"), M, H - 22);
+        doc.text("Página " + p + " de " + pages, W - M, H - 22, { align: "right" });
+      }
+      if (opt.base64) return doc.output("datauristring").split(",")[1];
+      var safe = function (s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9.]+/g, "-").replace(/^-+|-+$/g, ""); };
+      doc.save("Informe-de-progreso-" + safe(d.level) + "-" + safe(d.student) + ".pdf");
+    });
+  }
+
+  window.LEFInforme = { TEMPLATE: TEMPLATE, SKILLS: SKILLS, LEVELS: LEVELS, ALL: ALL, generate: generate, render: render, complete: complete, pdf: pdf };
 })();

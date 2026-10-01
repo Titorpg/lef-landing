@@ -39,3 +39,6 @@ verify_jwt = true
 
 [functions.notify-exam-result]
 verify_jwt = true
+
+[functions.notify-progress-report]
+verify_jwt = true

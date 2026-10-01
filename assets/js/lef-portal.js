@@ -353,7 +353,7 @@
             '<div class="news-card__body">' +
             '<div class="news-card__meta"><span class="news-cat ' + cat.cls + '">' + esc(cat.label) + "</span>" +
             (n.pinned ? '<span class="news-pin">📌 Fijado</span>' : "") +
-            (n.kind === "exam_result" ? '<span class="news-mine">Solo para ti</span>' : "") +
+            (n.kind === "exam_result" || n.kind === "progress_report" ? '<span class="news-mine">Solo para ti</span>' : "") +
             (isNew ? '<span class="news-new">Nuevo</span>' : "") +
             (n.module_level ? '<span class="news-mod">Módulo ' + esc(n.module_level) + "</span>" : "") + "</div>" +
             "<h3>" + esc(n.title) + "</h3>" +
@@ -381,8 +381,11 @@
     });
   }
 
-  // Imagen de la novedad; la del resultado del examen siempre lleva la de examen.
-  function newsImg(n) { return safeUrl(n.image_url) || (n.kind === "exam_result" ? "assets/inicio/noticia-examen-resultado.jpg" : ""); }
+  // Imagen de la novedad; la del resultado del examen y la del informe de progreso siempre llevan la suya.
+  function newsImg(n) {
+    return safeUrl(n.image_url) || (n.kind === "exam_result" ? "assets/inicio/noticia-examen-resultado.jpg"
+      : n.kind === "progress_report" ? "assets/inicio/noticia-informe-progreso.jpg" : "");
+  }
 
   // Novedad completa en un recuadro (el tablón solo muestra el resumen).
   function openNews(n) {
@@ -400,6 +403,7 @@
       '<div class="news-modal__body">' + esc(n.body || "") + "</div>" +
       (link ? '<a class="btn btn-blue btn-sm" style="margin-top:14px" target="_blank" rel="noopener" href="' + esc(link) + '">' + esc(n.link_label || "Ver más") + "</a>" : "") +
       (n.kind === "exam_result" && n.ref_id ? '<button type="button" class="btn btn-blue btn-sm" style="margin-top:14px" data-exam-detail>Ver detalle</button>' : "") +
+      (n.kind === "progress_report" && n.ref_id ? '<button type="button" class="btn btn-blue btn-sm" style="margin-top:14px" data-report-pdf>Descargar mi informe (PDF)</button>' : "") +
       "</div>"
     );
     bg.appendChild(box);
@@ -409,6 +413,30 @@
     box.querySelector("[data-close]").addEventListener("click", close);
     var det = box.querySelector("[data-exam-detail]");
     if (det) det.addEventListener("click", function () { close(); openExamResult(n.ref_id); });
+    var rp = box.querySelector("[data-report-pdf]");
+    if (rp) rp.addEventListener("click", function () {
+      rp.disabled = true; rp.textContent = "Preparando tu PDF…";
+      downloadProgressReport(n.ref_id).catch(function (e) { alertBox(box, (e && e.message) || "No se pudo descargar tu informe."); })
+        .then(function () { rp.disabled = false; rp.textContent = "Descargar mi informe (PDF)"; });
+    });
+  }
+
+  // Informe de progreso (1 oct 2026): lo envía el profesor al terminar el módulo;
+  // se descarga en PDF con la misma hoja que llenó (lef-informe.js).
+  function downloadProgressReport(id) {
+    return sb.rpc("get_my_progress_report", { p_report: id }).then(function (r) {
+      if (r.error) throw r.error;
+      var d = r.data;
+      if (!d) throw new Error("Tu informe ya no está disponible.");
+      var f = function (x) { return new Date(x + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", ""); };
+      var cycle = d.cycle_start ? "Ciclo " + f(d.cycle_start) + " – " + f(d.cycle_end) + " " + String(d.cycle_end).slice(0, 4) : (d.cycle_name || "");
+      return window.LEFInforme.pdf({ student: d.student_name, level: d.module_level, cycle: cycle, teacher: d.teacher_name || "",
+        date: date(d.sent_at), answers: d.answers, texts: d.texts, pct: d.exam_pct == null ? null : Number(d.exam_pct), note: d.teacher_note });
+    });
+  }
+  function alertBox(box, msg) {
+    var a = box.querySelector(".pnl-alert") || box.appendChild(h('<div class="pnl-alert err" style="margin-top:12px"></div>'));
+    a.textContent = msg;
   }
 
   /* ---------- Facturación ---------- */

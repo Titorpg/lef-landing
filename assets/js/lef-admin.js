@@ -3386,14 +3386,14 @@
   function rcInforme(main, S) {
     if (S.ro) { ipTeacherGroups(main, S); return; }
     var body = rcPage(main, rcHome(main, S), "Informe de progreso",
-      "Un informe por estudiante al terminar el módulo. El profesor solo marca las opciones y la plataforma redacta las observaciones. Por ahora lo ven solo el admin y los profesores.");
+      "Un informe por estudiante al terminar el módulo. El profesor solo marca las opciones y la plataforma redacta las observaciones. Cuando el profesor lo envía, el estudiante lo recibe en PDF por correo y en su Inicio.");
     body.innerHTML = '<p class="muted">Cargando…</p>';
-    q("progress_reports").select("id,module_level,student_name,teacher_name,group_label,cycle_name,cycle_start,cycle_end,updated_at")
+    q("progress_reports").select("id,module_level,student_name,teacher_name,group_label,cycle_name,cycle_start,cycle_end,updated_at,sent_at,emailed_at")
       .order("updated_at", { ascending: false }).then(function (r) {
         body.innerHTML = "";
         var grid = h('<div class="rs-grid"></div>');
-        grid.appendChild(rcCard({ tone: "rose", icon: "report", title: "Plantilla del informe", sub: "El formulario que llenan los profesores · versión de prueba",
-          chip: ["warn", "En prueba"], onOpen: function () { ipTemplate(main, S); } }));
+        grid.appendChild(rcCard({ tone: "rose", icon: "report", title: "Plantilla del informe", sub: "El formulario que llenan los profesores",
+          onOpen: function () { ipTemplate(main, S); } }));
         if (!r.error) {
           var rows = r.data || [];
           grid.appendChild(rcCard({ tone: "ink", icon: "folder", title: "Informes guardados", sub: "Por ciclo y grupo, de todos los profesores",
@@ -3422,6 +3422,51 @@
   }
   function ipSeeds(texts) { try { return texts && texts.seeds ? JSON.parse(texts.seeds) : {}; } catch (e) { return {}; } }
 
+  /* ---- Envío al estudiante (1 oct 2026) ----
+     Con todos los informes del grupo guardados, el profesor los envía:
+     teacher_send_progress_reports crea la novedad del Inicio de cada estudiante
+     y bloquea el informe; luego aquí se arma el PDF de cada uno y se manda a
+     notify-progress-report, que lo adjunta al correo. Si un correo falla, el
+     informe queda "Enviado" con "Correo pendiente" y se reintenta con un botón. */
+  var IP_REP_COLS = "id,student_id,group_id,updated_at,sent_at,emailed_at";
+  function ipPdfData(x) {
+    return { student: x.student_name, level: x.module_level, cycle: exCycleLabel(x), teacher: x.teacher_name || "",
+      date: date(x.sent_at || x.updated_at), answers: x.answers, texts: x.texts,
+      pct: x.exam_pct == null ? null : Number(x.exam_pct), note: x.teacher_note };
+  }
+  function ipEmail(id) {
+    return q("progress_reports").select("*").eq("id", id).maybeSingle().then(function (r) {
+      if (r.error || !r.data) throw new Error("No se encontró el informe.");
+      return LEFInforme.pdf(ipPdfData(r.data), { base64: true });
+    }).then(function (b64) {
+      return sb.auth.getSession().then(function (s) {
+        var tok = s.data && s.data.session ? s.data.session.access_token : "";
+        return fetch(window.LEF_SUPABASE.url + "/functions/v1/notify-progress-report", {
+          method: "POST", headers: { "Authorization": "Bearer " + tok, "Content-Type": "application/json" },
+          body: JSON.stringify({ report_id: id, pdf: b64 })
+        });
+      });
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        if (res.ok && (j.sent || j.skipped === "ya_avisado")) return "ok";
+        return j.skipped === "sin_correo" ? "sin_correo" : "error";
+      });
+    }).catch(function () { return "error"; });
+  }
+  // Correos uno por uno (con progreso); devuelve cuántos salieron y cuáles no.
+  function ipEmailAll(ids, onStep) {
+    var out = { ok: 0, noMail: 0, failed: 0 }, i = 0;
+    function next() {
+      if (i >= ids.length) return Promise.resolve(out);
+      onStep(i + 1, ids.length);
+      return ipEmail(ids[i++]).then(function (st) {
+        if (st === "ok") out.ok++; else if (st === "sin_correo") out.noMail++; else out.failed++;
+        return next();
+      });
+    }
+    return next();
+  }
+
   function ipTemplate(main, S) {
     var body = rcPage(main, ipCrumbs(main, S), "Plantilla del informe",
       "Así lo ve el profesor. Marca opciones para probar cómo se redacta el texto; aquí no se guarda nada. Los materiales sugeridos son los que hay cargados para A1.1.");
@@ -3444,10 +3489,15 @@
     });
   }
 
+  function ipStatus(r) {
+    if (!r.sent_at) return "Guardado el " + esc(date(r.updated_at)) + " · sin enviar";
+    return "Enviado el " + esc(date(r.sent_at)) + (r.emailed_at ? "" : " · correo pendiente");
+  }
+
   function ipAdminList(main, S, rows) {
     var crumbs = ipCrumbs(main, S);
     var here = crumbs.concat([["Informes guardados", function () { ipAdminList(main, S, rows); }]]);
-    var body = rcPage(main, crumbs, "Informes guardados", "Los informes de progreso que han guardado los profesores, por ciclo y grupo.");
+    var body = rcPage(main, crumbs, "Informes guardados", "Los informes de progreso de todos los profesores, por ciclo y grupo.");
     if (!rows.length) { body.appendChild(h('<div class="pnl-alert ok">Todavía ningún profesor ha guardado un informe de progreso.</div>')); return; }
     var byCycle = {}, order = [];
     rows.slice().sort(function (a, b) {
@@ -3466,7 +3516,9 @@
         var list = h('<div class="rs-files"></div>');
         byCycle[k][g].forEach(function (r) {
           var row = h('<div class="rs-file is-rose"><span class="rs-file__ic">' + rcIc("report") + '</span><span class="rs-file__t">' + esc(r.student_name) +
-            "<small>" + esc(r.module_level) + " · Guardado el " + esc(date(r.updated_at)) + '</small></span><span class="rc-ws__acts"></span></div>');
+            "<small>" + esc(r.module_level) + " · " + ipStatus(r) + "</small></span>" +
+            (r.sent_at ? '<span class="rs-chip is-ok">Enviado</span>' : '<span class="rs-chip is-soon">Sin enviar</span>') +
+            '<span class="rc-ws__acts"></span></div>');
           row.querySelector(".rc-ws__acts").appendChild(rcBtn("Ver informe", "read", "btn-dark", function () { ipView(main, here, r.id); }));
           list.appendChild(row);
         });
@@ -3475,29 +3527,56 @@
     });
   }
 
-  // Informe guardado, solo para leer (admin).
-  function ipView(main, crumbs, id) {
+  // Informe solo para leer: admin (con Desbloquear) o profesor ya enviado.
+  function ipView(main, crumbs, id, onBack) {
     var body = rcPage(main, crumbs, "Informe de progreso");
     body.innerHTML = '<p class="muted">Cargando…</p>';
     q("progress_reports").select("*").eq("id", id).maybeSingle().then(function (r) {
       body.innerHTML = "";
       if (r.error || !r.data) { body.appendChild(h('<div class="pnl-alert err">No se encontró el informe.</div>')); return; }
-      var x = r.data;
+      var x = r.data, isAdmin = ME.role === "admin";
       main.querySelector(".pnl-h").textContent = x.student_name;
+      if (x.sent_at) body.appendChild(h('<div class="pnl-alert ok" style="margin-bottom:14px">Enviado al estudiante el ' + esc(date(x.sent_at)) +
+        (x.emailed_at ? " (en su Inicio y por correo con el PDF)." : ". Está en su Inicio, pero el correo con el PDF todavía no salió.") +
+        (isAdmin ? "" : " Ya no se puede editar; si hay que corregirlo, pídele al admin que lo desbloquee.") + "</div>"));
       body.appendChild(LEFInforme.render({
         editable: false, answers: x.answers, texts: x.texts, pct: x.exam_pct == null ? null : Number(x.exam_pct),
         examNote: ipExamNote(x.exam_state, false), note: x.teacher_note,
-        meta: { student: x.student_name, level: x.module_level, cycle: exCycleLabel(x), teacher: x.teacher_name, date: date(x.updated_at) }
+        meta: { student: x.student_name, level: x.module_level, cycle: exCycleLabel(x), teacher: x.teacher_name, date: date(x.sent_at || x.updated_at) }
       }));
+      var bar = ipBar(x.sent_at ? "" : "Todavía no se ha enviado al estudiante.");
+      var dl = rcBtn("Descargar PDF", "read", "btn-ghost", function () {
+        dl.disabled = true;
+        LEFInforme.pdf(ipPdfData(x)).catch(function (e) { toast(friendly(e), "err"); }).then(function () { dl.disabled = false; });
+      });
+      bar.appendChild(dl);
+      if (x.sent_at && !x.emailed_at) bar.appendChild(rcBtn("Reenviar correo", "arrow", "btn-ghost", function () {
+        toast("Enviando el correo…");
+        ipEmail(x.id).then(function (st) {
+          toast(st === "ok" ? "Correo enviado con el PDF." : st === "sin_correo" ? "El estudiante no tiene correo registrado." : "No se pudo enviar el correo. Intenta más tarde.", st === "ok" ? "ok" : "err");
+          ipView(main, crumbs, id, onBack);
+        });
+      }));
+      if (isAdmin && x.sent_at) bar.appendChild(rcBtn("Desbloquear para corregir", "edit", "btn-dark", function () {
+        promptReason("Desbloquear el informe de " + x.student_name,
+          "Se quitará la novedad del Inicio del estudiante y el profesor podrá corregir el informe y volver a enviarlo. El correo que ya le llegó no se puede borrar.",
+          "Desbloquear", function (reason) {
+            return rpc("admin_unlock_progress_report", { p_report: x.id, p_reason: reason }).then(function () {
+              toast("Informe desbloqueado: el profesor ya lo puede corregir y volver a enviar.");
+              ipView(main, crumbs, id, onBack);
+            });
+          });
+      }));
+      body.appendChild(bar);
     });
   }
 
   // Profesor: buscador de sus grupos activos.
   function ipTeacherGroups(main, S) {
-    var body = rcPage(main, rcHome(main, S), "Informe de progreso", "Elige uno de tus grupos activos y luego el estudiante. Solo marcas las opciones; la plataforma redacta las observaciones.");
+    var body = rcPage(main, rcHome(main, S), "Informe de progreso", "Elige uno de tus grupos activos y luego el estudiante. Solo marcas las opciones; la plataforma redacta las observaciones. Cuando tengas todos los del grupo, los envías: a cada estudiante le llega en PDF por correo y en su Inicio.");
     if (!ME.teacher_id) { body.appendChild(h('<div class="pnl-alert err">Tu cuenta no está vinculada a un profesor todavía — pide al admin que la revise en Usuarios.</div>')); return; }
     body.innerHTML = '<p class="muted">Cargando…</p>';
-    Promise.all([loadMyGroups(), q("progress_reports").select("id,student_id,group_id,updated_at").eq("teacher_id", ME.teacher_id)]).then(function (res) {
+    Promise.all([loadMyGroups(), q("progress_reports").select(IP_REP_COLS).eq("teacher_id", ME.teacher_id)]).then(function (res) {
       body.innerHTML = "";
       S.tg = res[0];
       if (res[1].error) { body.appendChild(h('<div class="pnl-alert warn">El informe de progreso todavía no está disponible.</div>')); return; }
@@ -3507,12 +3586,13 @@
       var search = h('<label class="ip-search">' + rcIc("search") + '<input type="search" placeholder="Buscar grupo (módulo, día u hora)" aria-label="Buscar grupo"></label>');
       var grid = h('<div class="rs-grid"></div>');
       var cards = groups.map(function (g) {
-        var n = S.tg.enrollments.filter(function (e) { return e.group_id === g.id; }).length;
-        var done = S.ipRows.filter(function (x) { return x.group_id === g.id; }).length;
+        var ids = S.tg.enrollments.filter(function (e) { return e.group_id === g.id; }).map(function (e) { return e.student_id; });
+        var mine = S.ipRows.filter(function (x) { return x.group_id === g.id && ids.indexOf(x.student_id) >= 0; });
+        var n = ids.length, done = mine.length, sent = mine.filter(function (x) { return x.sent_at; }).length;
+        var chip = n && sent >= n ? ["ok", "Enviados"] : n && done >= n ? ["warn", "Listos para enviar"] : [done ? "warn" : "soon", done + " de " + n + " informes"];
         var c = rcCard({ tone: "lvl", badge: g.modules ? g.modules.level : "", title: exGroupLabel(g),
           sub: (g.modules ? g.modules.title + " · " : "") + rcCount(n, "estudiante", "estudiantes"),
-          chip: n && done >= n ? ["ok", "Informes completos"] : [done ? "warn" : "soon", done + " de " + n + " informes"],
-          onOpen: function () { ipTeacherGroup(main, S, g); } });
+          chip: chip, onOpen: function () { ipTeacherGroup(main, S, g); } });
         c.dataset.q = (exGroupLabel(g) + " " + (g.modules ? g.modules.title : "") + " " + ipGroupCycle(g)).toLowerCase();
         grid.appendChild(c);
         return c;
@@ -3529,22 +3609,76 @@
     }).catch(function (e) { body.innerHTML = '<div class="pnl-alert err">' + esc(friendly(e)) + "</div>"; });
   }
 
+  function ipReloadRows(S) {
+    return q("progress_reports").select(IP_REP_COLS).eq("teacher_id", ME.teacher_id).then(function (r) { if (!r.error) S.ipRows = r.data || []; });
+  }
+
   function ipTeacherGroup(main, S, g) {
     var crumbs = ipCrumbs(main, S);
+    var here = crumbs.concat([[exGroupLabel(g), function () { ipTeacherGroup(main, S, g); }]]);
     var body = rcPage(main, crumbs, exGroupLabel(g), (g.modules ? g.modules.level + " — " + g.modules.title + " · " : "") + ipGroupCycle(g));
     var enr = S.tg.enrollments.filter(function (e) { return e.group_id === g.id; })
       .sort(function (a, b) { return String(a.students ? a.students.full_name : "").localeCompare(String(b.students ? b.students.full_name : ""), "es"); });
     if (!enr.length) { body.appendChild(h('<div class="pnl-alert ok">Este grupo no tiene estudiantes.</div>')); return; }
+    var reps = enr.map(function (e) { return S.ipRows.filter(function (x) { return x.group_id === g.id && x.student_id === e.student_id; })[0]; });
+    var missing = reps.filter(function (r) { return !r; }).length;
+    var unsent = reps.filter(function (r) { return r && !r.sent_at; }).length;
+    var noMail = reps.filter(function (r) { return r && r.sent_at && !r.emailed_at; });
+
+    // Panel de envío (arriba de la lista)
+    var panel = h('<div class="ip-send"></div>');
+    if (missing) {
+      panel.appendChild(h('<p><strong>Faltan ' + missing + (missing === 1 ? " informe" : " informes") + " por llenar.</strong> Cuando tengas el de todos los estudiantes del grupo podrás enviarlos.</p>"));
+    } else if (unsent) {
+      panel.appendChild(h("<p><strong>" + (unsent === enr.length ? "Todos los informes están listos." : unsent === 1 ? "Hay 1 informe listo para enviar." : "Hay " + unsent + " informes listos para enviar.") + "</strong> " +
+        "Al enviarlos, a cada estudiante le llega su informe en PDF por correo y le aparece en su Inicio. Después ya no se pueden editar.</p>"));
+      var send = rcBtn(unsent === 1 ? "Enviar el informe" : "Enviar los " + unsent + " informes", "arrow", "btn-dark", function () {
+        modal("Enviar informes de progreso",
+          h('<p class="pnl-sub" style="margin:0">Se enviará' + (unsent === 1 ? " 1 informe" : "n " + unsent + " informes") + " del grupo " + esc(exGroupLabel(g)) +
+            ". Cada estudiante lo recibirá en PDF por correo y en su Inicio (hasta que termine el ciclo). Después ya no podrás editarlos.</p>"),
+          function () {
+            return rpc("teacher_send_progress_reports", { p_group: g.id }).then(function (ids) {
+              ids = (ids || []).map(function (x) { return typeof x === "string" ? x : x.teacher_send_progress_reports; });
+              var prog = h('<div class="pnl-alert ok" style="margin-bottom:14px">Preparando los correos…</div>');
+              body.insertBefore(prog, body.firstChild);
+              return ipEmailAll(ids, function (i, n) { prog.textContent = "Enviando correos con el PDF… " + i + " de " + n; }).then(function (o) {
+                toast(o.failed || o.noMail
+                  ? "Informes enviados a su Inicio. Correos: " + o.ok + " enviados" + (o.failed ? ", " + o.failed + " con error (usa Reenviar correo)" : "") + (o.noMail ? ", " + o.noMail + " sin correo registrado" : "") + "."
+                  : "Listo: los " + ids.length + " informes están en el Inicio de cada estudiante y les llegó el correo con el PDF.", o.failed ? "err" : "ok");
+                return ipReloadRows(S).then(function () { ipTeacherGroup(main, S, g); });
+              });
+            });
+          }, "Enviar");
+      });
+      panel.appendChild(send);
+    } else {
+      panel.appendChild(h('<p><strong>Informes enviados.</strong> Todos los estudiantes del grupo ya tienen su informe en su Inicio' + (noMail.length ? "" : " y en su correo") + ".</p>"));
+    }
+    if (noMail.length) {
+      panel.appendChild(h('<p class="ip-send__warn">' + (noMail.length === 1 ? "A 1 estudiante" : "A " + noMail.length + " estudiantes") + " no les llegó el correo con el PDF.</p>"));
+      panel.appendChild(rcBtn("Reenviar correos pendientes", "arrow", "btn-ghost", function () {
+        var prog = h('<div class="pnl-alert ok" style="margin-bottom:14px">Preparando los correos…</div>');
+        body.insertBefore(prog, body.firstChild);
+        ipEmailAll(noMail.map(function (r) { return r.id; }), function (i, n) { prog.textContent = "Enviando correos con el PDF… " + i + " de " + n; }).then(function (o) {
+          toast("Correos enviados: " + o.ok + (o.failed ? " · con error: " + o.failed : "") + (o.noMail ? " · sin correo registrado: " + o.noMail : "") + ".", o.failed ? "err" : "ok");
+          return ipReloadRows(S).then(function () { ipTeacherGroup(main, S, g); });
+        });
+      }));
+    }
+    body.appendChild(panel);
+
     var list = h('<div class="rs-files"></div>');
-    enr.forEach(function (e) {
+    enr.forEach(function (e, i) {
       var st = { id: e.student_id, name: e.students ? e.students.full_name : "Estudiante" };
-      var rep = S.ipRows.filter(function (x) { return x.group_id === g.id && x.student_id === st.id; })[0];
+      var rep = reps[i];
       var row = h('<div class="rs-file is-rose"><span class="rs-file__ic">' + rcIc("report") + '</span><span class="rs-file__t">' + esc(st.name) +
-        "<small>" + (rep ? "Informe guardado el " + esc(date(rep.updated_at)) : "Sin informe") + "</small></span>" +
-        (rep ? '<span class="rs-chip is-ok">Guardado</span>' : "") + '<span class="rc-ws__acts"></span></div>');
-      row.querySelector(".rc-ws__acts").appendChild(rep
-        ? rcBtn("Ver o editar informe", "edit", "btn-ghost", function () { ipForm(main, S, g, st); })
-        : rcBtn("Rellenar informe de progreso", "report", "btn-dark", function () { ipForm(main, S, g, st); }));
+        "<small>" + (rep ? ipStatus(rep) : "Sin informe") + "</small></span>" +
+        (rep ? (rep.sent_at ? '<span class="rs-chip is-ok">Enviado</span>' : '<span class="rs-chip is-warn">Guardado</span>') : "") +
+        '<span class="rc-ws__acts"></span></div>');
+      row.querySelector(".rc-ws__acts").appendChild(
+        rep && rep.sent_at ? rcBtn("Ver informe", "read", "btn-ghost", function () { ipView(main, here, rep.id); })
+          : rep ? rcBtn("Ver o editar informe", "edit", "btn-ghost", function () { ipForm(main, S, g, st); })
+            : rcBtn("Rellenar informe de progreso", "report", "btn-dark", function () { ipForm(main, S, g, st); }));
       list.appendChild(row);
     });
     body.appendChild(list);
@@ -3557,13 +3691,14 @@
     var body = rcPage(main, crumbs, st.name, "Informe de progreso · " + (g.modules ? g.modules.level : ""));
     body.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([
-      q("progress_reports").select("answers,texts").eq("student_id", st.id).eq("group_id", g.id).maybeSingle(),
+      q("progress_reports").select("id,answers,texts,sent_at").eq("student_id", st.id).eq("group_id", g.id).maybeSingle(),
       rpc("exam_results", { p_group: g.id }).catch(function () { return []; }),
       q("teacher_student_notes").select("note").eq("teacher_id", ME.teacher_id).eq("student_id", st.id).maybeSingle(),
       ipMaterials(g.modules ? g.modules.level : "")
     ]).then(function (res) {
       body.innerHTML = "";
       var saved = res[0].data, ex = (res[1] || []).filter(function (r) { return r.student_id === st.id; })[0];
+      if (saved && saved.sent_at) { ipView(main, crumbs, saved.id); return; }
       var state = ex ? ex.state : "sin_examen";
       var pct = ex && (state === "revisado" || state === "aprobado") && Number(ex.max_score) > 0 ? Math.round(Number(ex.score) / Number(ex.max_score) * 100) : null;
       var note = res[2].data && String(res[2].data.note || "").trim() ? res[2].data.note.trim() : null;
@@ -3594,9 +3729,8 @@
         rpc("teacher_save_progress_report", { p_group: g.id, p_student: st.id, p_answers: ans,
           p_texts: Object.assign({}, texts, { seeds: JSON.stringify(seeds) }) }).then(function () {
           toast("Informe de progreso de " + st.name + " guardado.");
-          return q("progress_reports").select("id,student_id,group_id,updated_at").eq("teacher_id", ME.teacher_id);
-        }).then(function (r) {
-          S.ipRows = (r && r.data) || S.ipRows;
+          return ipReloadRows(S);
+        }).then(function () {
           ipTeacherGroup(main, S, g);
         }).catch(function (e) { save.disabled = false; toast(friendly(e), "err"); });
       });
@@ -4204,7 +4338,8 @@
     "cycle.finish": "Ciclo finalizado (estudiantes liberados; grupos, horarios y ciclo eliminados)",
     "enrollment.correct_module": "Cambio de módulo por error (sin cobro nuevo)",
     "exam_submission.delete": "Respuesta de examen de validación borrada",
-    "exam.update": "Examen de validación editado"
+    "exam.update": "Examen de validación editado",
+    "progress_report.unlock": "Informe de progreso desbloqueado para corregir"
   };
   // Motivo en lenguaje simple para acciones que hizo el sistema (no un admin escribiendo a mano);
   // sin esto, la tabla mostraba el texto técnico tal cual quedó guardado en el momento de la corrección.
@@ -4328,6 +4463,18 @@
             line("Estado de la inscripción", d.pagado ? "ya estaba pagada: sigue activa en el módulo correcto" : (d.estado === "Active" ? "activa" : "pendiente de pago")),
             line("Mensualidad", moved ? (moved === 1 ? "su mensualidad" : "sus " + moved + " mensualidades") + " (con los pagos que tuviera) pasó al módulo correcto" : "no tenía mensualidad; se creó una sola para el módulo correcto"),
             line("Grupo", grp ? "estaba en el grupo " + grp + " y quedó sin grupo (el grupo era del otro módulo)" : "no tenía grupo asignado")
+          ].join("\n")
+        ];
+      }
+      case "progress_report.unlock": {
+        return [
+          "Se DESBLOQUEÓ el informe de progreso de " + (d.student_name || who(d)) + " para que su profesor lo corrija. Se quitó la novedad del informe de su Inicio; el correo que ya le había llegado no se puede borrar. Cuando el profesor lo corrija, lo vuelve a enviar.",
+          "Datos del informe:\n" + [
+            line("Módulo", d.module_level || "—"),
+            line("Grupo", d.group_label || "—"),
+            line("Profesor", d.teacher_name || "—"),
+            line("Se había enviado el", date(d.sent_at)),
+            line("Correo con el PDF", d.emailed_at ? "le llegó el " + date(d.emailed_at) : "no le había llegado")
           ].join("\n")
         ];
       }

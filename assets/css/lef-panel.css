@@ -1610,3 +1610,8 @@ body.is-modal-open{overflow:hidden;}
   .ip-result{grid-template-columns:1fr;}
   .ip-sign{gap:14px;margin-top:96px;}
 }
+/* Panel de envío de los informes del grupo (profesor, 1 oct 2026). */
+.ip-send{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;max-width:920px;margin-bottom:16px;padding:14px 16px;background:#fff;border:1px solid var(--niebla);border-left:4px solid #b4475f;border-radius:14px;box-shadow:var(--card-shadow);}
+.ip-send p{flex:1 1 320px;font-size:14px;color:var(--grafito);}
+.ip-send p strong{color:var(--ink);font-weight:600;}
+.ip-send__warn{color:var(--bad) !important;}

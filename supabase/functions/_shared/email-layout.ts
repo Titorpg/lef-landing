@@ -303,3 +303,27 @@ export function examResultEmail(c: { name: string; module: string; examTitle: st
     `Recuerda que este examen no afecta tu nota final ni define si pasas de nivel.` + LEF_TEXT_FOOTER;
   return { subject, html, text };
 }
+
+// Informe de progreso (1 oct 2026): va adjunto en PDF y también queda en el Inicio.
+export function progressReportEmail(c: { name: string; module: string; teacher: string; until: string }, portalUrl: string) {
+  const subject = `Tu informe de progreso del módulo ${c.module}`;
+  const heading = "Tu informe de progreso está listo";
+  const hi = c.name ? `Hola, ${c.name}:` : "Hola:";
+  const who = c.teacher ? `Tu profesor(a) <strong style="color:${INK};font-weight:600">${escHtml(c.teacher)}</strong>` : "Tu profesor(a)";
+  const bodyHtml = `<p style="margin:0 0 10px;color:${INK}">${escHtml(hi)}</p>
+<p style="margin:0 0 22px">${who} completó tu informe de progreso del módulo <strong style="color:${INK};font-weight:600">${escHtml(c.module)}</strong>: cómo vas en cada habilidad, sus observaciones y metas para tu siguiente ciclo.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px"><tr>
+<td style="background:${SUAVE};border-radius:14px;padding:18px 22px">
+<p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:${PLATA}">Dónde verlo</p>
+<p style="margin:0;font-family:${FONT};font-size:16px;font-weight:600;color:${INK}">Va adjunto a este correo en PDF</p>
+<p style="margin:6px 0 0;font-family:${FONT};font-size:14.5px;color:${GRAFITO}">También lo puedes descargar en tu portal, en Inicio, en la novedad "Tu informe de progreso"${c.until ? ` (disponible hasta el ${escHtml(c.until)})` : ""}.</p>
+</td></tr></table>
+<p style="margin:0">Léelo con calma: es una guía para que sepas qué estás haciendo bien y qué puedes reforzar.</p>`;
+  const html = lefEmail({
+    preheader: `Tu informe de progreso de ${c.module} va adjunto en PDF.`,
+    eyebrow: "Informe de progreso", heading, bodyHtml, cta: { label: "Ver en mi portal", url: portalUrl + "#inicio" },
+  });
+  const text = `${hi}\n\n${c.teacher ? `Tu profesor(a) ${c.teacher}` : "Tu profesor(a)"} completó tu informe de progreso del módulo ${c.module}.\n\n` +
+    `Va adjunto a este correo en PDF. También lo puedes descargar en tu portal, en Inicio: ${portalUrl}#inicio` + LEF_TEXT_FOOTER;
+  return { subject, html, text };
+}
