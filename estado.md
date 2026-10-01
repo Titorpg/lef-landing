@@ -21,7 +21,7 @@ cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso.
 - ⚠ Grupos cuyo ciclo NO alcanza para 16 clases: A1.2 del profesor Luis Caballero (14 días, vacío),
   A2.1 del profesor Luis Caballero (9, vacío) y A1.3 del profesor Luis Manga (9, prueba).
 
-### ▶ 30 sep 2026 — Informe de progreso (PLANTILLA DE PRUEBA, publicado; SQL `20260930010000` SIN APLICAR)
+### ▶ 30 sep 2026 — Informe de progreso (PLANTILLA DE PRUEBA, publicado; SQL `20260930010000` APLICADO y verificado por REST)
 - Quinta carpeta de Recursos compartidos (admin: Plantilla del informe para probar + Informes
   guardados por ciclo → grupo) y de Recursos de la clase (profesor: buscador de grupos activos →
   estudiantes → "Rellenar informe de progreso"). Réplica interactiva de PLANTILLA_INFORME_PROGRESO.docx
@@ -31,7 +31,7 @@ cierre de create_enrollment al público; limpieza de imágenes/archivos sin uso.
   estudiante y grupo; RPC `teacher_save_progress_report` toma de la BD el % (examen de validación
   del módulo en estado revisado/aprobado) y el comentario (`teacher_student_notes`).
 - Solo admin y profesores lo ven; el estudiante NO hasta la versión final (pedido del usuario).
-- Falta: que el usuario aplique el SQL, pruebe con el profesor Luis Manga y diga qué ajustar
+- Falta: que el usuario pruebe con el profesor Luis Manga y diga qué ajustar
   (textos, PDF, si el profesor puede editar el texto, abrirlo al estudiante).
 
 ### ▶ Tareas del usuario (dadas al cierre del 29 sep, en orden)
