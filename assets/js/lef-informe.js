@@ -25,7 +25,7 @@
   ];
 
   // Frases cortas (1 oct 2026: el usuario pidió textos más concisos) y dirigidas
-  // al estudiante de "usted" (el informe lo leerá el estudiante; el docente le habla).
+  // al estudiante por su nombre (el informe lo leerá el estudiante; el docente le habla).
   // s = fortaleza (3 y 4) · w = cómo está (1 y 2) · a = qué se recomienda (1 y 2)
   // goal = meta del siguiente ciclo si está bajo · up = meta para pasar de Logrado a Destacado
   var SKILLS = {
@@ -108,13 +108,13 @@
     version: 1,
     sections: [
       { id: "part", n: 1, title: "Participación y Compromiso", obs: true, focus: "la participación y el compromiso",
-        area: "la participación y el compromiso", items: ["asistencia", "participacion", "actitud"] },
+        area: "la participación", items: ["asistencia", "participacion", "actitud"] },
       { id: "speaking", n: 2, title: "Producción Oral — Speaking", obs: true, focus: "la producción oral",
         area: "la expresión oral", items: ["fluidez", "estructuras", "vocabOral", "pronunciacion"] },
       { id: "writing", n: 3, title: "Producción Escrita — Writing", obs: true, focus: "la producción escrita",
         area: "la expresión escrita", items: ["oraciones", "vocabEscrito", "ortografia"] },
       { id: "comprension", n: 4, title: "Comprensión — Listening & Reading", obs: false, focus: "la comprensión",
-        area: "la comprensión auditiva y lectora", items: ["auditiva", "lectora"] }
+        area: "la comprensión (listening y reading)", items: ["auditiva", "lectora"] }
     ]
   };
   var ALL = [];
@@ -145,20 +145,21 @@
 
   // Cada observación: apertura + fortalezas (una oración) + una oración por
   // aspecto a mejorar (cómo está; qué se le recomienda).
+  // Siempre con el nombre del estudiante, sin "usted" (pedido del usuario, 1 oct 2026).
   var OPEN = {
-    4: ["Su desempeño en {f} es destacado.", "En {f}, usted alcanza un nivel sobresaliente.", "Usted sobresale en {f} durante este ciclo."],
-    3: ["Usted cumple los objetivos del ciclo en {f}.", "En {f}, su desempeño es sólido.", "Usted logra avances claros en {f}."],
-    2: ["Usted está en proceso de consolidar {f}.", "En {f}, usted avanza, aunque todavía sin constancia.", "Sus avances en {f} aún requieren práctica."],
-    1: ["En {f}, usted está en una etapa inicial y necesita acompañamiento cercano.", "Usted presenta dificultades en {f} que conviene atender.",
-        "Usted inicia su proceso en {f} y necesita refuerzo constante."]
+    4: ["{n}su desempeño en {f} es destacado.", "{n}en {f} alcanza un nivel sobresaliente.", "{n}sobresale en {f} durante este ciclo."],
+    3: ["{n}cumple los objetivos del ciclo en {f}.", "{n}en {f} su desempeño es sólido.", "{n}logra avances claros en {f}."],
+    2: ["{n}está en proceso de consolidar {f}.", "{n}en {f} avanza, aunque todavía sin constancia.", "{n}sus avances en {f} aún requieren práctica."],
+    1: ["{n}en {f} está en una etapa inicial y necesita acompañamiento cercano.", "{n}presenta dificultades en {f} que conviene atender.",
+        "{n}inicia su proceso en {f} y necesita refuerzo constante."]
   };
-  var STRONG = ["Destaco que usted {x}.", "Entre sus fortalezas, usted {x}.", "Es de resaltar que usted {x}."];
+  var STRONG = ["Destaco que {x}.", "Es de resaltar que {x}.", "Valoro que {x}."];
   // [con "a", sin "a"]: "En cuanto a la…" / "En cuanto al vocabulario…"
   var WEAK_LEAD = [["En cuanto a", "En cuanto"], ["Respecto a", "Respecto"], ["Sobre", "Sobre"]];
   var REC = ["le recomiendo", "le sugiero", "es importante"];
 
   function sectionText(sec, ans, v, pick) {
-    var out = [fill(pick(OPEN[band(avgOf(sec.items, ans))]), { f: sec.focus })];
+    var out = [cap(fill(pick(OPEN[band(avgOf(sec.items, ans))]), { n: v.n ? v.n + ", " : "", f: sec.focus }))];
     var strong = sec.items.filter(function (id) { return ans[id] >= 3; })
       .sort(function (x, y) { return ans[y] - ans[x]; })
       .map(function (id) { return SKILLS[id].s[ans[id]]; });
@@ -217,7 +218,7 @@
 
   function recomText(ans, v) {
     var open = fill(R_OPEN[band(avgOf(ALL, ans))], { lv: v.lv });
-    var out = [v.n ? v.n + ", usted " + open : cap("usted " + open), areasSentence(ans), topSentence(ans)].filter(Boolean);
+    var out = [v.n ? v.n + ", " + open : cap(open), areasSentence(ans), topSentence(ans)].filter(Boolean);
     var ex = examSentence(v.pct);
     if (ex) out.push(ex);
     var order = function (list) { return list.slice().sort(function (x, y) { return ans[x] - ans[y] || ALL.indexOf(x) - ALL.indexOf(y); }); };
