@@ -535,9 +535,10 @@
       if (d.note) obsBox("Comentario del docente", d.note);
 
       // Firma: espacio libre sobre la línea para firmar a mano
-      // 1 oct 2026: menos espacio (antes 70) para que la firma no quede sola en otra hoja.
+      // 1 oct 2026: la firma nunca queda sola en otra hoja (mínimo 46 pt para firmar) y, si
+      // sobra hoja, baja la línea para dejar más espacio (hasta 90 pt).
       need(84);
-      y += 46;
+      y += Math.max(46, Math.min(90, H - M - 18 - y - 34));
       doc.setDrawColor(16, 16, 16); doc.setLineWidth(1);
       doc.line(M, y, M + CW / 2 - 14, y); doc.line(M + CW / 2 + 14, y, W - M, y);
       font(10, "normal"); doc.text(pl(d.teacher || ""), M, y + 14); doc.text(pl(d.date || ""), M + CW / 2 + 14, y + 14);
