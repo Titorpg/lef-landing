@@ -120,6 +120,7 @@ declare
   v_end date;
   v_missing int;
   v_ann uuid;
+  v_body text;
   r record;
 begin
   if v_t is null then
@@ -139,28 +140,39 @@ begin
      and not exists (select 1 from public.progress_reports p
                       where p.group_id = p_group and p.student_id = e.student_id);
   if v_missing > 0 then
-    raise exception 'Faltan % informes por llenar en este grupo. Llénalos todos antes de enviar.', v_missing;
+    raise exception
+      'Faltan % informes por llenar. Llénalos todos antes de enviar.',
+      v_missing;
   end if;
   v_end := coalesce(public.lef_group_end(p_group), public.lef_today() + 30);
+  v_body := 'Tu profesor(a)' || coalesce(' ' || v_tname, '')
+    || ' completó tu informe de progreso del módulo '
+    || v_level || '.' || chr(10) || chr(10)
+    || 'En él encuentras cómo vas en cada habilidad '
+    || '(participación, speaking, writing, listening y '
+    || 'reading), las observaciones de tu profesor(a) y '
+    || 'metas para tu siguiente ciclo.' || chr(10) || chr(10)
+    || 'Descárgalo en PDF con el botón de abajo; también '
+    || 'te llegó a tu correo.' || chr(10) || chr(10)
+    || 'Esta novedad estará aquí hasta el '
+    || to_char(v_end, 'DD/MM/YYYY')
+    || ', cuando termina tu ciclo.';
   for r in
     select p.id, p.student_id
       from public.progress_reports p
-      join public.enrollments e on e.group_id = p.group_id and e.student_id = p.student_id
-                               and e.status in ('Active', 'PendingPayment')
+      join public.enrollments e
+        on e.group_id = p.group_id
+       and e.student_id = p.student_id
+       and e.status in ('Active', 'PendingPayment')
      where p.group_id = p_group and p.sent_at is null
   loop
     insert into public.announcements
-      (title, body, category, student_id, image_url, pinned, published, expires_at, created_by)
+      (title, body, category, student_id, image_url,
+       pinned, published, expires_at, created_by)
     values
-      ('Tu informe de progreso ' || v_level,
-       'Tu profesor(a)' || coalesce(' ' || v_tname, '')
-         || ' completó tu informe de progreso del módulo ' || v_level || '.' || E'\n\n'
-         || 'En él encuentras cómo vas en cada habilidad (participación, speaking, writing, '
-         || 'listening y reading), las observaciones de tu profesor(a) y metas para tu siguiente ciclo.'
-         || E'\n\n' || 'Descárgalo en PDF con el botón de abajo; también te llegó a tu correo.'
-         || E'\n\n' || 'Esta novedad estará aquí hasta el ' || to_char(v_end, 'DD/MM/YYYY')
-         || ', cuando termina tu ciclo.',
-       'academico', r.student_id, 'assets/inicio/noticia-informe-progreso.jpg',
+      ('Tu informe de progreso ' || v_level, v_body,
+       'academico', r.student_id,
+       'assets/inicio/noticia-informe-progreso.jpg',
        false, true, v_end, auth.uid())
     returning id into v_ann;
     update public.progress_reports
@@ -172,7 +184,8 @@ end;
 $$;
 
 -- Admin: desbloquear un informe enviado para que el profesor lo corrija.
-create or replace function public.admin_unlock_progress_report(p_report uuid, p_reason text)
+create or replace function public.admin_unlock_progress_report(
+  p_report uuid, p_reason text)
   returns void language plpgsql security definer set search_path = public as $$
 declare
   v_r public.progress_reports%rowtype;
@@ -193,12 +206,19 @@ begin
   end if;
   select email into v_email from public.profiles where user_id = auth.uid();
   insert into public.audit_log
-    (actor_user_id, actor_email, action, target_table, target_id, reason, details)
+    (actor_user_id, actor_email, action, target_table,
+     target_id, reason, details)
   values
-    (auth.uid(), v_email, 'progress_report.unlock', 'progress_reports', v_r.id, trim(p_reason),
-     jsonb_build_object('student_id', v_r.student_id, 'student_name', v_r.student_name,
-       'module_level', v_r.module_level, 'group_label', v_r.group_label,
-       'teacher_name', v_r.teacher_name, 'sent_at', v_r.sent_at, 'emailed_at', v_r.emailed_at));
+    (auth.uid(), v_email, 'progress_report.unlock',
+     'progress_reports', v_r.id, trim(p_reason),
+     jsonb_build_object(
+       'student_id', v_r.student_id,
+       'student_name', v_r.student_name,
+       'module_level', v_r.module_level,
+       'group_label', v_r.group_label,
+       'teacher_name', v_r.teacher_name,
+       'sent_at', v_r.sent_at,
+       'emailed_at', v_r.emailed_at));
   if v_r.announcement_id is not null then
     delete from public.announcements where id = v_r.announcement_id;
   end if;
@@ -213,7 +233,8 @@ create or replace function public.get_my_progress_report(p_report uuid)
   returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', p.id, 'module_level', p.module_level,
            'student_name', p.student_name, 'teacher_name', p.teacher_name,
-           'cycle_name', p.cycle_name, 'cycle_start', p.cycle_start, 'cycle_end', p.cycle_end,
+           'cycle_name', p.cycle_name, 'cycle_start', p.cycle_start,
+           'cycle_end', p.cycle_end,
            'answers', p.answers, 'texts', p.texts, 'exam_pct', p.exam_pct,
            'teacher_note', p.teacher_note, 'sent_at', p.sent_at)
     from public.progress_reports p
@@ -260,9 +281,11 @@ $$;
 
 -- Novedad del profesor: se quita cuando todos tienen su resultado con OK.
 create or replace function public.get_teacher_news()
-  returns table(id uuid, kind text, title text, body text, image_url text, publish_at timestamptz,
+  returns table(id uuid, kind text, title text, body text,
+                image_url text, publish_at timestamptz,
                 group_id uuid, group_label text, module_level text,
-                opens_on date, closes_on date, to_review integer, sent integer, enrolled integer)
+                opens_on date, closes_on date, to_review integer,
+                sent integer, enrolled integer)
   language sql stable security definer set search_path = public as $$
   with mine as (
     select a.*, x.module_level, public.lef_group_label(a.group_id) as label
@@ -273,25 +296,42 @@ create or replace function public.get_teacher_news()
   ), counts as (
     select m.id,
       (select count(*)::int from public.exam_submissions s
-        where s.exam_id = m.exam_id and s.group_id = m.group_id and s.status in ('pendiente', 'revisado')) as to_review,
+        where s.exam_id = m.exam_id and s.group_id = m.group_id
+          and s.status in ('pendiente', 'revisado')) as to_review,
       (select count(*)::int from public.exam_submissions s
-        where s.exam_id = m.exam_id and s.group_id = m.group_id and s.status in ('pendiente', 'revisado', 'aprobado')) as sent,
+        where s.exam_id = m.exam_id and s.group_id = m.group_id
+          and s.status in ('pendiente', 'revisado', 'aprobado')) as sent,
       (select count(*)::int from public.exam_submissions s
-        where s.exam_id = m.exam_id and s.group_id = m.group_id and s.status = 'aprobado') as approved,
+        where s.exam_id = m.exam_id and s.group_id = m.group_id
+          and s.status = 'aprobado') as approved,
       (select count(*)::int from public.enrollments e
-        where e.group_id = m.group_id and e.status in ('PendingPayment', 'Active')) as enrolled
+        where e.group_id = m.group_id
+          and e.status in ('PendingPayment', 'Active')) as enrolled
     from mine m
   )
-  select m.id, 'exam_review'::text, 'Revisión de exámenes pendiente'::text,
-         ('Programaste el examen de validación ' || m.module_level || ' para el grupo ' || m.label
-          || ', del ' || to_char(m.opens_on, 'DD/MM/YYYY') || ' al ' || to_char(m.closes_on, 'DD/MM/YYYY') || '.'
-          || E'\n\n' || 'Hasta ahora lo enviaron ' || c.sent || ' de ' || c.enrolled || ' estudiantes'
-          || case when c.to_review > 0 then ' y tienes ' || c.to_review || ' por calificar.' else '.' end
-          || E'\n\n' || 'Revisa las respuestas de cada estudiante, confirma su calificación y dale OK para que '
-          || 'reciba su resultado. Esta novedad se quita sola cuando todos los estudiantes del grupo tengan '
-          || 'su resultado enviado (si alguien no lo presenta, al cerrar la franja).')::text,
+  select m.id, 'exam_review'::text,
+         'Revisión de exámenes pendiente'::text,
+         ('Programaste el examen de validación '
+          || m.module_level || ' para el grupo ' || m.label
+          || ', del ' || to_char(m.opens_on, 'DD/MM/YYYY')
+          || ' al ' || to_char(m.closes_on, 'DD/MM/YYYY')
+          || '.' || chr(10) || chr(10)
+          || 'Hasta ahora lo enviaron ' || c.sent || ' de '
+          || c.enrolled || ' estudiantes'
+          || case when c.to_review > 0
+               then ' y tienes ' || c.to_review
+                    || ' por calificar.'
+               else '.' end
+          || chr(10) || chr(10)
+          || 'Revisa las respuestas de cada estudiante, '
+          || 'confirma su calificación y dale OK para que '
+          || 'reciba su resultado. Esta novedad se quita '
+          || 'sola cuando todos los estudiantes del grupo '
+          || 'tengan su resultado enviado (si alguien no lo '
+          || 'presenta, al cerrar la franja).')::text,
          'assets/inicio/noticia-revision-examenes.jpg'::text, m.created_at,
-         m.group_id, m.label, m.module_level, m.opens_on, m.closes_on, c.to_review, c.sent, c.enrolled
+         m.group_id, m.label, m.module_level, m.opens_on,
+         m.closes_on, c.to_review, c.sent, c.enrolled
   from mine m join counts c on c.id = m.id
   where c.to_review > 0
      or (public.lef_today() <= m.closes_on and c.approved < c.enrolled)
@@ -299,12 +339,14 @@ create or replace function public.get_teacher_news()
 $$;
 
 revoke all on function public.teacher_send_progress_reports(uuid) from public, anon;
-revoke all on function public.admin_unlock_progress_report(uuid, text) from public, anon;
+revoke all on function public.admin_unlock_progress_report(uuid, text)
+  from public, anon;
 revoke all on function public.get_my_progress_report(uuid) from public, anon;
 revoke all on function public.get_my_announcements() from public, anon;
 revoke all on function public.get_teacher_news() from public, anon;
 grant execute on function public.teacher_send_progress_reports(uuid) to authenticated;
-grant execute on function public.admin_unlock_progress_report(uuid, text) to authenticated;
+grant execute on function public.admin_unlock_progress_report(uuid, text)
+  to authenticated;
 grant execute on function public.get_my_progress_report(uuid) to authenticated;
 grant execute on function public.get_my_announcements() to authenticated;
 grant execute on function public.get_teacher_news() to authenticated;
