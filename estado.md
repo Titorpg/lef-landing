@@ -8,6 +8,12 @@ y los SQL APLICADOS y verificados por REST: `20260930010000_informe_progreso` y
 renglones cortos y chr(10) porque se dañó al copiar desde el teléfono). Nada sin subir.
 Hecho: Informe de progreso completo (plantilla, formulario del profesor, envío al estudiante con PDF). Detalle abajo.
 
+### ▶ 6 oct 2026 — Clase de hoy ya no depende de si la agenda está publicada
+- Un estudiante de C1 (módulo 1) no vio su agenda de las 8: `student-classroom` leía SOLO lo
+  PUBLICADO en Classroom, mientras el Planificador lee publicado + borrador. Ahora lee ambos
+  (una programada es un borrador con fecha); manda el horario de LEF (DAY N = clase N).
+  Aviso del portal cambiado a "La agenda DAY N aún no está en Classroom". Desplegado.
+
 ### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` APLICADO y verificado 30 sep: B1.1 termina 30 oct con DAY 16)
 - El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
   A2.2 y B1.1 tienen 20 días de clase). Verificado con la pausa REAL "SEMANA DE RECESO" del B1.1 del
