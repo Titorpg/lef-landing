@@ -1810,6 +1810,7 @@
          - la clase lleva el nivel en el nombre ("LEVEL A2 - LUIS CABALLERO" → A2);
          - cada tema es un módulo con su número GLOBAL: "MODULE 4" → A2.1
            (según module_number de LEF); también sirve "A2.1" escrito tal cual;
+           si no trae número, por el nombre del módulo: "MODULE CERTIFIED" → C1.2;
          - cada material es un día: "LEVEL A2 MODULE 4 DAY 12 …" → día 12, en
            ese orden (sin número de día, por fecha de creación);
          - un material sin tema cae en su módulo si el título dice "MODULE n";
@@ -1827,12 +1828,14 @@
       if (cm) return cm[1].toUpperCase();
       var nm = /\bMODUL[OE]\s*(\d+)/i.exec(text || "");
       if (!nm) {
-        // También por nombre: "MODULE CERTIFIED" → C1.2 (los de C1 se nombran así; 6 oct 2026).
+        // Sin número (error u omisión del profesor): por el NOMBRE del módulo
+        // en el panel: "MODULE CERTIFIED" o un tema "CERTIFIED" → C1.2. Regla
+        // fija del usuario (6-7 oct 2026), igual en student-classroom.
         var t = normWords(text), hit = null;
         Object.keys(mods.titles).forEach(function (lv) {
           if (hit || !mods.titles[lv] || (levelCode && lv.indexOf(levelCode) !== 0)) return;
           var w = normWords(mods.titles[lv]);
-          if (t.indexOf(" MODULE" + w) >= 0 || t.indexOf(" MODULO" + w) >= 0) hit = lv;
+          if (t.indexOf(" MODULE" + w) >= 0 || t.indexOf(" MODULO" + w) >= 0 || t === w) hit = lv;
         });
         return hit;
       }

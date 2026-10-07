@@ -56,7 +56,12 @@ function sessionNumber(days: string[], start: string | null, ymd: string, paused
 }
 function dayNum(t: string) { const m = /\b(?:DAY|D[IÍ]A)\s*(\d+)/i.exec(t || ""); return m ? +m[1] : null; }
 // Nombre de tema o título → código de módulo de LEF (misma regla que el Planificador).
-// También por nombre: "MODULE CERTIFIED" → C1.2 (los de C1 se nombran así; 6 oct 2026).
+// REGLA FIJA (pedido del usuario, 6-7 oct 2026), en este orden:
+//   1. Por número: "C1.2" escrito tal cual, o "MODULE 14" / "MODULE 2" → C1.2.
+//   2. Si no trae número (error u omisión del profesor), por el NOMBRE del
+//      módulo que tiene en el panel (Académico): "MODULE CERTIFIED" → C1.2, o
+//      un tema que se llame solo "CERTIFIED". Solo entre los módulos del nivel
+//      de la clase. Luego el día sale de "DAY n".
 const normWords = (s: string) => " " + String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
   .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " ";
 function moduleCode(text: string, levelCode: string, byNumber: Record<number, string>, titles: Record<string, string> = {}) {
@@ -66,7 +71,7 @@ function moduleCode(text: string, levelCode: string, byNumber: Record<number, st
   if (!nm) {
     const t = normWords(text);
     const hit = Object.keys(titles).find((lv) => lv.indexOf(levelCode) === 0 && titles[lv] &&
-      (t.includes(" MODULE" + normWords(titles[lv])) || t.includes(" MODULO" + normWords(titles[lv]))));
+      (t.includes(" MODULE" + normWords(titles[lv])) || t.includes(" MODULO" + normWords(titles[lv])) || t === normWords(titles[lv])));
     return hit || null;
   }
   const n = +nm[1], byNum = byNumber[n];

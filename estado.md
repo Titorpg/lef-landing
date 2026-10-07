@@ -17,6 +17,12 @@ Hecho: Informe de progreso completo (plantilla, formulario del profesor, envío 
   20:00): la agenda SÍ estaba publicada, pero el tema se llama "MODULE CERTIFIED" (por nombre, no
   por número) y LEF solo reconocía "MODULE n" o "C1.2". Ahora también reconoce "MODULE <título del
   módulo>" (HIRED/CERTIFIED/FLUENT…) en Clase de hoy y en el Planificador.
+- **REGLA FIJA del usuario (7 oct 2026)** para ubicar la agenda en Classroom, en este orden:
+  1) por número: "C1.2" o "MODULE 14"/"MODULE 2" + "DAY n"; 2) si el profesor no puso el
+  número (error u omisión), por el NOMBRE del módulo del panel: "MODULE CERTIFIED" o un tema
+  llamado solo "CERTIFIED" → C1.2 (solo entre módulos del nivel de la clase). Mismo código en
+  `student-classroom` y en `lef-admin.js` (Planificador). El profesor ya renombró el tema con el
+  número y la estudiante ve la agenda.
 
 ### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` APLICADO y verificado 30 sep: B1.1 termina 30 oct con DAY 16)
 - El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
