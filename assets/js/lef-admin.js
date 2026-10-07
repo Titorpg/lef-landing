@@ -1809,12 +1809,25 @@
     var LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1"];
     var OTHERS = "Otros materiales";
     function dayNum(t) { var m = /\b(?:DAY|D[IÍ]A)\s*(\d+)/i.exec(t || ""); return m ? +m[1] : null; }
+    function normWords(s) {
+      return " " + String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " ";
+    }
     // Nombre de tema o título → código de módulo de LEF (o null).
     function moduleCode(text, levelCode, mods) {
       var cm = /\b([ABC][12]\.[1-3])\b/i.exec(text || "");
       if (cm) return cm[1].toUpperCase();
       var nm = /\bMODUL[OE]\s*(\d+)/i.exec(text || "");
-      if (!nm) return null;
+      if (!nm) {
+        // También por nombre: "MODULE CERTIFIED" → C1.2 (los de C1 se nombran así; 6 oct 2026).
+        var t = normWords(text), hit = null;
+        Object.keys(mods.titles).forEach(function (lv) {
+          if (hit || !mods.titles[lv] || (levelCode && lv.indexOf(levelCode) !== 0)) return;
+          var w = normWords(mods.titles[lv]);
+          if (t.indexOf(" MODULE" + w) >= 0 || t.indexOf(" MODULO" + w) >= 0) hit = lv;
+        });
+        return hit;
+      }
       var n = +nm[1], byNum = mods.byNumber[n];
       if (byNum && (!levelCode || byNum.indexOf(levelCode) === 0)) return byNum;
       // Numeración local dentro del nivel ("MODULE 2" en la clase de A2 → A2.2).

@@ -56,11 +56,19 @@ function sessionNumber(days: string[], start: string | null, ymd: string, paused
 }
 function dayNum(t: string) { const m = /\b(?:DAY|D[IÍ]A)\s*(\d+)/i.exec(t || ""); return m ? +m[1] : null; }
 // Nombre de tema o título → código de módulo de LEF (misma regla que el Planificador).
-function moduleCode(text: string, levelCode: string, byNumber: Record<number, string>) {
+// También por nombre: "MODULE CERTIFIED" → C1.2 (los de C1 se nombran así; 6 oct 2026).
+const normWords = (s: string) => " " + String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " ";
+function moduleCode(text: string, levelCode: string, byNumber: Record<number, string>, titles: Record<string, string> = {}) {
   const cm = /\b([ABC][12]\.[1-3])\b/i.exec(text || "");
   if (cm) return cm[1].toUpperCase();
   const nm = /\bMODUL[OE]\s*(\d+)/i.exec(text || "");
-  if (!nm) return null;
+  if (!nm) {
+    const t = normWords(text);
+    const hit = Object.keys(titles).find((lv) => lv.indexOf(levelCode) === 0 && titles[lv] &&
+      (t.includes(" MODULE" + normWords(titles[lv])) || t.includes(" MODULO" + normWords(titles[lv]))));
+    return hit || null;
+  }
   const n = +nm[1], byNum = byNumber[n];
   if (byNum && byNum.indexOf(levelCode) === 0) return byNum;
   if (n >= 1 && n <= 3) return levelCode + "." + n; // numeración local dentro del nivel
@@ -228,13 +236,15 @@ Deno.serve(async (req) => {
     let byDay = new Map<number, any[]>();
     let maxDay = 0;
     if (needAgendas) {
-      const { data: modsAll } = await admin.from("modules").select("level, module_number");
-      const byNumber: Record<number, string> = {};
-      (modsAll || []).forEach((m: { level: string; module_number: number }) => { byNumber[m.module_number] = m.level; });
+      const { data: modsAll } = await admin.from("modules").select("level, module_number, title");
+      const byNumber: Record<number, string> = {}, titles: Record<string, string> = {};
+      (modsAll || []).forEach((m: { level: string; module_number: number; title: string }) => {
+        byNumber[m.module_number] = m.level; titles[m.level] = m.title;
+      });
       let topics: Record<string, unknown>[] = [];
       try { topics = await classroomList(tok.accessToken, `courses/${course.id}/topics?pageSize=200`, "topic"); } catch { /* sin temas */ }
       const topicMod: Record<string, string | null> = {};
-      topics.forEach((t) => { topicMod[String(t.topicId)] = moduleCode(String(t.name || ""), levelCode, byNumber); });
+      topics.forEach((t) => { topicMod[String(t.topicId)] = moduleCode(String(t.name || ""), levelCode, byNumber, titles); });
       let mats: Record<string, unknown>[] = [];
       try {
         mats = await classroomList(tok.accessToken,
@@ -245,7 +255,7 @@ Deno.serve(async (req) => {
       // Publicadas, en borrador o programadas (una programada es un borrador con
       // fecha): manda el horario de LEF, igual que en el Planificador.
       mats.filter((m) => m.state === "PUBLISHED" || m.state === "DRAFT").forEach((m) => {
-        const mk = (m.topicId && topicMod[String(m.topicId)]) || moduleCode(String(m.title || ""), levelCode, byNumber);
+        const mk = (m.topicId && topicMod[String(m.topicId)]) || moduleCode(String(m.title || ""), levelCode, byNumber, titles);
         const n = dayNum(String(m.title || ""));
         if (mk !== mod.level || n === null) return;
         maxDay = Math.max(maxDay, n);

@@ -13,6 +13,10 @@ Hecho: Informe de progreso completo (plantilla, formulario del profesor, envío 
   PUBLICADO en Classroom, mientras el Planificador lee publicado + borrador. Ahora lee ambos
   (una programada es un borrador con fecha); manda el horario de LEF (DAY N = clase N).
   Aviso del portal cambiado a "La agenda DAY N aún no está en Classroom". Desplegado.
+- Causa REAL del caso (Diana Ramírez, C1.2, grupo del profesor Luis Caballero, ciclo desde 6 oct
+  20:00): la agenda SÍ estaba publicada, pero el tema se llama "MODULE CERTIFIED" (por nombre, no
+  por número) y LEF solo reconocía "MODULE n" o "C1.2". Ahora también reconoce "MODULE <título del
+  módulo>" (HIRED/CERTIFIED/FLUENT…) en Clase de hoy y en el Planificador.
 
 ### ▶ 30 sep 2026 — Pausa SIN extender el ciclo + correo informativo (SQL `20260930000000` APLICADO y verificado 30 sep: B1.1 termina 30 oct con DAY 16)
 - El cliente/administrador arma los ciclos con días de sobra (módulo = 16 agendas, DAY 16 = examen;
