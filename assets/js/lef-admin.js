@@ -1501,8 +1501,16 @@
       '<p class="pnl-sub">El documento del estudiante es obligatorio. Si es menor de edad, va su tarjeta de identidad; el documento de quien paga se registra aparte, en la suscripción.</p>' +
       "</div>");
     var correctBox = b.querySelector("[data-correct]");
+    // Con "Cambio de módulo por error" elegido se esconden los módulos de la
+    // lista de arriba: tocar uno ahí deshacía la opción sin avisar e inscribía
+    // con cobro nuevo (pasó el 6 oct 2026). Solo queda la lista "Módulo correcto".
+    var mainRows = b.querySelectorAll(".mod-pick")[0].querySelectorAll(".mod-pick__row:not(.mod-pick__row--extra)");
     if (correctBox) b.querySelectorAll("[name=mod]").forEach(function (r) {
-      r.addEventListener("change", function () { correctBox.hidden = pickedValue(b, "mod") !== "__correct"; });
+      r.addEventListener("change", function () {
+        var corr = pickedValue(b, "mod") === "__correct";
+        correctBox.hidden = !corr;
+        mainRows.forEach(function (row) { row.style.display = corr ? "none" : ""; });
+      });
     });
     modal(s ? "Editar estudiante" : "Nuevo estudiante", b, function () {
       var docNum = b.querySelector("[name=dn]").value.trim();
