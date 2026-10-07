@@ -968,10 +968,10 @@
   /* ---------- Mi clase en Google Classroom + "Clase de hoy" ---------- */
   // Pedido del usuario (24 sep 2026): desde Mi curso el estudiante abre "Clase de hoy"
   // (desde el 26 sep sin botón ni código para unirse a Classroom),
-  // donde ve la agenda que el profesor publicó hoy (en Classroom las agendas
-  // "DAY n" están en borrador y el profesor publica la del día). Todo sale de
-  // la función student-classroom, que lee Classroom con la conexión del
-  // profesor y SOLO lo publicado. Requiere la mensualidad pagada.
+  // donde ve la agenda "DAY n" que le toca por horario, esté publicada o en
+  // borrador en Classroom (6 oct 2026). Todo sale de la función
+  // student-classroom, que lee Classroom con la conexión del profesor.
+  // Requiere la mensualidad pagada.
   function classFn(action) {
     // Token fresco en cada llamada (la sesión se renueva sola cada hora).
     return sb.auth.getSession().then(function (r) {
@@ -1272,7 +1272,7 @@
         // visible hasta medianoche; el botón de la reunión (recuadro de Meet)
         // solo se activa en curso.
         if (!s.agenda.length) {
-          wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está publicada", "Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
+          wrap.appendChild(empty("alert", "La agenda DAY " + s.day + " aún no está en Classroom","Tu profesor la tendrá lista en breve. Vuelve a revisar en unos minutos."));
         }
         s.agenda.forEach(function (a) {
           wrap.appendChild(h('<article class="agenda">' +

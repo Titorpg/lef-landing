@@ -1,8 +1,9 @@
 // LEF — "Mi clase" del estudiante (portal → Mi curso → Clase de hoy).
 //
 // Pedido del usuario (24 sep 2026). En Classroom las agendas de cada módulo
-// ("… MODULE 4 DAY 12 …") están SIEMPRE publicadas: la misma clase se usa con
-// cada grupo nuevo. LEF decide qué agenda ve cada estudiante y cuándo:
+// ("… MODULE 4 DAY 12 …") se reutilizan con cada grupo nuevo. LEF decide qué
+// agenda ve cada estudiante y cuándo, sin importar si en Classroom está
+// publicada, en borrador o programada (pedido del usuario, 6 oct 2026):
 //   * La clase n.º N de su grupo (contando desde el inicio del ciclo SOLO los
 //     días de su horario) le toca la agenda "DAY N". Un día "Sin clase" igual
 //     consume su número (el ciclo no se detiene); esa agenda se ve el día y la
@@ -18,7 +19,7 @@
 //   estudiante → su inscripción vigente con grupo → profesor + módulo (A2.1)
 //   → clase del profesor en Classroom cuyo nombre lleva SU nombre y el nivel
 //     ("LEVEL A2 - LUIS CABALLERO") → tema del módulo ("MODULE 4"/"A2.1").
-// Se lee con la conexión de Google del PROFESOR y solo lo publicado. Requiere
+// Se lee con la conexión de Google del PROFESOR (publicado y borrador). Requiere
 // la inscripción pagada. El Meet es el de la clase de Classroom, que el
 // profesor pega en el Planificador (classroom_meet_links).
 //
@@ -237,10 +238,13 @@ Deno.serve(async (req) => {
       let mats: Record<string, unknown>[] = [];
       try {
         mats = await classroomList(tok.accessToken,
-          `courses/${course.id}/courseWorkMaterials?pageSize=200&courseWorkMaterialStates=PUBLISHED`, "courseWorkMaterial");
+          `courses/${course.id}/courseWorkMaterials?pageSize=200&courseWorkMaterialStates=PUBLISHED&courseWorkMaterialStates=DRAFT`,
+          "courseWorkMaterial");
       } catch { /* sin materiales */ }
       byDay = new Map();
-      mats.filter((m) => m.state === "PUBLISHED").forEach((m) => {
+      // Publicadas, en borrador o programadas (una programada es un borrador con
+      // fecha): manda el horario de LEF, igual que en el Planificador.
+      mats.filter((m) => m.state === "PUBLISHED" || m.state === "DRAFT").forEach((m) => {
         const mk = (m.topicId && topicMod[String(m.topicId)]) || moduleCode(String(m.title || ""), levelCode, byNumber);
         const n = dayNum(String(m.title || ""));
         if (mk !== mod.level || n === null) return;
